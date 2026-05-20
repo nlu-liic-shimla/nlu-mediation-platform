@@ -32,7 +32,9 @@ import os
 from typing import Type, TypeVar
 
 from groq import Groq
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError 
+from dotenv import load_dotenv
+load_dotenv()
 
 # ── Types ─────────────────────────────────────────────────────────────────────
 T = TypeVar("T", bound=BaseModel)
