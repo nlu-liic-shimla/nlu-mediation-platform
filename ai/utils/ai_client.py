@@ -82,6 +82,8 @@ def call_with_retry(
     Callers must check is_failed(result) before using the result.
     """
 
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path="C:/Users/desk/Downloads/nlu-mediation-platform/.env")
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
     full_system_prompt = system_prompt.strip() + "\n\n" + JSON_INSTRUCTION.strip()
