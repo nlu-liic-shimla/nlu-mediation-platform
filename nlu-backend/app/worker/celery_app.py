@@ -1,4 +1,5 @@
 import os
+import ssl
 import logging
 from celery import Celery
 from dotenv import load_dotenv
@@ -6,12 +7,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
 REDIS_URL = os.getenv("REDIS_URL")
 
 if not REDIS_URL:
     raise EnvironmentError("REDIS_URL is not set in .env")
 
-celery_app = Celery("nlu_mediation", broker=REDIS_URL, backend=REDIS_URL)
+celery_app = Celery(
+    "nlu_mediation",
+    broker=REDIS_URL,
+    backend=REDIS_URL,
+    broker_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
+    redis_backend_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
+)
 
 celery_app.conf.update(
     task_serializer="json",
@@ -19,8 +27,6 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="Asia/Kolkata",
     enable_utc=True,
-    broker_use_ssl={"ssl_cert_reqs": None},
-    redis_backend_use_ssl={"ssl_cert_reqs": None},
     result_expires=3600,
 )
 
