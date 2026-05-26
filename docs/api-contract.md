@@ -18,7 +18,7 @@ Fields:
   monetary_amount: float (optional)
   timeline: string (required)
   relationship_type: enum [landlord_tenant | employer_employee | commercial | family | other]
-  prior_negotiation: boolean (required)
+  prior_negotiation: string (required) — send "true" or "false", not 1/0
 
 Success: 201 { "id": "uuid", "case_id": "uuid", "submitted_at": "iso8601" }
 Errors:
