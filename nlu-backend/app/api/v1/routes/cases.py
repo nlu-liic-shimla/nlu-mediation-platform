@@ -14,7 +14,7 @@ async def create_case(
     new_case = {
         "title": request.title,
         "description": request.description,
-        "status": "pending",
+        "status": "INTAKE_PENDING",
         "created_by": current_user["user_id"],
         "negotiation_round": 0,
     }
