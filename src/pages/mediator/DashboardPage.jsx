@@ -1,5 +1,6 @@
-"use client";
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { getCases } from "../../api/cases";
 import {
   LayoutDashboard,
   Brain,
@@ -34,7 +35,7 @@ import {
   Tooltip,
 } from "recharts";
 
-/* ─── static data ─────────────────────────────────────────── */
+/* ─── static chart data ─────────────────────────────────────────── */
 const caseVolumeData = [
   { month: "Jan", cases: 10 },
   { month: "Feb", cases: 15 },
@@ -54,41 +55,6 @@ const aiPerfData = [
   { week: "Week 2", acc: 85 },
   { week: "Week 3", acc: 84 },
   { week: "Week 4", acc: 88 },
-];
-
-const CASES = [
-  {
-    id: "CASE-2024-001",
-    status: "active",
-    sCol: "#1e3a5f",
-    priority: "high",
-    pCol: "#ef4444",
-    due: "2026-05-25",
-  },
-  {
-    id: "CASE-2024-002",
-    status: "proposal pending",
-    sCol: "#6366f1",
-    priority: "medium",
-    pCol: "#6366f1",
-    due: "2026-05-28",
-  },
-  {
-    id: "CASE-2024-003",
-    status: "analysis",
-    sCol: "#0ea5e9",
-    priority: "high",
-    pCol: "#ef4444",
-    due: "2026-05-24",
-  },
-  {
-    id: "CASE-2024-004",
-    status: "settlement",
-    sCol: "#10b981",
-    priority: "low",
-    pCol: "#6b7280",
-    due: "2026-05-30",
-  },
 ];
 
 const APPROVALS = [
@@ -148,6 +114,7 @@ const Badge = ({ label, color }) => (
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════ */
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [dark, setDark] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -155,7 +122,27 @@ export default function Dashboard() {
   const [isMobile, setIsMobile] = useState(false);
   const notifRef = useRef(null);
 
+  // ── Real API data ──
+  const [cases, setCases] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const user = JSON.parse(localStorage.getItem("nlu_user") || "{}");
   const tk = tokens(dark);
+
+  // Fetch real cases from backend
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        const data = await getCases();
+        setCases(data);
+      } catch (err) {
+        console.error("Failed to load cases", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCases();
+  }, []);
 
   /* detect mobile */
   useEffect(() => {
@@ -180,12 +167,18 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  const handleLogout = () => {
+    localStorage.removeItem("nlu_token");
+    localStorage.removeItem("nlu_role");
+    localStorage.removeItem("nlu_user");
+    navigate("/");
+  };
+
   const sidebarW = isMobile ? 220 : collapsed ? 64 : 220;
 
   /* ── sidebar ───────────────────────────────────────────── */
   const Sidebar = () => (
     <>
-      {/* overlay */}
       {isMobile && mobileOpen && (
         <div
           onClick={() => setMobileOpen(false)}
@@ -206,7 +199,7 @@ export default function Dashboard() {
           display: "flex",
           flexDirection: "column",
           padding: "20px 0",
-          position: isMobile ? "fixed" : "fixed",
+          position: "fixed",
           top: 0,
           left: 0,
           bottom: 0,
@@ -387,7 +380,6 @@ export default function Dashboard() {
         zIndex: 50,
       }}
     >
-      {/* hamburger — mobile only */}
       {isMobile && (
         <button
           onClick={() => setMobileOpen(true)}
@@ -578,7 +570,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* avatar */}
+      {/* avatar + logout */}
       <div
         style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}
       >
@@ -596,7 +588,7 @@ export default function Dashboard() {
             color: "#fff",
           }}
         >
-          MC
+          {user?.email?.slice(0, 2).toUpperCase() || "MC"}
         </div>
         {!isMobile && (
           <span
@@ -607,9 +599,23 @@ export default function Dashboard() {
               whiteSpace: "nowrap",
             }}
           >
-            Dr. Michael Chen
+            {user?.email || "Mediator"}
           </span>
         )}
+        <button
+          onClick={handleLogout}
+          style={{
+            fontSize: 12,
+            color: tk.sub,
+            background: "none",
+            border: `1px solid ${tk.border}`,
+            borderRadius: 7,
+            padding: "6px 12px",
+            cursor: "pointer",
+          }}
+        >
+          Sign out
+        </button>
       </div>
     </header>
   );
@@ -651,7 +657,6 @@ export default function Dashboard() {
     </div>
   );
 
-  /* ── main content ───────────────────────────────────────── */
   const mainMargin = isMobile ? 0 : collapsed ? 64 : 220;
 
   return (
@@ -666,7 +671,6 @@ export default function Dashboard() {
     >
       <Sidebar />
 
-      {/* page wrapper shifts right on desktop */}
       <div
         style={{
           marginLeft: mainMargin,
@@ -710,8 +714,8 @@ export default function Dashboard() {
             {[
               {
                 label: "Total Cases",
-                value: "28",
-                sub: "+4 this month",
+                value: cases.length.toString(),
+                sub: "From database",
                 subC: "#10b981",
                 icon: FileText,
                 iconBg: "#eff6ff",
@@ -807,7 +811,7 @@ export default function Dashboard() {
                 minWidth: 0,
               }}
             >
-              {/* Active Cases table */}
+              {/* Active Cases table — REAL DATA */}
               <Card>
                 <CardHead
                   title="Active Cases"
@@ -846,7 +850,7 @@ export default function Dashboard() {
                           "Parties",
                           "Status",
                           "Priority",
-                          "Due Date",
+                          "Created",
                           "Action",
                         ].map((h) => (
                           <th
@@ -865,79 +869,113 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {CASES.map((c, i) => (
-                        <tr
-                          key={c.id}
-                          style={{
-                            borderBottom:
-                              i < CASES.length - 1
-                                ? `1px solid ${tk.border}`
-                                : "none",
-                          }}
-                        >
+                      {loading ? (
+                        <tr>
                           <td
+                            colSpan={6}
                             style={{
-                              padding: "14px 16px",
-                              fontWeight: 500,
-                              color: tk.text,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {c.id}
-                          </td>
-                          <td
-                            style={{
-                              padding: "14px 16px",
+                              padding: "30px",
+                              textAlign: "center",
                               color: tk.sub,
-                              whiteSpace: "nowrap",
                             }}
                           >
-                            <span
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 6,
-                              }}
-                            >
-                              <Users size={13} /> 2 parties
-                            </span>
+                            Loading cases...
                           </td>
-                          <td style={{ padding: "14px 16px" }}>
-                            <Badge label={c.status} color={c.sCol} />
-                          </td>
-                          <td style={{ padding: "14px 16px" }}>
-                            <Badge label={c.priority} color={c.pCol} />
-                          </td>
+                        </tr>
+                      ) : cases.length === 0 ? (
+                        <tr>
                           <td
+                            colSpan={6}
                             style={{
-                              padding: "14px 16px",
+                              padding: "30px",
+                              textAlign: "center",
                               color: tk.sub,
-                              whiteSpace: "nowrap",
                             }}
                           >
-                            {c.due}
+                            No cases yet — invite a party to begin
                           </td>
-                          <td style={{ padding: "14px 16px" }}>
-                            <button
+                        </tr>
+                      ) : (
+                        cases.map((c, i) => (
+                          <tr
+                            key={c.id}
+                            style={{
+                              borderBottom:
+                                i < cases.length - 1
+                                  ? `1px solid ${tk.border}`
+                                  : "none",
+                            }}
+                          >
+                            <td
                               style={{
-                                padding: "5px 12px",
-                                borderRadius: 6,
-                                border: `1px solid ${tk.border}`,
-                                background: "transparent",
-                                fontSize: 12,
-                                cursor: "pointer",
+                                padding: "14px 16px",
+                                fontWeight: 500,
                                 color: tk.text,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 4,
                                 whiteSpace: "nowrap",
                               }}
                             >
-                              <Eye size={12} /> Review
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                              {c.id?.slice(0, 8).toUpperCase()}
+                            </td>
+                            <td
+                              style={{
+                                padding: "14px 16px",
+                                color: tk.sub,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                }}
+                              >
+                                <Users size={13} /> 2 parties
+                              </span>
+                            </td>
+                            <td style={{ padding: "14px 16px" }}>
+                              <Badge
+                                label={c.status || "pending"}
+                                color="#1e3a5f"
+                              />
+                            </td>
+                            <td style={{ padding: "14px 16px" }}>
+                              <Badge label="medium" color="#6366f1" />
+                            </td>
+                            <td
+                              style={{
+                                padding: "14px 16px",
+                                color: tk.sub,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {new Date(c.created_at).toLocaleDateString()}
+                            </td>
+                            <td style={{ padding: "14px 16px" }}>
+                              <button
+                                onClick={() =>
+                                  navigate(`/mediator/cases/${c.id}`)
+                                }
+                                style={{
+                                  padding: "5px 12px",
+                                  borderRadius: 6,
+                                  border: `1px solid ${tk.border}`,
+                                  background: "transparent",
+                                  fontSize: 12,
+                                  cursor: "pointer",
+                                  color: tk.text,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <Eye size={12} /> Review
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -951,7 +989,6 @@ export default function Dashboard() {
                   gap: 16,
                 }}
               >
-                {/* Case Volume */}
                 <Card style={{ padding: "18px 20px" }}>
                   <div
                     style={{
@@ -999,7 +1036,6 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                 </Card>
 
-                {/* Resolution Status */}
                 <Card style={{ padding: "18px 20px" }}>
                   <div
                     style={{
@@ -1090,7 +1126,6 @@ export default function Dashboard() {
 
             {/* RIGHT */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Pending Approvals */}
               <Card>
                 <CardHead
                   title="Pending Approvals"
@@ -1159,7 +1194,6 @@ export default function Dashboard() {
                 </div>
               </Card>
 
-              {/* Risk Indicators */}
               <Card>
                 <CardHead
                   title="Risk Indicators"
@@ -1207,7 +1241,6 @@ export default function Dashboard() {
                 </div>
               </Card>
 
-              {/* AI Performance */}
               <Card style={{ padding: "18px 20px" }}>
                 <div
                   style={{
