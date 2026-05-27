@@ -1,0 +1,71 @@
+/* ── Light mode (default) ── */
+:root,
+[data-theme="light"] {
+  --bg-page:        #eef0f5;
+  --bg-card:        #ffffff;
+  --bg-input:       #f9fafc;
+  --bg-muted:       #f1f3f8;
+  --bg-hover:       #f5f7ff;
+
+  --border:         #dde1ea;
+  --border-card:    #e2e5ee;
+
+  --text-primary:   #0f1c3f;
+  --text-secondary: #3d4a5c;
+  --text-muted:     #8a94a6;
+  --text-placeholder: #b0b8c9;
+
+  --brand:          #2a3f8f;
+  --brand-hover:    #1e2f6e;
+  --brand-light:    #eef1fb;
+
+  --error:          #dc2626;
+  --error-bg:       #fef2f2;
+  --error-border:   #fecaca;
+
+  --success-bg:     #eef0f7;
+  --success-icon-bg:#d8ddf0;
+
+  --toggle-bg:      #e2e4ec;
+  --shadow:         0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Dark mode ── */
+[data-theme="dark"] {
+  --bg-page:        #0d1117;
+  --bg-card:        #161b27;
+  --bg-input:       #1c2333;
+  --bg-muted:       #1c2333;
+  --bg-hover:       #1e2a45;
+
+  --border:         #2e3a52;
+  --border-card:    #2e3a52;
+
+  --text-primary:   #e8ecf4;
+  --text-secondary: #a8b3c9;
+  --text-muted:     #6b7a96;
+  --text-placeholder: #4a5568;
+
+  --brand:          #4a6cf7;
+  --brand-hover:    #3a5ce6;
+  --brand-light:    #1a2540;
+
+  --error:          #f87171;
+  --error-bg:       #2d1515;
+  --error-border:   #7f1d1d;
+
+  --success-bg:     #1a2035;
+  --success-icon-bg:#1e2a4a;
+
+  --toggle-bg:      #2e3a52;
+  --shadow:         0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Base resets ── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  transition: background 0.25s ease, color 0.25s ease;
+}
