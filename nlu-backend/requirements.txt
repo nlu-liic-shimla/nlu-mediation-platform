@@ -11,3 +11,5 @@ redis
 celery
 python-dotenv
 python-multipart
+pydantic[email]
+pydantic-settings
