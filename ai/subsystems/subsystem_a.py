@@ -27,11 +27,56 @@ RULES:
    - 0.5-0.8: Moderately clear with some ambiguity
    - 0.0-0.5: Vague or contradictory statements
 
-DISPUTE TYPES:
+DISPUTE TYPES — pick exactly one:
 landlord_tenant, employment, commercial_contract, property_boundary,
 family_business, construction, consumer, debt_recovery, other
 
-Return ONLY valid JSON matching the required schema. Nothing else.
+DISPUTE TYPE DEFINITIONS — read carefully before choosing:
+- "landlord_tenant"     : disputes between a landlord and tenant about rent, deposit, damage, eviction
+- "employment"          : disputes between employer and employee about salary, termination, contract
+- "commercial_contract" : disputes between two businesses or individuals over a service or product contract
+- "property_boundary"   : disputes between neighbours about land boundaries, walls, encroachment
+- "family_business"     : disputes between FAMILY MEMBERS or PARTNERS who personally know each other about a shared business, partnership dissolution, profit sharing — even if it looks like a contract dispute, if the parties are partners or family, use this
+- "construction"        : disputes about building work quality, delays, payments to contractors
+- "consumer"            : disputes between a customer and a seller or manufacturer about a product or service
+- "debt_recovery"       : ONLY for clear loan or money lending disputes where one party lent money to another
+- "other"               : use this when the dispute is vague, unclear, ambiguous, or does not clearly fit any category above — when in doubt use "other" not "debt_recovery"
+
+CRITICAL RULES:
+- If two people were in a business partnership together — always use "family_business" even if they are not related by blood
+- If the dispute mentions "partners", "partnership", "profit sharing", "business together" — use "family_business"
+- "debt_recovery" requires an explicit loan — do NOT use it for vague money disputes
+- When the dispute is unclear or ambiguous — ALWAYS use "other"
+
+IMPORTANT DISPUTE TYPE RULES:
+- If the dispute is vague, unclear, or does not fit any category — use "other"
+- "debt_recovery" is ONLY for clear loan or money lending disputes
+- Never guess — when unsure always use "other"
+
+You MUST return ONLY this exact JSON structure — all fields are required:
+
+{
+  "dispute_type": "one of the dispute types above",
+  "core_dispute": "one to two sentence neutral description of the central disagreement",
+  "claims_party_a": ["claim 1", "claim 2", "claim 3"],
+  "claims_party_b": ["claim 1", "claim 2", "claim 3"],
+  "disputed_facts": ["fact 1", "fact 2"],
+  "undisputed_facts": ["fact 1"],
+  "monetary_value": 50000,
+  "jurisdiction_clear": true,
+  "extraction_confidence": 0.85
+}
+
+FIELD RULES — read carefully:
+- "claims_party_a" — MUST be a LIST of strings, minimum 1 item, never a dict or object
+- "claims_party_b" — MUST be a LIST of strings, minimum 1 item, never a dict or object
+- "disputed_facts" — MUST be a LIST of strings
+- "undisputed_facts" — MUST be a LIST of strings, can be empty []
+- "monetary_value" — number in INR or null if not mentioned
+- "jurisdiction_clear" — true or false (boolean, not string)
+- "extraction_confidence" — decimal between 0.0 and 1.0
+
+Return ONLY the JSON object. No explanation. No markdown. No extra text.
 """
 
 def extract_conflict(party_a_statement: str, party_b_statement: str):
