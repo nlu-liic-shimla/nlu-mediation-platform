@@ -1,0 +1,18 @@
+{
+  "id": "S-01",
+  "description": "Landlord-tenant security deposit dispute",
+  "dispute_type": "landlord_tenant",
+  "party_a_statement": "I vacated the flat on October 1 2025 after giving 30 days notice. The flat was clean and in good condition. I have photos from move-out day. The landlord has not returned my security deposit of 50000 INR despite three written requests via WhatsApp. It has been 3 months since I vacated.",
+  "party_b_statement": "The tenant left on October 3 two days after the agreed date without informing me. The flat was damaged with wall marks a broken ceiling fan and cracked bathroom tiles. I have had the repairs done at a cost of 45000 INR and I have the invoices. The deposit was 50000 INR and I am deducting repair costs.",
+  "metadata": {
+    "relationship_type": "landlord_tenant",
+    "monetary_amount": 50000,
+    "currency": "INR",
+    "prior_negotiation": true
+  },
+  "expected": {
+    "dispute_type": "landlord_tenant",
+    "mediatability_band": "High",
+    "extraction_confidence_min": 0.7
+  }
+}

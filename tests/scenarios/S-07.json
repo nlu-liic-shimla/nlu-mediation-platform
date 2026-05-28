@@ -1,0 +1,18 @@
+{
+  "id": "S-07",
+  "description": "Construction delay and quality dispute",
+  "dispute_type": "construction",
+  "party_a_statement": "I hired this contractor to build my house for 2500000 INR with a completion date of December 2025. It is now May 2026 and the house is still not complete. The work that has been done is also of very poor quality — cracks in walls, leaking roof, uneven flooring. I have paid 2000000 INR already. I refuse to pay the remaining 500000 INR until all issues are fixed and work is completed.",
+  "party_b_statement": "The delay was caused by the client changing the design 3 times midway through construction which added 4 months to the timeline. The additional design changes also cost us extra money which the client has not paid. The quality issues mentioned are minor and can be fixed. We are owed the remaining 500000 INR plus 150000 INR for the extra design change work.",
+  "metadata": {
+    "relationship_type": "contractor_client",
+    "monetary_amount": 650000,
+    "currency": "INR",
+    "prior_negotiation": true
+  },
+  "expected": {
+    "dispute_type": "construction",
+    "mediatability_band": "Medium",
+    "extraction_confidence_min": 0.7
+  }
+}

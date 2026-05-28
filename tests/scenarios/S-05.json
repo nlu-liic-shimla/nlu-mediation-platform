@@ -1,0 +1,18 @@
+{
+  "id": "S-05",
+  "description": "Business partnership dissolution dispute",
+  "dispute_type": "family_business",
+  "party_a_statement": "My business partner and I started a restaurant together in 2022 with equal investment of 500000 INR each. I handled all operations and day to day management for 3 years. He only provided money but never worked. Now he wants 50 percent of everything including the goodwill and customer base which I built entirely. This is unfair. I want 70 percent share based on my contribution.",
+  "party_b_statement": "We are equal partners with equal investment as per our partnership deed signed in 2022. The deed clearly states 50-50 profit and asset sharing. My partner has been drawing a salary for his work which was already his compensation. The investment and business assets should be split equally as agreed. I want my 50 percent share which is approximately 800000 INR.",
+  "metadata": {
+    "relationship_type": "business_partner",
+    "monetary_amount": 1600000,
+    "currency": "INR",
+    "prior_negotiation": true
+  },
+  "expected": {
+    "dispute_type": "family_business",
+    "mediatability_band": "Medium",
+    "extraction_confidence_min": 0.7
+  }
+}
