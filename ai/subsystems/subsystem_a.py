@@ -23,9 +23,13 @@ RULES:
 3. Use "Party A" and "Party B" — never real names
 4. If monetary value is not mentioned — set to null
 5. Set extraction_confidence based on how clear the statements are:
-   - 0.8-1.0: Very clear statements with specific facts
+   - 0.8-1.0: Very clear statements with specific facts and no ambiguity
    - 0.5-0.8: Moderately clear with some ambiguity
-   - 0.0-0.5: Vague or contradictory statements
+   - 0.0-0.5: Vague, contradictory, or unclear statements — if you
+              cannot clearly identify what the dispute is actually about,
+              confidence MUST be below 0.5
+   - If dispute_type is "other" — confidence should almost always be
+     below 0.5 since the dispute is unclear by definition
 
 DISPUTE TYPES — pick exactly one:
 landlord_tenant, employment, commercial_contract, property_boundary,
