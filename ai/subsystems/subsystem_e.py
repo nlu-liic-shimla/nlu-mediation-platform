@@ -10,7 +10,7 @@ If bias detected — revised_summary replaces the original.
 """
 
 from dotenv import load_dotenv
-load_dotenv(dotenv_path="C:/Users/desk/Downloads/nlu-mediation-platform/.env")
+load_dotenv()
 
 from ai.schemas import NeutralSummary, BiasRemovalOutput
 from ai.utils.ai_client import call_small, is_failed

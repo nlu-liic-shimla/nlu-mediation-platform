@@ -16,7 +16,7 @@ Week 3 scope: Full pipeline A through G.
 """
 
 from dotenv import load_dotenv
-load_dotenv(dotenv_path="C:/Users/desk/Downloads/nlu-mediation-platform/.env")
+load_dotenv()
 
 from ai.subsystems.subsystem_e import remove_bias
 from ai.subsystems.subsystem_f import analyse_tone

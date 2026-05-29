@@ -1,5 +1,5 @@
 """
-claude_client.py
+ai_client.py
 NLU Shimla — AI-Powered Mediation Platform
 -------------------------------------------
 Shared Groq API utility used by all 7 subsystems.
