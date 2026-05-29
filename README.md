@@ -107,7 +107,7 @@ Week: 1 | Date: May 2026
 | S-05 | family_business | family_business | 0.9 | ✅ Pass |
 | S-06 | property_boundary | property_boundary | 0.9 | ✅ Pass |
 | S-07 | construction | construction | 0.9 | ✅ Pass |
-| S-08 | other | other | 0.6 | ✅ Pass |
+| S-08 | other | other | 0.4 | ✅ Pass |
 
 **Pass rate: 8/8 (100%)**
 
