@@ -2,29 +2,36 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
 import ThemeToggle from '../../components/ui/ThemeToggle'
-import { Scale, LayoutDashboard, FilePlus, MessageSquare, FileText, CheckSquare, Bell, Search, ChevronRight, ChevronLeft, Calendar, TrendingUp, Clock, AlertCircle, Bot } from 'lucide-react'
+import {
+  Scale, LayoutDashboard, FilePlus, MessageSquare,
+  FileText, CheckSquare, Bell, Search, ChevronRight,
+  ChevronLeft, Calendar, TrendingUp, Clock, AlertCircle, Bot
+} from 'lucide-react'
+
+// Add this at the top of the Dashboard component:
+const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
+const userEmail = user.email || 'User'
+const userInitials = userEmail.substring(0, 2).toUpperCase()
+const userName = userEmail.split('@')[0]  // gets "sakk" from "sakk@gmail.com"
 
 const NAV_ITEMS = [
-  { id: 'dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
-  { id: 'new-case',     icon: FilePlus,        label: 'New Case' },
-  { id: 'questionnaire',icon: MessageSquare,   label: 'Questionnaire' },
-  { id: 'proposals',    icon: FileText,        label: 'Proposals' },
-  { id: 'settlement',   icon: CheckSquare,     label: 'Settlement' },
+  { id: 'dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
+  { id: 'new-case',      icon: FilePlus,        label: 'New Case' },
+  { id: 'questionnaire', icon: MessageSquare,   label: 'Questionnaire' },
+  { id: 'proposals',     icon: FileText,        label: 'Proposals' },
+  { id: 'settlement',    icon: CheckSquare,     label: 'Settlement' },
 ]
 
-// ── Sidebar ──
 const Sidebar = ({ active, onNavigate, collapsed, onToggle }) => (
-  <aside style={{ ...s.sidebar, width: collapsed ? '60px' : '240px' }}>
-    {/* Logo */}
-    <div style={s.sidebarLogoRow}>
-      <div style={s.sidebarLogoIcon}>
+  <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+    <div className="sidebar-logo">
+      <div className="sidebar-logo-icon">
         <Scale size={20} color="var(--brand)" strokeWidth={1.8} />
       </div>
-      {!collapsed && <span style={s.sidebarLogoText}>SULAH</span>}
+      {!collapsed && <span className="sidebar-logo-text">SULAH</span>}
     </div>
 
-    {/* Nav */}
-    <nav style={s.sidebarNav}>
+    <nav className="sidebar-nav">
       {NAV_ITEMS.map(({ id, icon: Icon, label }) => {
         const isActive = active === id
         return (
@@ -32,103 +39,85 @@ const Sidebar = ({ active, onNavigate, collapsed, onToggle }) => (
             key={id}
             title={collapsed ? label : ''}
             onClick={() => onNavigate(id)}
-            style={{
-              ...s.navBtn,
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              ...(isActive ? s.navBtnActive : {}),
-            }}
+            className={`nav-btn ${isActive ? 'active' : ''} ${collapsed ? 'centered' : ''}`}
           >
             <Icon size={18} strokeWidth={isActive ? 2 : 1.6} style={{ flexShrink: 0 }} />
-            {!collapsed && <span style={s.navLabel}>{label}</span>}
+            {!collapsed && <span className="nav-label">{label}</span>}
           </button>
         )
       })}
     </nav>
 
-    {/* AI Assistant */}
     {!collapsed && (
-      <div style={s.aiAssistant}>
-        <div style={s.aiIcon}><Bot size={18} color="var(--brand)" /></div>
+      <div className="ai-assistant">
+        <div className="ai-icon"><Bot size={18} color="var(--brand)" /></div>
         <div>
-          <p style={s.aiTitle}>AI Assistant</p>
-          <p style={s.aiSubtitle}>Always here to help</p>
+          <p className="ai-title">AI Assistant</p>
+          <p className="ai-sub">Always here to help</p>
         </div>
       </div>
     )}
 
-    {/* Collapse toggle */}
-    <button
-      onClick={onToggle}
-      style={s.collapseBtn}
-      title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-    >
+    <button className="collapse-btn" onClick={onToggle}>
       {collapsed
         ? <ChevronRight size={16} />
-        : <><ChevronLeft size={16} /><span style={s.collapseLabel}>Collapse</span></>
+        : <><ChevronLeft size={16} /><span>Collapse</span></>
       }
     </button>
   </aside>
 )
 
-// ── Stat card ──
 const StatCard = ({ label, value, sub, subColor, icon, iconBg }) => (
-  <div style={s.statCard}>
-    <div>
-      <p style={s.statLabel}>{label}</p>
-      <p style={s.statValue}>{value}</p>
-      <p style={{ ...s.statSub, color: subColor || 'var(--text-muted)' }}>{sub}</p>
+  <div className="stat-card">
+    <div className="stat-info">
+      <p className="stat-label">{label}</p>
+      <p className="stat-value">{value}</p>
+      <p className="stat-sub" style={{ color: subColor || 'var(--text-muted)' }}>{sub}</p>
     </div>
-    <div style={{ ...s.statIconWrap, background: iconBg }}>{icon}</div>
+    <div className="stat-icon" style={{ background: iconBg }}>{icon}</div>
   </div>
 )
 
-// ── Case card ──
 const CaseCard = ({ title, status, caseId, vs, progress, aiScore, nextDate, statusColor, statusBg, onView }) => (
-  <div style={s.caseCard}>
-    <div style={s.caseTop}>
-      <div style={{ flex: 1 }}>
-        <div style={s.caseTitleRow}>
-          <h3 style={s.caseTitle}>{title}</h3>
-          <span style={{ ...s.badge, color: statusColor, background: statusBg }}>{status}</span>
+  <div className="case-card">
+    <div className="case-top">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="case-title-row">
+          <h3 className="case-title">{title}</h3>
+          <span className="case-badge" style={{ color: statusColor, background: statusBg }}>{status}</span>
         </div>
-        <p style={s.caseMeta}>Case ID: {caseId} • vs. {vs}</p>
+        <p className="case-meta">Case ID: {caseId} • vs. {vs}</p>
       </div>
-      <div style={s.aiScore}>
-        <p style={s.aiScoreLabel}>AI Score</p>
-        <p style={s.aiScoreValue}>{aiScore}%</p>
-      </div>
-    </div>
-    <div style={s.progressSection}>
-      <div style={s.progressRow}>
-        <span style={s.progressLabel}>Case Progress</span>
-        <span style={s.progressPct}>{progress}%</span>
-      </div>
-      <div style={s.progressBg}>
-        <div style={{ ...s.progressFill, width: `${progress}%` }} />
+      <div className="ai-score">
+        <p className="ai-score-label">AI Score</p>
+        <p className="ai-score-value">{aiScore}%</p>
       </div>
     </div>
-    <div style={s.caseBottom}>
+    <div className="progress-section">
+      <div className="progress-row">
+        <span className="progress-label">Case Progress</span>
+        <span className="progress-pct">{progress}%</span>
+      </div>
+      <div className="progress-bg">
+        <div className="progress-fill" style={{ width: `${progress}%` }} />
+      </div>
+    </div>
+    <div className="case-bottom">
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Calendar size={13} color="var(--text-muted)" />
-        <span style={s.nextDate}>Next: {nextDate}</span>
+        <span className="next-date">Next: {nextDate}</span>
       </div>
-      <button style={s.viewBtn} onClick={onView}
-        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand)'}
-        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
-        View Details
-      </button>
+      <button className="view-btn" onClick={onView}>View Details</button>
     </div>
   </div>
 )
 
-// ── Main ──
 export default function Dashboard() {
   const navigate = useNavigate()
   const [activeNav, setActiveNav] = useState('dashboard')
   const [collapsed, setCollapsed] = useState(false)
   const [search, setSearch] = useState('')
-
-  const sidebarWidth = collapsed ? 60 : 240
+  const [showNotifs, setShowNotifs] = useState(false)
 
   const cases = [
     { title: 'Contract Dispute Resolution', status: 'in progress', statusColor: '#1a56b0', statusBg: '#dbeafe', caseId: 'CASE-2024-001', vs: 'TechCorp Inc.', progress: 65, aiScore: 78, nextDate: '5/25/2026' },
@@ -154,7 +143,7 @@ export default function Dashboard() {
   ]
 
   return (
-    <div style={s.page}>
+    <div className="dash-page">
       <Sidebar
         active={activeNav}
         onNavigate={setActiveNav}
@@ -162,63 +151,71 @@ export default function Dashboard() {
         onToggle={() => setCollapsed(p => !p)}
       />
 
-      {/* Main area shifts with sidebar */}
-      <div style={{ ...s.main, marginLeft: `${sidebarWidth}px`, transition: 'margin-left 0.25s ease' }}>
-
+      <div className={`dash-main ${collapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}`}>
         {/* Topbar */}
-        <header style={s.topbar}>
-          <div style={s.searchWrap}>
-            <Search size={15} color="var(--text-muted)" />
+        <header className="topbar">
+          <div className="search-wrap">
+            <Search size={15} color="var(--text-muted)" style={{ flexShrink: 0 }} />
             <input
+              className="search-input"
               placeholder="Search cases, documents, or proposals..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={s.searchInput}
             />
           </div>
-          <div style={s.topRight}>
+          <div className="topbar-right">
             <ThemeToggle />
-            <div style={{ position: 'relative', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-              <Bell size={20} color="var(--text-secondary)" />
-              <span style={s.badge2}>2</span>
+            <div className="notif-wrap">
+              <button className="notif-btn" onClick={() => setShowNotifs(p => !p)}>
+                <Bell size={20} color="var(--text-secondary)" />
+                <span className="notif-badge">2</span>
+              </button>
+              {showNotifs && (
+                <div className="notif-dropdown">
+                  <p className="notif-dropdown-title">Notifications</p>
+                  {notifications.map((n, i) => (
+                    <div key={i} className="notif-drop-item">
+                      <div className="notif-drop-icon"><AlertCircle size={14} color="var(--brand)" /></div>
+                      <div>
+                        <p className="notif-drop-text">{n.text}</p>
+                        <p className="notif-drop-time">{n.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <button className="notif-view-all">View all notifications</button>
+                </div>
+              )}
             </div>
-            <div style={s.avatar}>SJ</div>
-            <span style={s.avatarName}>Sarah Johnson</span>
+            <div className="avatar">{userInitials}</div>
+<span className="avatar-name">{userName}</span>
           </div>
         </header>
 
-        {/* Page content */}
-        <div style={s.content}>
-          <div style={s.inner}>
-
-            <div style={s.pageHeader}>
-              <h1 style={s.pageTitle}>Dashboard</h1>
-              <p style={s.pageSub}>Welcome back, Sarah. Here's your case overview.</p>
+        {/* Content */}
+        <div className="dash-content">
+          <div className="dash-inner">
+            <div className="page-header">
+              <h1 className="page-title">Dashboard</h1>
+              <p className="page-sub">Welcome back, {userName}. Here's your case overview.</p>
             </div>
 
-            <div style={s.layout}>
+            <div className="dash-layout">
               {/* Left */}
-              <div style={s.leftCol}>
-                {/* Stats */}
-                <div style={s.statsGrid}>
+              <div className="left-col">
+                <div className="stats-grid">
                   <StatCard label="Active Cases" value="2" sub="+1 this month" subColor="#16a34a" iconBg="#eef1fb" icon={<FileText size={22} color="#2a3f8f" />} />
                   <StatCard label="Pending Proposals" value="3" sub="2 require action" iconBg="#fff7ed" icon={<Clock size={22} color="#ea8c0d" />} />
                   <StatCard label="Completed" value="5" sub="100% success rate" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
                   <StatCard label="Avg. Resolution Time" value="45 days" sub="-12 days vs avg" subColor="#dc2626" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
                 </div>
 
-                {/* Cases section */}
-                <div style={s.section}>
-                  <div style={s.sectionHead}>
+                <div className="section">
+                  <div className="section-head">
                     <div>
-                      <h2 style={s.sectionTitle}>Active Cases</h2>
-                      <p style={s.sectionSub}>Track your ongoing mediation cases</p>
+                      <h2 className="section-title">Active Cases</h2>
+                      <p className="section-sub">Track your ongoing mediation cases</p>
                     </div>
-                    <button style={s.newCaseBtn}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--brand-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'var(--brand)'}>
-                      New Case
-                    </button>
+                    <button className="new-case-btn">New Case</button>
                   </div>
                   {cases.map(c => (
                     <CaseCard key={c.caseId} {...c} onView={() => navigate(`/party/cases/${c.caseId}`)} />
@@ -227,46 +224,41 @@ export default function Dashboard() {
               </div>
 
               {/* Right */}
-              <div style={s.rightCol}>
-                {/* Notifications */}
-                <div style={s.sideCard}>
-                  <h2 style={s.sideTitle}>Recent Notifications</h2>
+              <div className="right-col">
+                <div className="side-card">
+                  <h2 className="side-title">Recent Notifications</h2>
                   {notifications.map((n, i) => (
-                    <div key={i} style={{ ...s.notifItem, borderBottom: i < notifications.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                      <div style={s.notifIcon}><AlertCircle size={15} color="var(--brand)" /></div>
+                    <div key={i} className="notif-item" style={{ borderBottom: i < notifications.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <div className="notif-icon"><AlertCircle size={14} color="var(--brand)" /></div>
                       <div>
-                        <p style={s.notifText}>{n.text}</p>
-                        <p style={s.notifTime}>{n.time}</p>
+                        <p className="notif-text">{n.text}</p>
+                        <p className="notif-time">{n.time}</p>
                       </div>
                     </div>
                   ))}
-                  <button style={s.viewAllBtn}>View all notifications</button>
+                  <button className="view-all-btn">View all notifications</button>
                 </div>
 
-                {/* Quick actions */}
-                <div style={s.sideCard}>
-                  <h2 style={s.sideTitle}>Quick Actions</h2>
+                <div className="side-card">
+                  <h2 className="side-title">Quick Actions</h2>
                   {quickActions.map((a, i) => (
-                    <button key={i} style={{ ...s.qaBtn, marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-card)'}>
+                    <button key={i} className="qa-btn" style={{ marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}>
                       <span style={{ color: 'var(--brand)', display: 'flex' }}>{a.icon}</span>
-                      <span style={s.qaLabel}>{a.label}</span>
+                      <span className="qa-label">{a.label}</span>
                       <ChevronRight size={15} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />
                     </button>
                   ))}
                 </div>
 
-                {/* Activity */}
-                <div style={s.sideCard}>
-                  <h2 style={s.sideTitle}>Recent Activity</h2>
+                <div className="side-card">
+                  <h2 className="side-title">Recent Activity</h2>
                   {activities.map((a, i) => (
-                    <div key={i} style={{ ...s.activityItem, borderBottom: i < activities.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                      <div style={s.activityDot} />
+                    <div key={i} className="activity-item" style={{ borderBottom: i < activities.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <div className="activity-dot" />
                       <div>
-                        <p style={s.activityTitle}>{a.title}</p>
-                        <p style={s.activityDesc}>{a.desc}</p>
-                        <p style={s.activityDate}>{a.date}</p>
+                        <p className="activity-title">{a.title}</p>
+                        <p className="activity-desc">{a.desc}</p>
+                        <p className="activity-date">{a.date}</p>
                       </div>
                     </div>
                   ))}
@@ -277,211 +269,297 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Floating chat */}
-      <button style={s.chatBtn}>
-        <MessageSquare size={21} color="white" />
-      </button>
+      <button className="chat-btn"><MessageSquare size={21} color="white" /></button>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=DM+Sans:wght@400;500&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         input::placeholder { color: var(--text-placeholder); }
-        @media (max-width: 1024px) {
-          .dash-stats { grid-template-columns: repeat(2,1fr) !important; }
-          .dash-right { width: 280px !important; }
+
+        /* Page */
+        .dash-page { display: flex; min-height: 100vh; background: var(--bg-page); font-family: 'DM Sans', sans-serif; }
+
+        /* Sidebar */
+        .sidebar {
+          position: fixed; top: 0; left: 0; bottom: 0;
+          width: 240px;
+          background: var(--bg-card);
+          border-right: 1px solid var(--border-card);
+          display: flex; flex-direction: column;
+          z-index: 50; overflow: hidden;
+          transition: width 0.25s ease;
         }
-        @media (max-width: 768px) {
-          .dash-layout { flex-direction: column !important; }
-          .dash-right { width: 100% !important; }
-          .dash-stats { grid-template-columns: repeat(2,1fr) !important; }
-          .avatar-name { display: none !important; }
+        .sidebar.collapsed { width: 60px; }
+
+        .sidebar-logo {
+          display: flex; align-items: center; gap: 10px;
+          padding: 14px; min-height: 60px;
+          border-bottom: 1px solid var(--border);
+          flex-shrink: 0;
         }
+        .sidebar-logo-icon {
+          width: 32px; height: 32px; border-radius: 8px;
+          background: var(--brand-light);
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
+        }
+        .sidebar-logo-text {
+          font-family: 'Sora', sans-serif; font-size: 16px;
+          font-weight: 700; color: var(--text-primary);
+          letter-spacing: 0.08em; white-space: nowrap;
+        }
+
+        .sidebar-nav { display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; flex: 1; overflow-y: auto; }
+        .nav-btn {
+          display: flex; align-items: center; gap: 10px;
+          padding: 10px; border-radius: 8px;
+          border: none; background: none;
+          color: var(--text-muted); cursor: pointer;
+          transition: all 0.15s; width: 100%;
+          white-space: nowrap; font-family: 'DM Sans', sans-serif;
+        }
+        .nav-btn.centered { justify-content: center; }
+        .nav-btn:hover { background: var(--bg-muted); color: var(--text-primary); }
+        .nav-btn.active { background: var(--brand-light); color: var(--brand); }
+        .nav-label { font-size: 14px; font-weight: 500; }
+
+        .ai-assistant {
+          display: flex; align-items: center; gap: 10px;
+          margin: 8px; padding: 12px;
+          background: var(--bg-muted); border-radius: 10px; flex-shrink: 0;
+        }
+        .ai-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .ai-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+        .ai-sub { font-size: 11px; color: var(--text-muted); }
+
+        .collapse-btn {
+          display: flex; align-items: center; gap: 8px;
+          padding: 12px 14px; border: none;
+          border-top: 1px solid var(--border);
+          background: none; color: var(--text-muted);
+          cursor: pointer; font-size: 13px;
+          font-family: 'DM Sans', sans-serif; flex-shrink: 0;
+          white-space: nowrap;
+        }
+        .collapse-btn:hover { color: var(--text-primary); }
+
+        /* Main */
+        .dash-main {
+          flex: 1; display: flex; flex-direction: column;
+          min-height: 100vh;
+          transition: margin-left 0.25s ease;
+        }
+        .dash-main.sidebar-expanded { margin-left: 240px; }
+        .dash-main.sidebar-collapsed { margin-left: 60px; }
+
+        /* Topbar */
+        .topbar {
+          height: 60px; background: var(--bg-card);
+          border-bottom: 1px solid var(--border-card);
+          display: flex; align-items: center;
+          justify-content: space-between;
+          padding: 0 1.25rem;
+          position: sticky; top: 0; z-index: 40;
+          gap: 1rem;
+        }
+        .search-wrap {
+          display: flex; align-items: center; gap: 8px;
+          background: var(--bg-muted); border: 1px solid var(--border);
+          border-radius: 8px; padding: 0 12px;
+          flex: 0 1 360px; min-width: 0;
+        }
+        .search-input {
+          border: none; background: none; outline: none;
+          font-size: 13px; color: var(--text-primary);
+          font-family: 'DM Sans', sans-serif;
+          width: 100%; padding: 9px 0;
+        }
+        .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+        /* Notification dropdown */
+        .notif-wrap { position: relative; }
+        .notif-btn {
+          position: relative; background: none; border: none;
+          cursor: pointer; display: flex; align-items: center;
+          padding: 4px;
+        }
+        .notif-badge {
+          position: absolute; top: -2px; right: -2px;
+          width: 16px; height: 16px; background: #ef4444;
+          color: #fff; border-radius: 50%; font-size: 10px;
+          display: flex; align-items: center; justify-content: center;
+          font-weight: 600;
+        }
+        .notif-dropdown {
+          position: absolute; top: calc(100% + 8px); right: 0;
+          width: 320px; background: var(--bg-card);
+          border: 1px solid var(--border-card);
+          border-radius: 12px; box-shadow: var(--shadow);
+          z-index: 100; overflow: hidden;
+        }
+        .notif-dropdown-title {
+          font-family: 'Sora', sans-serif; font-size: 13px;
+          font-weight: 600; color: var(--text-primary);
+          padding: 14px 16px 10px; border-bottom: 1px solid var(--border);
+        }
+        .notif-drop-item {
+          display: flex; gap: 10px; padding: 12px 16px;
+          border-bottom: 1px solid var(--border);
+        }
+        .notif-drop-icon {
+          width: 28px; height: 28px; border-radius: 6px;
+          background: var(--brand-light);
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .notif-drop-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 3px; }
+        .notif-drop-time { font-size: 11px; color: var(--text-muted); }
+        .notif-view-all {
+          width: 100%; background: none; border: none;
+          padding: 12px; font-size: 13px; color: var(--brand);
+          cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500;
+        }
+
+        .avatar {
+          width: 32px; height: 32px; border-radius: 50%;
+          background: var(--brand); color: #fff;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 600; flex-shrink: 0;
+        }
+        .avatar-name { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; }
+
+        /* Content */
+        .dash-content { flex: 1; overflow-y: auto; }
+        .dash-inner { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+
+        .page-header { margin-bottom: 1.5rem; }
+        .page-title { font-family: 'Sora', sans-serif; font-size: clamp(20px, 3vw, 26px); font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+        .page-sub { font-size: 14px; color: var(--text-muted); }
+
+        /* Layout */
+        .dash-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
+        .left-col { flex: 1; min-width: 0; }
+        .right-col { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; gap: 1rem; }
+
+        /* Stats grid */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 1rem; margin-bottom: 1.25rem;
+        }
+        .stat-card {
+          background: var(--bg-card); border-radius: 12px;
+          border: 1px solid var(--border-card); padding: 1.1rem;
+          display: flex; justify-content: space-between; align-items: flex-start;
+          min-width: 0;
+        }
+        .stat-info { flex: 1; min-width: 0; }
+        .stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .stat-value { font-family: 'Sora', sans-serif; font-size: clamp(16px, 2vw, 22px); font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+        .stat-sub { font-size: 11px; }
+        .stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 8px; }
+
+        /* Section */
+        .section { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-card); padding: 1.25rem; }
+        .section-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; gap: 1rem; }
+        .section-title { font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+        .section-sub { font-size: 13px; color: var(--text-muted); }
+        .new-case-btn {
+          padding: 8px 16px; background: var(--brand); color: #fff;
+          border: none; border-radius: 8px; font-size: 13px;
+          font-family: 'Sora', sans-serif; font-weight: 600;
+          cursor: pointer; transition: background 0.15s; flex-shrink: 0;
+        }
+        .new-case-btn:hover { background: var(--brand-hover); }
+
+        /* Case card */
+        .case-card { border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1rem; }
+        .case-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; gap: 1rem; }
+        .case-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+        .case-title { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .case-badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 99px; white-space: nowrap; }
+        .case-meta { font-size: 12px; color: var(--text-muted); }
+        .ai-score { text-align: right; flex-shrink: 0; }
+        .ai-score-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+        .ai-score-value { font-family: 'Sora', sans-serif; font-size: clamp(18px, 2vw, 22px); font-weight: 700; color: var(--brand); }
+        .progress-section { margin-bottom: 1rem; }
+        .progress-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .progress-label { font-size: 12px; color: var(--text-muted); }
+        .progress-pct { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+        .progress-bg { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--brand); border-radius: 99px; transition: width 0.3s; }
+        .case-bottom { display: flex; justify-content: space-between; align-items: center; }
+        .next-date { font-size: 12px; color: var(--text-muted); }
+        .view-btn { padding: 7px 14px; background: none; border: 1px solid var(--border); border-radius: 7px; font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: border-color 0.15s; }
+        .view-btn:hover { border-color: var(--brand); color: var(--brand); }
+
+        /* Side cards */
+        .side-card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-card); padding: 1.1rem; }
+        .side-title { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; }
+
+        .notif-item { display: flex; gap: 10px; padding: 10px 0; }
+        .notif-icon { width: 28px; height: 28px; border-radius: 6px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .notif-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 3px; }
+        .notif-time { font-size: 11px; color: var(--text-muted); }
+        .view-all-btn { width: 100%; background: none; border: none; padding: 10px 0 0; font-size: 13px; color: var(--text-muted); cursor: pointer; text-align: center; font-family: 'DM Sans', sans-serif; }
+        .view-all-btn:hover { color: var(--brand); }
+
+        .qa-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 9px; cursor: pointer; transition: background 0.15s; font-family: 'DM Sans', sans-serif; }
+        .qa-btn:hover { background: var(--bg-hover); }
+        .qa-label { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+
+        .activity-item { display: flex; gap: 12px; padding: 12px 0; }
+        .activity-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--brand); flex-shrink: 0; margin-top: 4px; }
+        .activity-title { font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 2px; }
+        .activity-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 3px; line-height: 1.4; }
+        .activity-date { font-size: 11px; color: var(--text-placeholder); }
+
+        /* Chat button */
+        .chat-btn { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 50px; height: 50px; border-radius: 50%; background: var(--brand); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 16px rgba(42,63,143,0.35); z-index: 100; }
+        .chat-btn:hover { background: var(--brand-hover); }
+
+        /* ── Responsive ── */
+        /* ── Responsive ── */
+@media (max-width: 1200px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .right-col { width: 260px; }
+}
+
+@media (max-width: 900px) {
+  .dash-layout { flex-direction: column; }
+  .right-col { width: 100%; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .sidebar { width: 60px !important; }
+  .dash-main { margin-left: 60px !important; }
+  .sidebar-logo-text, .nav-label, .ai-assistant, .collapse-btn span { display: none; }
+  .nav-btn { justify-content: center; }
+  .collapse-btn { justify-content: center; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+  .stat-card { padding: 0.85rem; }
+  .stat-value { font-size: 18px; }
+  .stat-icon { width: 34px; height: 34px; }
+  .stat-icon svg { width: 18px; height: 18px; }
+  .avatar-name { display: none; }
+  .search-wrap { flex: 1; min-width: 0; }
+  .topbar { padding: 0 0.75rem; gap: 0.5rem; }
+  .dash-inner { padding: 1rem 0.75rem; }
+  .notif-dropdown { right: -80px; width: 260px; }
+  .case-title { font-size: 13px; }
+  .new-case-btn { padding: 7px 12px; font-size: 12px; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-label { font-size: 10px; }
+  .stat-value { font-size: 16px; }
+}
+
+@media (max-width: 360px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
       `}</style>
     </div>
   )
-}
-
-const s = {
-  page: { display: 'flex', minHeight: '100vh', background: 'var(--bg-page)', fontFamily: "'DM Sans', sans-serif" },
-
-  // Sidebar
-  sidebar: {
-    position: 'fixed', top: 0, left: 0, bottom: 0,
-    background: 'var(--bg-card)',
-    borderRight: '1px solid var(--border-card)',
-    display: 'flex', flexDirection: 'column',
-    zIndex: 50, overflow: 'hidden',
-    transition: 'width 0.25s ease',
-  },
-  sidebarLogoRow: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    padding: '16px 14px', borderBottom: '1px solid var(--border)',
-    flexShrink: 0, minHeight: '60px',
-  },
-  sidebarLogoIcon: {
-    width: '32px', height: '32px', borderRadius: '8px',
-    background: 'var(--brand-light)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
-  },
-  sidebarLogoText: {
-    fontFamily: "'Sora', sans-serif", fontSize: '16px',
-    fontWeight: '700', color: 'var(--text-primary)',
-    letterSpacing: '0.08em', whiteSpace: 'nowrap',
-  },
-  sidebarNav: { display: 'flex', flexDirection: 'column', gap: '2px', padding: '12px 8px', flex: 1, overflowY: 'auto' },
-  navBtn: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    padding: '10px 10px', borderRadius: '8px',
-    border: 'none', background: 'none',
-    color: 'var(--text-muted)', cursor: 'pointer',
-    transition: 'all 0.15s', width: '100%', whiteSpace: 'nowrap',
-  },
-  navBtnActive: { background: 'var(--brand-light)', color: 'var(--brand)' },
-  navLabel: { fontSize: '14px', fontWeight: '500' },
-
-  aiAssistant: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    margin: '8px', padding: '12px',
-    background: 'var(--bg-muted)', borderRadius: '10px',
-    flexShrink: 0,
-  },
-  aiIcon: {
-    width: '32px', height: '32px', borderRadius: '8px',
-    background: 'var(--brand-light)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  aiTitle: { fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' },
-  aiSubtitle: { fontSize: '11px', color: 'var(--text-muted)' },
-
-  collapseBtn: {
-    display: 'flex', alignItems: 'center', gap: '8px',
-    padding: '12px 14px', border: 'none',
-    borderTop: '1px solid var(--border)',
-    background: 'none', color: 'var(--text-muted)',
-    cursor: 'pointer', fontSize: '13px',
-    fontFamily: "'DM Sans', sans-serif", flexShrink: 0,
-    whiteSpace: 'nowrap',
-  },
-  collapseLabel: { fontSize: '13px' },
-
-  // Main
-  main: { flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' },
-
-  topbar: {
-    height: '60px', background: 'var(--bg-card)',
-    borderBottom: '1px solid var(--border-card)',
-    display: 'flex', alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 1.5rem', position: 'sticky', top: 0, zIndex: 40, gap: '1rem',
-  },
-  searchWrap: {
-    display: 'flex', alignItems: 'center', gap: '8px',
-    background: 'var(--bg-muted)', border: '1px solid var(--border)',
-    borderRadius: '8px', padding: '0 12px',
-    flex: '0 1 380px',
-  },
-  searchInput: {
-    border: 'none', background: 'none', outline: 'none',
-    fontSize: '13px', color: 'var(--text-primary)',
-    fontFamily: "'DM Sans', sans-serif",
-    width: '100%', padding: '9px 0',
-  },
-  topRight: { display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 },
-  badge2: {
-    position: 'absolute', top: '-6px', right: '-6px',
-    width: '16px', height: '16px', background: '#ef4444',
-    color: '#fff', borderRadius: '50%', fontSize: '10px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600',
-  },
-  avatar: {
-    width: '32px', height: '32px', borderRadius: '50%',
-    background: 'var(--brand)', color: '#fff',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '11px', fontWeight: '600', flexShrink: 0,
-  },
-  avatarName: { fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', whiteSpace: 'nowrap' },
-
-  content: { flex: 1, overflowY: 'auto' },
-  inner: { padding: '1.75rem 1.5rem', maxWidth: '1400px', margin: '0 auto' },
-
-  pageHeader: { marginBottom: '1.5rem' },
-  pageTitle: { fontFamily: "'Sora', sans-serif", fontSize: '26px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' },
-  pageSub: { fontSize: '14px', color: 'var(--text-muted)' },
-
-  layout: { display: 'flex', gap: '1.5rem', alignItems: 'flex-start' },
-  leftCol: { flex: 1, minWidth: 0 },
-  rightCol: { width: '300px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '1rem' },
-
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem', marginBottom: '1.5rem' },
-  statCard: {
-    background: 'var(--bg-card)', borderRadius: '12px',
-    border: '1px solid var(--border-card)', padding: '1.25rem',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-  },
-  statLabel: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' },
-  statValue: { fontFamily: "'Sora', sans-serif", fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' },
-  statSub: { fontSize: '12px' },
-  statIconWrap: { width: '44px', height: '44px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-
-  section: { background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-card)', padding: '1.25rem' },
-  sectionHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' },
-  sectionTitle: { fontFamily: "'Sora', sans-serif", fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' },
-  sectionSub: { fontSize: '13px', color: 'var(--text-muted)' },
-  newCaseBtn: {
-    padding: '8px 18px', background: 'var(--brand)', color: '#fff',
-    border: 'none', borderRadius: '8px', fontSize: '13px',
-    fontFamily: "'Sora', sans-serif", fontWeight: '600',
-    cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0,
-  },
-
-  caseCard: { border: '1px solid var(--border)', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1rem' },
-  caseTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' },
-  caseTitleRow: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' },
-  caseTitle: { fontFamily: "'Sora', sans-serif", fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' },
-  badge: { fontSize: '11px', fontWeight: '500', padding: '3px 10px', borderRadius: '99px' },
-  caseMeta: { fontSize: '12px', color: 'var(--text-muted)' },
-  aiScore: { textAlign: 'right', flexShrink: 0, marginLeft: '1rem' },
-  aiScoreLabel: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' },
-  aiScoreValue: { fontFamily: "'Sora', sans-serif", fontSize: '22px', fontWeight: '700', color: 'var(--brand)' },
-  progressSection: { marginBottom: '1rem' },
-  progressRow: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' },
-  progressLabel: { fontSize: '12px', color: 'var(--text-muted)' },
-  progressPct: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' },
-  progressBg: { height: '6px', background: 'var(--border)', borderRadius: '99px', overflow: 'hidden' },
-  progressFill: { height: '100%', background: 'var(--brand)', borderRadius: '99px', transition: 'width 0.3s' },
-  caseBottom: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  nextDate: { fontSize: '12px', color: 'var(--text-muted)' },
-  viewBtn: {
-    padding: '7px 14px', background: 'none',
-    border: '1px solid var(--border)', borderRadius: '7px',
-    fontSize: '12px', fontWeight: '500',
-    color: 'var(--text-secondary)', cursor: 'pointer', transition: 'border-color 0.15s',
-  },
-
-  sideCard: { background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-card)', padding: '1.25rem' },
-  sideTitle: { fontFamily: "'Sora', sans-serif", fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '1rem' },
-
-  notifItem: { display: 'flex', gap: '10px', padding: '10px 0' },
-  notifIcon: { width: '30px', height: '30px', borderRadius: '8px', background: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  notifText: { fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '3px' },
-  notifTime: { fontSize: '11px', color: 'var(--text-muted)' },
-  viewAllBtn: { width: '100%', background: 'none', border: 'none', padding: '10px 0 0', fontSize: '13px', color: 'var(--text-muted)', cursor: 'pointer', textAlign: 'center' },
-
-  qaBtn: { width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '11px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '9px', cursor: 'pointer', transition: 'background 0.15s' },
-  qaLabel: { fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' },
-
-  activityItem: { display: 'flex', gap: '12px', padding: '12px 0' },
-  activityDot: { width: '10px', height: '10px', borderRadius: '50%', background: 'var(--brand)', flexShrink: 0, marginTop: '4px' },
-  activityTitle: { fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '2px' },
-  activityDesc: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '3px', lineHeight: '1.4' },
-  activityDate: { fontSize: '11px', color: 'var(--text-placeholder)' },
-
-  chatBtn: {
-    position: 'fixed', bottom: '1.5rem', right: '1.5rem',
-    width: '50px', height: '50px', borderRadius: '50%',
-    background: 'var(--brand)', border: 'none',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', boxShadow: '0 4px 16px rgba(42,63,143,0.35)', zIndex: 100,
-  },
 }
