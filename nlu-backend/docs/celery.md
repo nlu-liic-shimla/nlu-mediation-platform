@@ -19,7 +19,7 @@ venv\Scripts\activate
 
 **Step 2 — Start the worker**
 ```
-celery -A app.worker.celery_app worker --loglevel=info --pool=solo
+python -m celery -A tasks worker --loglevel=info
 ```
 Note: `--pool=solo` is required on Windows. On Mac/Linux you can omit it.
 
@@ -35,7 +35,7 @@ Connected to rediss://...
 
 | Task Name | Trigger | Description |
 |-----------|---------|-------------|
-| tasks.hello_task | Manual (smoke test) | Week 1 smoke test — confirms worker + Redis working |
+| tasks.hello | Manual (smoke test) | Week 1 smoke test — confirms worker + Redis working |
 | tasks.process_burst_1 | Auto — BOTH_SUBMITTED state | Starts AI analysis pipeline for a case |
 | tasks.process_submission_received | Stub — Week 3 | Reserved for future use |
 
@@ -58,9 +58,9 @@ python scripts/test_celery.py
 
 **Expected Terminal 1 output:**
 ```
-Task tasks.hello_task received
-hello from celery — worker is running, broker connected.
-Task tasks.hello_task succeeded
+Task tasks.hello received
+Hello from Celery!
+Task tasks.hello succeeded
 ```
 
 ---
