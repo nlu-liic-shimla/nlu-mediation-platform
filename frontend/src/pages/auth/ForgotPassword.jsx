@@ -15,7 +15,6 @@ export default function ForgotPassword() {
     if (!/\S+@\S+\.\S+/.test(email)) { setError('Enter a valid email address.'); return }
     setLoading(true)
     try {
-      // await authService.forgotPassword(email)
       await new Promise(r => setTimeout(r, 800))
       setSent(true)
     } catch (err) {
@@ -24,205 +23,104 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div style={s.page}>
-      <div style={s.logoRow}>
-        <Scale size={30} color="var(--brand)" strokeWidth={1.8} />
-        <span style={s.logoText}>SULAH</span>
-      </div>
-
-      <div style={s.card}>
-        {!sent ? (
-          <>
-            <h1 style={s.title}>Forgot password?</h1>
-            <p style={s.subtitle}>
-              Enter your email and we'll send you instructions to reset your password
-            </p>
-
-            <div style={s.field}>
-              <label style={s.label}>Email</label>
-              <input
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={e => { setEmail(e.target.value); setError('') }}
-                style={{ ...s.input, ...(error ? s.inputError : {}) }}
-                onFocus={e => e.target.style.borderColor = 'var(--brand)'}
-                onBlur={e => e.target.style.borderColor = error ? 'var(--error)' : 'var(--border)'}
-                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              />
-              {error && <p style={s.errorText}>{error}</p>}
-            </div>
-
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              style={{ ...s.submitBtn, opacity: loading ? 0.75 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
-              onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--brand-hover)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'var(--brand)' }}
-            >
-              <Mail size={18} color="white" />
-              {loading ? 'Sending…' : 'Send reset link'}
-            </button>
-
-            <button
-              onClick={() => navigate('/auth/login')}
-              style={s.backBtn}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--brand)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
-            >
-              <ArrowLeft size={16} />
-              Back to login
-            </button>
-          </>
-        ) : (
-          <>
-            <h1 style={s.title}>Check your email</h1>
-            <p style={s.subtitle}>
-              We've sent password reset instructions to your email
-            </p>
-
-            <div style={s.successBox}>
-              <div style={s.successIconWrap}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <path d="M22 4L12 14.01l-3-3" />
-                </svg>
-              </div>
-              <p style={s.successText}>
-                If an account exists for{' '}
-                <strong style={s.emailHighlight}>{email}</strong>
-                , you will receive an email with instructions to reset your password.
-              </p>
-            </div>
-
-            <p style={s.resendText}>
-              Didn't receive the email? Check your spam folder or{' '}
-              <button
-                onClick={() => { setSent(false); setEmail('') }}
-                style={s.tryAgainBtn}
-                onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-                onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-              >
-                try again
-              </button>
-            </p>
-
-            <button
-              onClick={() => navigate('/auth/login')}
-              style={s.backBtn}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--brand)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
-            >
-              <ArrowLeft size={16} />
-              Back to login
-            </button>
-          </>
-        )}
-      </div>
-
+    <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=DM+Sans:wght@400;500&display=swap');
-        input::placeholder { color: var(--text-placeholder); }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body, #root { height: 100%; }
+
+        .fp {
+          min-height: 100vh;
+          background: var(--bg-page);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem 1.25rem;
+          font-family: 'DM Sans', sans-serif;
+        }
+        .fp-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 2rem; }
+        .fp-logo-text { font-family: 'Sora', sans-serif; font-size: 24px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.08em; }
+        .fp-card { background: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-card); padding: 2.5rem; width: 100%; max-width: 480px; box-shadow: var(--shadow); }
+        .fp-title { font-family: 'Sora', sans-serif; font-size: clamp(22px, 4vw, 26px); font-weight: 700; color: var(--text-primary); margin-bottom: 10px; }
+        .fp-sub { font-size: 14px; color: var(--text-muted); line-height: 1.65; margin-bottom: 1.75rem; }
+        .fp-field { margin-bottom: 1.25rem; }
+        .fp-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; }
+        .fp-input { width: 100%; padding: 13px 15px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 14px; font-family: 'DM Sans', sans-serif; color: var(--text-primary); background: var(--bg-input); outline: none; transition: border-color 0.15s; }
+        .fp-input:focus { border-color: var(--brand); }
+        .fp-input.err { border-color: var(--error); }
+        .fp-err-text { font-size: 12px; color: var(--error); margin-top: 5px; }
+        .fp-btn { width: 100%; padding: 14px; background: var(--brand); color: #fff; border: none; border-radius: 11px; font-size: 15px; font-family: 'Sora', sans-serif; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: background 0.15s; margin-bottom: 1rem; }
+        .fp-btn:hover:not(:disabled) { background: var(--brand-hover); }
+        .fp-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        .fp-back { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: none; border: none; font-size: 14px; font-family: 'DM Sans', sans-serif; font-weight: 500; color: var(--text-secondary); cursor: pointer; padding: 8px 0; transition: color 0.15s; }
+        .fp-back:hover { color: var(--brand); }
+        .fp-success-box { background: var(--success-bg); border-radius: 14px; padding: 2rem 1.5rem; text-align: center; margin-bottom: 1.25rem; }
+        .fp-success-icon { width: 60px; height: 60px; border-radius: 50%; background: var(--success-icon-bg); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+        .fp-success-text { font-size: 14px; color: var(--text-secondary); line-height: 1.65; }
+        .fp-highlight { color: var(--brand); font-weight: 600; }
+        .fp-resend { font-size: 13px; color: var(--text-muted); text-align: center; margin-bottom: 1.25rem; line-height: 1.6; }
+        .fp-try-again { background: none; border: none; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 700; color: var(--text-primary); cursor: pointer; padding: 0; text-decoration: underline; }
+
         @media (max-width: 520px) {
-          .forgot-card { padding: 1.5rem 1.25rem !important; margin: 0 1rem !important; }
+          .fp { justify-content: center; padding: 1.5rem 1.25rem; }
+          .fp-logo { justify-content: center; }
+          .fp-card { border-radius: 16px; padding: 1.75rem 1.25rem; }
         }
       `}</style>
-    </div>
-  )
-}
 
-const s = {
-  page: {
-    minHeight: '100vh',
-    background: 'var(--bg-page)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '2.5rem 1rem 3rem',
-    fontFamily: "'DM Sans', sans-serif",
-  },
-  logoRow: {
-    display: 'flex', alignItems: 'center',
-    gap: '10px', marginBottom: '2rem',
-  },
-  logoText: {
-    fontFamily: "'Sora', sans-serif",
-    fontSize: '24px', fontWeight: '700',
-    color: 'var(--text-primary)', letterSpacing: '0.08em',
-  },
-  card: {
-    background: 'var(--bg-card)',
-    borderRadius: '16px',
-    border: '1px solid var(--border-card)',
-    padding: '2.25rem 2.5rem',
-    width: '100%', maxWidth: '520px',
-    boxShadow: 'var(--shadow)',
-  },
-  title: {
-    fontFamily: "'Sora', sans-serif",
-    fontSize: 'clamp(22px, 4vw, 26px)', fontWeight: '700',
-    color: 'var(--text-primary)', marginBottom: '10px',
-  },
-  subtitle: {
-    fontSize: '14px', color: 'var(--text-muted)',
-    lineHeight: '1.65', marginBottom: '1.75rem',
-  },
-  field: { marginBottom: '1.25rem' },
-  label: {
-    display: 'block', fontSize: '13px', fontWeight: '500',
-    color: 'var(--text-secondary)', marginBottom: '8px',
-  },
-  input: {
-    width: '100%', padding: '13px 14px',
-    border: '1.5px solid var(--border)',
-    borderRadius: '10px', fontSize: '14px',
-    fontFamily: "'DM Sans', sans-serif",
-    color: 'var(--text-primary)',
-    background: 'var(--bg-input)',
-    outline: 'none', transition: 'border-color 0.15s',
-  },
-  inputError: { borderColor: 'var(--error)' },
-  errorText: { fontSize: '12px', color: 'var(--error)', marginTop: '5px' },
-  submitBtn: {
-    width: '100%', padding: '13px',
-    background: 'var(--brand)', color: '#fff',
-    border: 'none', borderRadius: '10px',
-    fontSize: '15px', fontFamily: "'Sora', sans-serif", fontWeight: '600',
-    cursor: 'pointer', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', gap: '10px',
-    transition: 'background 0.15s', marginBottom: '1.25rem',
-  },
-  backBtn: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    gap: '8px', width: '100%', background: 'none', border: 'none',
-    fontSize: '14px', fontFamily: "'DM Sans', sans-serif", fontWeight: '500',
-    color: 'var(--text-secondary)', cursor: 'pointer',
-    padding: '6px 0', transition: 'color 0.15s',
-  },
-  successBox: {
-    background: 'var(--success-bg)',
-    borderRadius: '12px', padding: '1.75rem 1.5rem',
-    textAlign: 'center', marginBottom: '1.25rem',
-  },
-  successIconWrap: {
-    width: '56px', height: '56px', borderRadius: '50%',
-    background: 'var(--success-icon-bg)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    margin: '0 auto 1rem',
-  },
-  successText: {
-    fontSize: '14px', color: 'var(--text-secondary)',
-    lineHeight: '1.65', textAlign: 'center',
-  },
-  emailHighlight: { color: 'var(--brand)', fontWeight: '600' },
-  resendText: {
-    fontSize: '13px', color: 'var(--text-muted)',
-    textAlign: 'center', marginBottom: '1.25rem',
-  },
-  tryAgainBtn: {
-    background: 'none', border: 'none',
-    fontSize: '13px', fontFamily: "'DM Sans', sans-serif",
-    fontWeight: '700', color: 'var(--text-primary)',
-    cursor: 'pointer', padding: 0,
-  },
+      <div className="fp">
+        <div className="fp-logo">
+          <Scale size={30} color="var(--brand)" strokeWidth={1.8} />
+          <span className="fp-logo-text">SULAH</span>
+        </div>
+
+        <div className="fp-card">
+          {!sent ? (
+            <>
+              <h1 className="fp-title">Forgot password?</h1>
+              <p className="fp-sub">Enter your email and we'll send you instructions to reset your password</p>
+              <div className="fp-field">
+                <label className="fp-label">Email</label>
+                <input type="email" placeholder="name@example.com" value={email}
+                  onChange={e => { setEmail(e.target.value); setError('') }}
+                  className={`fp-input${error ? ' err' : ''}`}
+                  onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
+                {error && <p className="fp-err-text">{error}</p>}
+              </div>
+              <button className="fp-btn" onClick={handleSubmit} disabled={loading}>
+                <Mail size={18} color="white" />
+                {loading ? 'Sending…' : 'Send reset link'}
+              </button>
+              <button className="fp-back" onClick={() => navigate('/auth/login')}>
+                <ArrowLeft size={16} /> Back to login
+              </button>
+            </>
+          ) : (
+            <>
+              <h1 className="fp-title">Check your email</h1>
+              <p className="fp-sub">We've sent password reset instructions to your email</p>
+              <div className="fp-success-box">
+                <div className="fp-success-icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4L12 14.01l-3-3" />
+                  </svg>
+                </div>
+                <p className="fp-success-text">
+                  If an account exists for <strong className="fp-highlight">{email}</strong>, you will receive an email with instructions to reset your password.
+                </p>
+              </div>
+              <p className="fp-resend">
+                Didn't receive the email? Check your spam folder or{' '}
+                <button className="fp-try-again" onClick={() => { setSent(false); setEmail('') }}>try again</button>
+              </p>
+              <button className="fp-back" onClick={() => navigate('/auth/login')}>
+                <ArrowLeft size={16} /> Back to login
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  )
 }

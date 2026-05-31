@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
 import ForgotPassword from "../pages/auth/ForgotPassword";
+import InvitationAccept from '../pages/auth/InvitationAccept';
 
 // Party pages
 import PartyDashboard from "../pages/party/Dashboard";
@@ -34,8 +35,19 @@ export default function AppRoutes() {
         <Route path="/auth/login" element={<Login />} />
         <Route path="/auth/register" element={<Register />} />
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+        <Route path="/invitations/:token" element={<InvitationAccept />} />
 
         {/* ── Party routes (requesting_party + against_party) ── */}
+        <Route
+  path="/party/cases/:id/intake"
+  element={
+    <ProtectedRoute>
+      <RoleBasedRoute allowedRoles={['requesting_party', 'against_party']}>
+        <IntakeWizard />
+      </RoleBasedRoute>
+    </ProtectedRoute>
+  }
+/>
         <Route
           path="/party"
           element={
@@ -120,6 +132,15 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route path="/invitations/:token" element={<InvitationAccept />} />
+
+<Route path="/party/cases/:id/intake" element={
+  <ProtectedRoute>
+    <RoleBasedRoute allowedRoles={['requesting_party', 'against_party']}>
+      <IntakeWizard />
+    </RoleBasedRoute>
+  </ProtectedRoute>
+} />
 
         {/* ── Mediator routes ── */}
         <Route
