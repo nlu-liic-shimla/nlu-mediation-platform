@@ -4,7 +4,6 @@ Backend Role 2 | NLU Mediation Platform | Week 2
 ---
 
 ## Overview
-
 Celery is used for background task processing. When both parties submit their dispute statements, a Celery task triggers automatically to start the AI analysis pipeline (Burst 1). Redis (Upstash) acts as the message broker — it receives tasks from FastAPI and delivers them to the Celery worker.
 
 ---
@@ -21,6 +20,7 @@ venv\Scripts\activate
 ```
 python -m celery -A tasks worker --loglevel=info
 ```
+
 Note: `--pool=solo` is required on Windows. On Mac/Linux you can omit it.
 
 **Expected output:**
@@ -37,17 +37,16 @@ Connected to rediss://...
 |-----------|---------|-------------|
 | tasks.hello | Manual (smoke test) | Week 1 smoke test — confirms worker + Redis working |
 | tasks.process_burst_1 | Auto — BOTH_SUBMITTED state | Starts AI analysis pipeline for a case |
-| tasks.process_submission_received | Stub — Week 3 | Reserved for future use |
 
 ---
 
 ## How to Test Manually
 
-**Test hello_task (smoke test):**
+**Test hello (smoke test):**
 
 Terminal 1 — start worker:
 ```
-celery -A app.worker.celery_app worker --loglevel=info --pool=solo
+python -m celery -A tasks worker --loglevel=info
 ```
 
 Terminal 2 — trigger task:
@@ -75,7 +74,7 @@ process_burst_1.delay(case_id)
 
 This sends the task to Redis. The Celery worker picks it up and:
 1. Transitions case to `BURST_1_PROCESSING`
-2. Runs AI pipeline (Week 3 — placeholder sleep in Week 2)
+2. Runs AI pipeline (Week 3 — placeholder in Week 2)
 3. Transitions case to `BURST_1_COMPLETE` on success
 
 ---
@@ -89,7 +88,7 @@ If `process_burst_1` raises any unhandled exception:
 
 **To test PROCESSING_FAILED manually:**
 
-In `app/worker/tasks.py`, temporarily add `raise Exception("test error")` inside `process_burst_1` before the `time.sleep(2)` line. Trigger the task, then check:
+In `tasks.py`, temporarily add `raise Exception("test error")` inside `process_burst_1`. Trigger the task, then check:
 - Celery worker logs show the error
 - Case status in Supabase becomes `PROCESSING_FAILED`
 
