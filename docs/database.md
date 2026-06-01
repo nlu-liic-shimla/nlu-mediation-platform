@@ -241,3 +241,38 @@ ORDER BY tablename;
 -- END OF FILE
 -- All sections verified = Week 1 Database Role complete
 -- ============================================================
+
+-- ============================================================
+-- Week 2 Updates
+-- Database Role | Week 2
+-- ============================================================
+
+-- New Tables Added:
+
+-- case_invitations
+-- Purpose: Stores invitation tokens for against party to join a case
+-- Columns: id, case_id, invited_email, token_hash, role,
+--          expires_at, accepted_at, created_by, created_at
+-- RLS: SELECT open for token lookup, mediator can INSERT, UPDATE open for acceptance
+
+-- documents
+-- Purpose: Stores metadata of documents uploaded by parties
+-- Columns: id, case_id, uploaded_by, file_name, file_size,
+--          file_type, storage_path, created_at
+-- RLS: Party sees own, mediator sees all for their cases
+-- Index: idx_documents_case_id
+
+-- Updated Tables:
+
+-- submissions
+-- Added columns: timeline, relationship_type, prior_negotiation, submitted_at
+-- RLS: Party sees only their own, mediator sees both
+
+-- cases
+-- Added RLS: UPDATE policy added for case status transitions
+
+-- ai_analysis
+-- Added columns: started_at, completed_at, failed
+
+-- Storage:
+-- case-documents bucket: INSERT and SELECT allowed for authenticated users
