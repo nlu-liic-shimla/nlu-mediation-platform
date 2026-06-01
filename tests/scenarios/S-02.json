@@ -1,0 +1,18 @@
+{
+  "id": "S-02",
+  "description": "Freelance unpaid invoice dispute",
+  "dispute_type": "commercial_contract",
+  "party_a_statement": "I completed a full website design project for this client in August 2025. The agreed payment was 75000 INR for 3 months of work. I delivered everything on time including all revisions they asked for. They have not paid a single rupee despite 4 invoices sent. I have all emails and WhatsApp messages as proof.",
+  "party_b_statement": "The freelancer did not deliver what was agreed. The website has multiple bugs, the mobile version does not work, and they missed 2 deadlines. I asked for fixes multiple times but they refused. I should not have to pay for incomplete work. I am willing to pay 25000 INR for what was actually delivered.",
+  "metadata": {
+    "relationship_type": "business_partner",
+    "monetary_amount": 75000,
+    "currency": "INR",
+    "prior_negotiation": true
+  },
+  "expected": {
+    "dispute_type": "commercial_contract",
+    "mediatability_band": "High",
+    "extraction_confidence_min": 0.7
+  }
+}

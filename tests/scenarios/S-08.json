@@ -1,0 +1,20 @@
+{
+  "id": "S-08",
+  "description": "Vague and ambiguous dispute - edge case test",
+  "dispute_type": "other",
+  "party_a_statement": "This person owes me money. We had a deal and they broke it. I am very upset and want justice. They know what they did. Everyone in our community knows this person is dishonest. I want everything back that I lost because of them.",
+  "party_b_statement": "I don't owe this person anything. Whatever happened between us was resolved long ago. They are just trying to harass me now. I have nothing more to say about this matter.",
+  "metadata": {
+    "relationship_type": "other",
+    "monetary_amount": null,
+    "currency": "INR",
+    "prior_negotiation": false
+  },
+  "expected": {
+    "dispute_type": "other",
+    "mediatability_band": "Low",
+    "extraction_confidence_min": 0.0,
+    "extraction_confidence_max": 0.5,
+    "note": "This scenario tests low confidence path. extraction_confidence should be below 0.5 and mediator flag should trigger."
+  }
+}

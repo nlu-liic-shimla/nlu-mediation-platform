@@ -31,10 +31,10 @@ celery_app.conf.update(
 )
 
 
-@celery_app.task(name="tasks.hello_task", bind=True)
-def hello_task(self):
-    logger.info("hello from celery — worker is running, broker connected.")
-    return {"status": "ok", "message": "hello from celery"}
+@celery_app.task(name="tasks.hello", bind=True)
+def hello(self):
+    print("Hello from Celery!")
+    return {"status": "ok", "message": "Hello from Celery!"}
 
 
 @celery_app.task(name="tasks.process_submission_received", bind=True)

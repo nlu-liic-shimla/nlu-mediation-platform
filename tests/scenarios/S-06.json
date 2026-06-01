@@ -1,0 +1,18 @@
+{
+  "id": "S-06",
+  "description": "Property boundary dispute between neighbours",
+  "dispute_type": "property_boundary",
+  "party_a_statement": "My neighbour has illegally constructed a wall 2 feet inside my property boundary. I have the original property documents and survey map clearly showing the boundary. This construction has reduced my usable land and blocked my window. The construction happened 6 months ago while I was travelling. I want the wall demolished and compensation for damages of 50000 INR.",
+  "party_b_statement": "The wall I constructed is entirely within my property boundary. I have my own property documents showing this. The survey my neighbour is referring to is outdated and incorrect. I got a fresh survey done by a licensed surveyor before construction which confirmed the wall is on my land. I am not willing to demolish anything.",
+  "metadata": {
+    "relationship_type": "neighbour",
+    "monetary_amount": 50000,
+    "currency": "INR",
+    "prior_negotiation": false
+  },
+  "expected": {
+    "dispute_type": "property_boundary",
+    "mediatability_band": "Low",
+    "extraction_confidence_min": 0.65
+  }
+}

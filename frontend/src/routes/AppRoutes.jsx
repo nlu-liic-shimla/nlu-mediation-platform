@@ -193,6 +193,29 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/mediator/analysis"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <Analysis />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mediator/proposals"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <ProposalManagement />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ── Fallback ── */}
+        <Route path="*" element={<Navigate to="/" replace />} />
 
         {/* ── Fallback ── */}
         <Route path="*" element={<Navigate to="/" replace />} />
