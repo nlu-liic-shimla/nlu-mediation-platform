@@ -1,0 +1,18 @@
+{
+  "id": "S-04",
+  "description": "Defective consumer product dispute",
+  "dispute_type": "consumer",
+  "party_a_statement": "I bought a washing machine from this company for 35000 INR in January 2026. Within 2 months it stopped working completely. The motor burned out. When I called customer service they said it was my fault due to voltage fluctuation. This is completely false. I want a full replacement or full refund. I have the bill and warranty card.",
+  "party_b_statement": "The customer used the machine incorrectly and did not use a voltage stabilizer as mentioned in the user manual. The warranty clearly states that damage due to voltage fluctuation is not covered. Our technician inspected and confirmed external damage. We are willing to offer a 40 percent discount on repair costs as a goodwill gesture.",
+  "metadata": {
+    "relationship_type": "consumer_business",
+    "monetary_amount": 35000,
+    "currency": "INR",
+    "prior_negotiation": true
+  },
+  "expected": {
+    "dispute_type": "consumer",
+    "mediatability_band": "High",
+    "extraction_confidence_min": 0.75
+  }
+}

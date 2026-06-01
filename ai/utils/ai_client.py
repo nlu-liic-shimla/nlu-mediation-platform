@@ -1,5 +1,5 @@
 """
-claude_client.py
+ai_client.py
 NLU Shimla — AI-Powered Mediation Platform
 -------------------------------------------
 Shared Groq API utility used by all 7 subsystems.
@@ -83,7 +83,7 @@ def call_with_retry(
     """
 
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(dotenv_path="C:/Users/desk/Downloads/nlu-mediation-platform/.env")
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
     full_system_prompt = system_prompt.strip() + "\n\n" + JSON_INSTRUCTION.strip()

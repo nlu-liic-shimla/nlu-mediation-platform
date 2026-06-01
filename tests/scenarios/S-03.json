@@ -1,0 +1,18 @@
+{
+  "id": "S-03",
+  "description": "Wrongful dismissal employment dispute",
+  "dispute_type": "employment",
+  "party_a_statement": "I was fired from my job at ABC Technologies without any warning or reason on March 15 2026. I had been working there for 4 years with excellent performance reviews. They just called me in one day and said my services are no longer required. No notice period was given and no severance pay. This is completely illegal and I want compensation of 3 months salary which is 180000 INR plus my pending dues.",
+  "party_b_statement": "The employee was terminated due to repeated performance issues and insubordination over the past 6 months. We have documented warnings and emails showing this. His work quality had deteriorated significantly and he refused to follow manager instructions multiple times. We followed proper HR procedure. We are willing to pay 15 days salary as full and final settlement.",
+  "metadata": {
+    "relationship_type": "employer_employee",
+    "monetary_amount": 180000,
+    "currency": "INR",
+    "prior_negotiation": false
+  },
+  "expected": {
+    "dispute_type": "employment",
+    "mediatability_band": "Medium",
+    "extraction_confidence_min": 0.65
+  }
+}
