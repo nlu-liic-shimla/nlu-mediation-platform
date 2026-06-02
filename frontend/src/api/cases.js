@@ -6,12 +6,12 @@ export const getCases = async () => {
 };
 
 export const getCaseById = async (caseId) => {
-  const response = await client.get(`/api/v1/cases/${caseId}`);
+  const response = await client.get(`/cases/${caseId}`);
   return response.data;
 };
 
 export const createCase = async (payload) => {
-  const response = await client.post("/api/v1/cases/", payload);
+  const response = await client.post("/cases/", payload);
   return response.data;
 };
 
@@ -32,9 +32,13 @@ export const submitDispute = async (caseId, formData) => {
   }
 
   const response = await client.post(
-    `/api/v1/cases/${caseId}/submissions`,
+    `/cases/${caseId}/submissions`,
     data,
     { headers: { "Content-Type": "multipart/form-data" } }
   );
+  return response.data;
+};
+export const getAnalysisStatus = async (caseId) => {
+  const response = await client.get(`/cases/${caseId}/analysis/status`);
   return response.data;
 };
