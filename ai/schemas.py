@@ -547,23 +547,22 @@ class MediatabilitySore(BaseModel):
 class Burst1Output(BaseModel):
     """
     Complete output of Burst 1 pipeline.
-    Stored as JSON in the ai_analysis table against the case.
-    All fields except conflict_extraction are Optional — if a sub-system
-    fails after retries, its field is None and the mediator is notified.
+    Sub-systems: F (tone), E (bias), A (extraction), B (summary), G (mediatability)
+    Stored as JSON in ai_analysis table.
     """
-
-    conflict_extraction: ConflictExtraction
-    neutral_summary: Optional[NeutralSummary]       = None
-    bias_removal: Optional[BiasRemovalOutput]        = None
-    tone_analysis: Optional[ToneAnalysis]            = None
-    mediatability: Optional[MediatabilitySore]       = None
-
+    bias_removal_a: Optional[BiasRemovalOutput]        = None
+    bias_removal_b: Optional[BiasRemovalOutput]        = None
+    tone_analysis: Optional[ToneAnalysis]              = None
+    conflict_extraction: Optional[ConflictExtraction]  = None
+    neutral_summary: Optional[NeutralSummary]          = None
+    mediatability: Optional[MediatabilitySore]         = None
+    pipeline_version: str                              = "1.0"
+    completed_steps: List[str]                         = []
 
 class Burst2Output(BaseModel):
     """
     Complete output of Burst 2 pipeline.
-    Stored in ai_analysis table after questionnaire responses are received.
+    Sub-systems: C (questionnaire), D (BATNA/WATNA)
     """
-
-    questionnaire: Optional[QuestionnaireOutput]    = None
-    batna_watna: Optional[BatnaWatnaOutput]         = None
+    questionnaire: Optional[QuestionnaireOutput]  = None
+    batna_watna: Optional[BatnaWatnaOutput]       = None
