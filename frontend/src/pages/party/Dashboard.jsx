@@ -1,134 +1,160 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useTheme } from '../../context/ThemeContext'
 import ThemeToggle from '../../components/ui/ThemeToggle'
-import { Scale, LayoutDashboard, FilePlus, MessageSquare, FileText, CheckSquare, Bell, Search, ChevronRight, ChevronLeft, Calendar, TrendingUp, Clock, AlertCircle, Bot } from 'lucide-react'
+import {
+  Scale, LayoutDashboard, FilePlus, MessageSquare,
+  FileText, CheckSquare, Bell, Search, ChevronRight,
+  ChevronLeft, Calendar, TrendingUp, Clock, AlertCircle,
+  Bot, LogOut, Menu, X
+} from 'lucide-react'
 
 const NAV_ITEMS = [
-  { id: 'dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
-  { id: 'new-case',     icon: FilePlus,        label: 'New Case' },
-  { id: 'questionnaire',icon: MessageSquare,   label: 'Questionnaire' },
-  { id: 'proposals',    icon: FileText,        label: 'Proposals' },
-  { id: 'settlement',   icon: CheckSquare,     label: 'Settlement' },
+  { id: 'dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
+  { id: 'new-case',      icon: FilePlus,        label: 'New Case' },
+  { id: 'questionnaire', icon: MessageSquare,   label: 'Questionnaire' },
+  { id: 'proposals',     icon: FileText,        label: 'Proposals' },
+  { id: 'settlement',    icon: CheckSquare,     label: 'Settlement' },
 ]
 
-// ── Sidebar ──
-const Sidebar = ({ active, onNavigate, collapsed, onToggle }) => (
-  <aside style={{ ...s.sidebar, width: collapsed ? '60px' : '240px' }}>
-    {/* Logo */}
-    <div style={s.sidebarLogoRow}>
-      <div style={s.sidebarLogoIcon}>
-        <Scale size={20} color="var(--brand)" strokeWidth={1.8} />
-      </div>
-      {!collapsed && <span style={s.sidebarLogoText}>SULAH</span>}
-    </div>
-
-    {/* Nav */}
-    <nav style={s.sidebarNav}>
-      {NAV_ITEMS.map(({ id, icon: Icon, label }) => {
-        const isActive = active === id
-        return (
-          <button
-            key={id}
-            title={collapsed ? label : ''}
-            onClick={() => onNavigate(id)}
-            style={{
-              ...s.navBtn,
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              ...(isActive ? s.navBtnActive : {}),
-            }}
-          >
-            <Icon size={18} strokeWidth={isActive ? 2 : 1.6} style={{ flexShrink: 0 }} />
-            {!collapsed && <span style={s.navLabel}>{label}</span>}
-          </button>
-        )
-      })}
-    </nav>
-
-    {/* AI Assistant */}
-    {!collapsed && (
-      <div style={s.aiAssistant}>
-        <div style={s.aiIcon}><Bot size={18} color="var(--brand)" /></div>
-        <div>
-          <p style={s.aiTitle}>AI Assistant</p>
-          <p style={s.aiSubtitle}>Always here to help</p>
-        </div>
-      </div>
+const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile, mobileOpen, onMobileClose }) => (
+  <>
+    {/* Mobile overlay */}
+    {isMobile && mobileOpen && (
+      <div className="pd-overlay" onClick={onMobileClose} />
     )}
 
-    {/* Collapse toggle */}
-    <button
-      onClick={onToggle}
-      style={s.collapseBtn}
-      title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-    >
-      {collapsed
-        ? <ChevronRight size={16} />
-        : <><ChevronLeft size={16} /><span style={s.collapseLabel}>Collapse</span></>
-      }
-    </button>
-  </aside>
+    <aside className={`pd-sidebar ${collapsed && !isMobile ? 'collapsed' : ''} ${isMobile ? (mobileOpen ? 'mobile-open' : 'mobile-closed') : ''}`}>
+      <div className="pd-sidebar-logo">
+        <div className="pd-logo-icon">
+          <Scale size={20} color="var(--brand)" strokeWidth={1.8} />
+        </div>
+        {(!collapsed || isMobile) && <span className="pd-logo-text">SULAH</span>}
+        {isMobile && (
+          <button className="pd-mobile-close" onClick={onMobileClose}>
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
+      <nav className="pd-sidebar-nav">
+        {NAV_ITEMS.map(({ id, icon: Icon, label }) => {
+          const isActive = active === id
+          return (
+            <button
+              key={id}
+              title={collapsed && !isMobile ? label : ''}
+              onClick={() => { onNavigate(id); if (isMobile) onMobileClose() }}
+              className={`pd-nav-btn ${isActive ? 'active' : ''} ${collapsed && !isMobile ? 'centered' : ''}`}
+            >
+              <Icon size={18} strokeWidth={isActive ? 2 : 1.6} style={{ flexShrink: 0 }} />
+              {(!collapsed || isMobile) && <span className="pd-nav-label">{label}</span>}
+            </button>
+          )
+        })}
+      </nav>
+
+      {(!collapsed || isMobile) && (
+        <div className="pd-ai-box">
+          <div className="pd-ai-icon"><Bot size={18} color="var(--brand)" /></div>
+          <div>
+            <p className="pd-ai-title">AI Assistant</p>
+            <p className="pd-ai-sub">Always here to help</p>
+          </div>
+        </div>
+      )}
+
+      {!isMobile && (
+        <button className="pd-collapse-btn" onClick={onToggle}>
+          {collapsed
+            ? <ChevronRight size={16} />
+            : <><ChevronLeft size={16} /><span>Collapse</span></>
+          }
+        </button>
+      )}
+
+      {isMobile && (
+        <button className="pd-signout-sidebar" onClick={onSignOut}>
+          <LogOut size={16} />
+          <span>Sign out</span>
+        </button>
+      )}
+    </aside>
+  </>
 )
 
-// ── Stat card ──
 const StatCard = ({ label, value, sub, subColor, icon, iconBg }) => (
-  <div style={s.statCard}>
-    <div>
-      <p style={s.statLabel}>{label}</p>
-      <p style={s.statValue}>{value}</p>
-      <p style={{ ...s.statSub, color: subColor || 'var(--text-muted)' }}>{sub}</p>
+  <div className="pd-stat-card">
+    <div className="pd-stat-info">
+      <p className="pd-stat-label">{label}</p>
+      <p className="pd-stat-value">{value}</p>
+      <p className="pd-stat-sub" style={{ color: subColor || 'var(--text-muted)' }}>{sub}</p>
     </div>
-    <div style={{ ...s.statIconWrap, background: iconBg }}>{icon}</div>
+    <div className="pd-stat-icon" style={{ background: iconBg }}>{icon}</div>
   </div>
 )
 
-// ── Case card ──
 const CaseCard = ({ title, status, caseId, vs, progress, aiScore, nextDate, statusColor, statusBg, onView }) => (
-  <div style={s.caseCard}>
-    <div style={s.caseTop}>
-      <div style={{ flex: 1 }}>
-        <div style={s.caseTitleRow}>
-          <h3 style={s.caseTitle}>{title}</h3>
-          <span style={{ ...s.badge, color: statusColor, background: statusBg }}>{status}</span>
+  <div className="pd-case-card">
+    <div className="pd-case-top">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="pd-case-title-row">
+          <h3 className="pd-case-title">{title}</h3>
+          <span className="pd-case-badge" style={{ color: statusColor, background: statusBg }}>{status}</span>
         </div>
-        <p style={s.caseMeta}>Case ID: {caseId} • vs. {vs}</p>
+        <p className="pd-case-meta">Case ID: {caseId} • vs. {vs}</p>
       </div>
-      <div style={s.aiScore}>
-        <p style={s.aiScoreLabel}>AI Score</p>
-        <p style={s.aiScoreValue}>{aiScore}%</p>
-      </div>
-    </div>
-    <div style={s.progressSection}>
-      <div style={s.progressRow}>
-        <span style={s.progressLabel}>Case Progress</span>
-        <span style={s.progressPct}>{progress}%</span>
-      </div>
-      <div style={s.progressBg}>
-        <div style={{ ...s.progressFill, width: `${progress}%` }} />
+      <div className="pd-ai-score">
+        <p className="pd-ai-score-label">AI Score</p>
+        <p className="pd-ai-score-value">{aiScore}%</p>
       </div>
     </div>
-    <div style={s.caseBottom}>
+    <div className="pd-progress-section">
+      <div className="pd-progress-row">
+        <span className="pd-progress-label">Case Progress</span>
+        <span className="pd-progress-pct">{progress}%</span>
+      </div>
+      <div className="pd-progress-bg">
+        <div className="pd-progress-fill" style={{ width: `${progress}%` }} />
+      </div>
+    </div>
+    <div className="pd-case-bottom">
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Calendar size={13} color="var(--text-muted)" />
-        <span style={s.nextDate}>Next: {nextDate}</span>
+        <span className="pd-next-date">Next: {nextDate}</span>
       </div>
-      <button style={s.viewBtn} onClick={onView}
-        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand)'}
-        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
-        View Details
-      </button>
+      <button className="pd-view-btn" onClick={onView}>View Details</button>
     </div>
   </div>
 )
 
-// ── Main ──
 export default function Dashboard() {
   const navigate = useNavigate()
   const [activeNav, setActiveNav] = useState('dashboard')
   const [collapsed, setCollapsed] = useState(false)
   const [search, setSearch] = useState('')
+  const [showNotifs, setShowNotifs] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
-  const sidebarWidth = collapsed ? 60 : 240
+  const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
+  const userEmail = user.email || 'User'
+  const userInitials = userEmail.substring(0, 2).toUpperCase()
+  const userName = userEmail.split('@')[0]
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  const handleSignOut = () => {
+    localStorage.removeItem('nlu_token')
+    localStorage.removeItem('nlu_role')
+    localStorage.removeItem('nlu_user')
+    navigate('/auth/login')
+  }
+
+  const sidebarWidth = isMobile ? 0 : (collapsed ? 60 : 240)
 
   const cases = [
     { title: 'Contract Dispute Resolution', status: 'in progress', statusColor: '#1a56b0', statusBg: '#dbeafe', caseId: 'CASE-2024-001', vs: 'TechCorp Inc.', progress: 65, aiScore: 78, nextDate: '5/25/2026' },
@@ -148,340 +174,326 @@ export default function Dashboard() {
   ]
 
   const quickActions = [
-    { icon: <FilePlus size={17} />, label: 'Start New Case' },
-    { icon: <FileText size={17} />, label: 'Upload Documents' },
-    { icon: <Calendar size={17} />, label: 'Schedule Session' },
-  ]
+  { icon: <FilePlus size={17} />, label: 'Start New Case', onClick: () => {} },
+  { 
+    icon: <FileText size={17} />, 
+    label: 'Upload Documents', 
+    onClick: () => cases[0] && navigate(`/party/cases/${cases[0].id}/documents`)
+  },
+  { icon: <Calendar size={17} />, label: 'Schedule Session', onClick: () => {} },
+]
 
   return (
-    <div style={s.page}>
-      <Sidebar
-        active={activeNav}
-        onNavigate={setActiveNav}
-        collapsed={collapsed}
-        onToggle={() => setCollapsed(p => !p)}
-      />
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=DM+Sans:wght@400;500&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        input::placeholder { color: var(--text-placeholder); }
 
-      {/* Main area shifts with sidebar */}
-      <div style={{ ...s.main, marginLeft: `${sidebarWidth}px`, transition: 'margin-left 0.25s ease' }}>
+        .pd-page { display: flex; min-height: 100vh; background: var(--bg-page); font-family: 'DM Sans', sans-serif; }
 
-        {/* Topbar */}
-        <header style={s.topbar}>
-          <div style={s.searchWrap}>
-            <Search size={15} color="var(--text-muted)" />
-            <input
-              placeholder="Search cases, documents, or proposals..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={s.searchInput}
-            />
-          </div>
-          <div style={s.topRight}>
-            <ThemeToggle />
-            <div style={{ position: 'relative', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-              <Bell size={20} color="var(--text-secondary)" />
-              <span style={s.badge2}>2</span>
+        /* ── Overlay ── */
+        .pd-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 49; }
+
+        /* ── Sidebar ── */
+        .pd-sidebar {
+          position: fixed; top: 0; left: 0; bottom: 0;
+          width: 240px; background: var(--bg-card);
+          border-right: 1px solid var(--border-card);
+          display: flex; flex-direction: column;
+          z-index: 50; overflow: hidden;
+          transition: width 0.25s ease, transform 0.25s ease;
+        }
+        .pd-sidebar.collapsed { width: 60px; }
+        .pd-sidebar.mobile-closed { transform: translateX(-100%); width: 240px; }
+        .pd-sidebar.mobile-open { transform: translateX(0); width: 240px; }
+
+        .pd-sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 14px; min-height: 60px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .pd-logo-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .pd-logo-text { font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.08em; white-space: nowrap; flex: 1; }
+        .pd-mobile-close { background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; padding: 4px; }
+
+        .pd-sidebar-nav { display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; flex: 1; overflow-y: auto; }
+        .pd-nav-btn { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; border: none; background: none; color: var(--text-muted); cursor: pointer; transition: all 0.15s; width: 100%; white-space: nowrap; font-family: 'DM Sans', sans-serif; }
+        .pd-nav-btn.centered { justify-content: center; }
+        .pd-nav-btn:hover { background: var(--bg-muted); color: var(--text-primary); }
+        .pd-nav-btn.active { background: var(--brand-light); color: var(--brand); }
+        .pd-nav-label { font-size: 14px; font-weight: 500; }
+
+        .pd-ai-box { display: flex; align-items: center; gap: 10px; margin: 8px; padding: 12px; background: var(--bg-muted); border-radius: 10px; flex-shrink: 0; }
+        .pd-ai-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .pd-ai-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+        .pd-ai-sub { font-size: 11px; color: var(--text-muted); }
+
+        .pd-collapse-btn { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border: none; border-top: 1px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; flex-shrink: 0; white-space: nowrap; }
+        .pd-collapse-btn:hover { color: var(--text-primary); }
+
+        .pd-signout-sidebar { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border: none; border-top: 1px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; flex-shrink: 0; width: 100%; }
+        .pd-signout-sidebar:hover { color: #ef4444; }
+
+        /* ── Main ── */
+        .pd-main { flex: 1; display: flex; flex-direction: column; min-height: 100vh; transition: margin-left 0.25s ease; }
+
+        /* ── Topbar ── */
+        .pd-topbar { height: 60px; background: var(--bg-card); border-bottom: 1px solid var(--border-card); display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; position: sticky; top: 0; z-index: 40; gap: 1rem; }
+        .pd-hamburger { background: none; border: none; cursor: pointer; color: var(--text-secondary); display: none; align-items: center; padding: 4px; }
+        .pd-search-wrap { display: flex; align-items: center; gap: 8px; background: var(--bg-muted); border: 1px solid var(--border); border-radius: 8px; padding: 0 12px; flex: 0 1 360px; min-width: 0; }
+        .pd-search-input { border: none; background: none; outline: none; font-size: 13px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; width: 100%; padding: 9px 0; }
+        .pd-topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+        .pd-notif-wrap { position: relative; }
+        .pd-notif-btn { position: relative; background: none; border: none; cursor: pointer; display: flex; align-items: center; padding: 4px; }
+        .pd-notif-badge { position: absolute; top: -2px; right: -2px; width: 16px; height: 16px; background: #ef4444; color: #fff; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+        .pd-notif-dropdown { position: absolute; top: calc(100% + 8px); right: 0; width: 300px; background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px; box-shadow: var(--shadow); z-index: 100; overflow: hidden; }
+        .pd-notif-title { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; color: var(--text-primary); padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
+        .pd-notif-item-drop { display: flex; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        .pd-notif-drop-icon { width: 28px; height: 28px; border-radius: 6px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .pd-notif-drop-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 3px; }
+        .pd-notif-drop-time { font-size: 11px; color: var(--text-muted); }
+        .pd-notif-view-all { width: 100%; background: none; border: none; padding: 12px; font-size: 13px; color: var(--brand); cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500; }
+
+        .pd-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+        .pd-avatar-name { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; }
+        .pd-signout-btn { display: flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+        .pd-signout-btn:hover { border-color: #ef4444; color: #ef4444; }
+
+        /* ── Content ── */
+        .pd-content { flex: 1; overflow-y: auto; }
+        .pd-inner { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+        .pd-page-header { margin-bottom: 1.5rem; }
+        .pd-page-title { font-family: 'Sora', sans-serif; font-size: clamp(20px, 3vw, 26px); font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+        .pd-page-sub { font-size: 14px; color: var(--text-muted); }
+
+        .pd-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
+        .pd-left-col { flex: 1; min-width: 0; }
+        .pd-right-col { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; gap: 1rem; }
+
+        /* Stats */
+        .pd-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
+        .pd-stat-card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-card); padding: 1.1rem; display: flex; justify-content: space-between; align-items: flex-start; min-width: 0; }
+        .pd-stat-info { flex: 1; min-width: 0; }
+        .pd-stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pd-stat-value { font-family: 'Sora', sans-serif; font-size: clamp(16px, 2vw, 22px); font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+        .pd-stat-sub { font-size: 11px; }
+        .pd-stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 8px; }
+
+        /* Section */
+        .pd-section { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-card); padding: 1.25rem; }
+        .pd-section-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; gap: 1rem; }
+        .pd-section-title { font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+        .pd-section-sub { font-size: 13px; color: var(--text-muted); }
+        .pd-new-case-btn { padding: 8px 16px; background: var(--brand); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-family: 'Sora', sans-serif; font-weight: 600; cursor: pointer; transition: background 0.15s; flex-shrink: 0; }
+        .pd-new-case-btn:hover { background: var(--brand-hover); }
+
+        /* Case card */
+        .pd-case-card { border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1rem; }
+        .pd-case-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; gap: 1rem; }
+        .pd-case-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+        .pd-case-title { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .pd-case-badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 99px; white-space: nowrap; }
+        .pd-case-meta { font-size: 12px; color: var(--text-muted); }
+        .pd-ai-score { text-align: right; flex-shrink: 0; }
+        .pd-ai-score-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+        .pd-ai-score-value { font-family: 'Sora', sans-serif; font-size: clamp(18px, 2vw, 22px); font-weight: 700; color: var(--brand); }
+        .pd-progress-section { margin-bottom: 1rem; }
+        .pd-progress-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .pd-progress-label { font-size: 12px; color: var(--text-muted); }
+        .pd-progress-pct { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+        .pd-progress-bg { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+        .pd-progress-fill { height: 100%; background: var(--brand); border-radius: 99px; transition: width 0.3s; }
+        .pd-case-bottom { display: flex; justify-content: space-between; align-items: center; }
+        .pd-next-date { font-size: 12px; color: var(--text-muted); }
+        .pd-view-btn { padding: 7px 14px; background: none; border: 1px solid var(--border); border-radius: 7px; font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: border-color 0.15s; }
+        .pd-view-btn:hover { border-color: var(--brand); color: var(--brand); }
+
+        /* Side cards */
+        .pd-side-card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-card); padding: 1.1rem; }
+        .pd-side-title { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; }
+        .pd-notif-item { display: flex; gap: 10px; padding: 10px 0; }
+        .pd-notif-icon { width: 28px; height: 28px; border-radius: 6px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .pd-notif-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 3px; }
+        .pd-notif-time { font-size: 11px; color: var(--text-muted); }
+        .pd-view-all { width: 100%; background: none; border: none; padding: 10px 0 0; font-size: 13px; color: var(--text-muted); cursor: pointer; text-align: center; font-family: 'DM Sans', sans-serif; }
+        .pd-view-all:hover { color: var(--brand); }
+        .pd-qa-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 9px; cursor: pointer; transition: background 0.15s; font-family: 'DM Sans', sans-serif; }
+        .pd-qa-btn:hover { background: var(--bg-hover); }
+        .pd-qa-label { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+        .pd-activity-item { display: flex; gap: 12px; padding: 12px 0; }
+        .pd-activity-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--brand); flex-shrink: 0; margin-top: 4px; }
+        .pd-activity-title { font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 2px; }
+        .pd-activity-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 3px; line-height: 1.4; }
+        .pd-activity-date { font-size: 11px; color: var(--text-placeholder); }
+
+        .pd-chat-btn { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 50px; height: 50px; border-radius: 50%; background: var(--brand); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 16px rgba(42,63,143,0.35); z-index: 100; }
+        .pd-chat-btn:hover { background: var(--brand-hover); }
+
+        /* ── Responsive ── */
+        @media (max-width: 1200px) {
+          .pd-stats-grid { grid-template-columns: repeat(2, 1fr); }
+          .pd-right-col { width: 260px; }
+        }
+        @media (max-width: 900px) {
+          .pd-layout { flex-direction: column; }
+          .pd-right-col { width: 100%; }
+        }
+        @media (max-width: 768px) {
+          .pd-sidebar { transform: translateX(-100%); }
+          .pd-main { margin-left: 0 !important; }
+          .pd-hamburger { display: flex !important; }
+          .pd-avatar-name { display: none; }
+          .pd-signout-btn span { display: none; }
+          .pd-signout-btn { padding: 7px; }
+          .pd-search-wrap { flex: 1; }
+          .pd-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+          .pd-notif-dropdown { right: -60px; width: 270px; }
+        }
+        @media (max-width: 480px) {
+          .pd-inner { padding: 1rem 0.75rem; }
+          .pd-topbar { padding: 0 0.75rem; gap: 0.5rem; }
+          .pd-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+          .pd-stat-card { padding: 0.85rem; }
+          .pd-stat-value { font-size: 16px; }
+          .pd-stat-icon { width: 34px; height: 34px; }
+        }
+        @media (max-width: 360px) {
+          .pd-stats-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
+
+      <div className="pd-page">
+        <Sidebar
+          active={activeNav}
+          onNavigate={setActiveNav}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed(p => !p)}
+          onSignOut={handleSignOut}
+          isMobile={isMobile}
+          mobileOpen={mobileOpen}
+          onMobileClose={() => setMobileOpen(false)}
+        />
+
+        <div className="pd-main" style={{ marginLeft: isMobile ? 0 : (collapsed ? 60 : 240), transition: 'margin-left 0.25s ease' }}>
+          {/* Topbar */}
+          <header className="pd-topbar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+              <button className="pd-hamburger" onClick={() => setMobileOpen(true)}>
+                <Menu size={22} color="var(--text-secondary)" />
+              </button>
+              <div className="pd-search-wrap">
+                <Search size={15} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                <input className="pd-search-input" placeholder="Search cases, documents, or proposals..." value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
             </div>
-            <div style={s.avatar}>SJ</div>
-            <span style={s.avatarName}>Sarah Johnson</span>
-          </div>
-        </header>
-
-        {/* Page content */}
-        <div style={s.content}>
-          <div style={s.inner}>
-
-            <div style={s.pageHeader}>
-              <h1 style={s.pageTitle}>Dashboard</h1>
-              <p style={s.pageSub}>Welcome back, Sarah. Here's your case overview.</p>
-            </div>
-
-            <div style={s.layout}>
-              {/* Left */}
-              <div style={s.leftCol}>
-                {/* Stats */}
-                <div style={s.statsGrid}>
-                  <StatCard label="Active Cases" value="2" sub="+1 this month" subColor="#16a34a" iconBg="#eef1fb" icon={<FileText size={22} color="#2a3f8f" />} />
-                  <StatCard label="Pending Proposals" value="3" sub="2 require action" iconBg="#fff7ed" icon={<Clock size={22} color="#ea8c0d" />} />
-                  <StatCard label="Completed" value="5" sub="100% success rate" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
-                  <StatCard label="Avg. Resolution Time" value="45 days" sub="-12 days vs avg" subColor="#dc2626" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
-                </div>
-
-                {/* Cases section */}
-                <div style={s.section}>
-                  <div style={s.sectionHead}>
-                    <div>
-                      <h2 style={s.sectionTitle}>Active Cases</h2>
-                      <p style={s.sectionSub}>Track your ongoing mediation cases</p>
-                    </div>
-                    <button style={s.newCaseBtn}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--brand-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'var(--brand)'}>
-                      New Case
-                    </button>
+            <div className="pd-topbar-right">
+              <ThemeToggle />
+              <div className="pd-notif-wrap">
+                <button className="pd-notif-btn" onClick={() => setShowNotifs(p => !p)}>
+                  <Bell size={20} color="var(--text-secondary)" />
+                  <span className="pd-notif-badge">2</span>
+                </button>
+                {showNotifs && (
+                  <div className="pd-notif-dropdown">
+                    <p className="pd-notif-title">Notifications</p>
+                    {notifications.map((n, i) => (
+                      <div key={i} className="pd-notif-item-drop">
+                        <div className="pd-notif-drop-icon"><AlertCircle size={14} color="var(--brand)" /></div>
+                        <div>
+                          <p className="pd-notif-drop-text">{n.text}</p>
+                          <p className="pd-notif-drop-time">{n.time}</p>
+                        </div>
+                      </div>
+                    ))}
+                    <button className="pd-notif-view-all">View all notifications</button>
                   </div>
-                  {cases.map(c => (
-                    <CaseCard key={c.caseId} {...c} onView={() => navigate(`/party/cases/${c.caseId}`)} />
-                  ))}
-                </div>
+                )}
+              </div>
+              <div className="pd-avatar">{userInitials}</div>
+              <span className="pd-avatar-name">{userName}</span>
+              <button className="pd-signout-btn" onClick={handleSignOut}>
+                <LogOut size={15} />
+                <span>Sign out</span>
+              </button>
+            </div>
+          </header>
+
+          {/* Content */}
+          <div className="pd-content">
+            <div className="pd-inner">
+              <div className="pd-page-header">
+                <h1 className="pd-page-title">Dashboard</h1>
+                <p className="pd-page-sub">Welcome back, {userName}. Here's your case overview.</p>
               </div>
 
-              {/* Right */}
-              <div style={s.rightCol}>
-                {/* Notifications */}
-                <div style={s.sideCard}>
-                  <h2 style={s.sideTitle}>Recent Notifications</h2>
-                  {notifications.map((n, i) => (
-                    <div key={i} style={{ ...s.notifItem, borderBottom: i < notifications.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                      <div style={s.notifIcon}><AlertCircle size={15} color="var(--brand)" /></div>
+              <div className="pd-layout">
+                <div className="pd-left-col">
+                  <div className="pd-stats-grid">
+                    <StatCard label="Active Cases" value="2" sub="+1 this month" subColor="#16a34a" iconBg="#eef1fb" icon={<FileText size={22} color="#2a3f8f" />} />
+                    <StatCard label="Pending Proposals" value="3" sub="2 require action" iconBg="#fff7ed" icon={<Clock size={22} color="#ea8c0d" />} />
+                    <StatCard label="Completed" value="5" sub="100% success rate" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
+                    <StatCard label="Avg. Resolution Time" value="45 days" sub="-12 days vs avg" subColor="#dc2626" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
+                  </div>
+
+                  <div className="pd-section">
+                    <div className="pd-section-head">
                       <div>
-                        <p style={s.notifText}>{n.text}</p>
-                        <p style={s.notifTime}>{n.time}</p>
+                        <h2 className="pd-section-title">Active Cases</h2>
+                        <p className="pd-section-sub">Track your ongoing mediation cases</p>
                       </div>
+                      <button className="pd-new-case-btn">New Case</button>
                     </div>
-                  ))}
-                  <button style={s.viewAllBtn}>View all notifications</button>
+                    {cases.map(c => (
+                      <CaseCard key={c.caseId} {...c} onView={() => navigate(`/party/cases/${c.id}/intake`)} />
+                    ))}
+                  </div>
                 </div>
 
-                {/* Quick actions */}
-                <div style={s.sideCard}>
-                  <h2 style={s.sideTitle}>Quick Actions</h2>
-                  {quickActions.map((a, i) => (
-                    <button key={i} style={{ ...s.qaBtn, marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-card)'}>
-                      <span style={{ color: 'var(--brand)', display: 'flex' }}>{a.icon}</span>
-                      <span style={s.qaLabel}>{a.label}</span>
-                      <ChevronRight size={15} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />
-                    </button>
-                  ))}
-                </div>
-
-                {/* Activity */}
-                <div style={s.sideCard}>
-                  <h2 style={s.sideTitle}>Recent Activity</h2>
-                  {activities.map((a, i) => (
-                    <div key={i} style={{ ...s.activityItem, borderBottom: i < activities.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                      <div style={s.activityDot} />
-                      <div>
-                        <p style={s.activityTitle}>{a.title}</p>
-                        <p style={s.activityDesc}>{a.desc}</p>
-                        <p style={s.activityDate}>{a.date}</p>
+                <div className="pd-right-col">
+                  <div className="pd-side-card">
+                    <h2 className="pd-side-title">Recent Notifications</h2>
+                    {notifications.map((n, i) => (
+                      <div key={i} className="pd-notif-item" style={{ borderBottom: i < notifications.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <div className="pd-notif-icon"><AlertCircle size={14} color="var(--brand)" /></div>
+                        <div>
+                          <p className="pd-notif-text">{n.text}</p>
+                          <p className="pd-notif-time">{n.time}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                    <button className="pd-view-all">View all notifications</button>
+                  </div>
+
+                  <div className="pd-side-card">
+                    <h2 className="pd-side-title">Quick Actions</h2>
+                    {quickActions.map((a, i) => (
+                      <button key={i} className="pd-qa-btn" onClick={a.onClick} style={{ marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}>
+                        <span style={{ color: 'var(--brand)', display: 'flex' }}>{a.icon}</span>
+                        <span className="pd-qa-label">{a.label}</span>
+                        <ChevronRight size={15} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="pd-side-card">
+                    <h2 className="pd-side-title">Recent Activity</h2>
+                    {activities.map((a, i) => (
+                      <div key={i} className="pd-activity-item" style={{ borderBottom: i < activities.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <div className="pd-activity-dot" />
+                        <div>
+                          <p className="pd-activity-title">{a.title}</p>
+                          <p className="pd-activity-desc">{a.desc}</p>
+                          <p className="pd-activity-date">{a.date}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        <button className="pd-chat-btn"><MessageSquare size={21} color="white" /></button>
       </div>
-
-      {/* Floating chat */}
-      <button style={s.chatBtn}>
-        <MessageSquare size={21} color="white" />
-      </button>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=DM+Sans:wght@400;500&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        input::placeholder { color: var(--text-placeholder); }
-        @media (max-width: 1024px) {
-          .dash-stats { grid-template-columns: repeat(2,1fr) !important; }
-          .dash-right { width: 280px !important; }
-        }
-        @media (max-width: 768px) {
-          .dash-layout { flex-direction: column !important; }
-          .dash-right { width: 100% !important; }
-          .dash-stats { grid-template-columns: repeat(2,1fr) !important; }
-          .avatar-name { display: none !important; }
-        }
-      `}</style>
-    </div>
+    </>
   )
-}
-
-const s = {
-  page: { display: 'flex', minHeight: '100vh', background: 'var(--bg-page)', fontFamily: "'DM Sans', sans-serif" },
-
-  // Sidebar
-  sidebar: {
-    position: 'fixed', top: 0, left: 0, bottom: 0,
-    background: 'var(--bg-card)',
-    borderRight: '1px solid var(--border-card)',
-    display: 'flex', flexDirection: 'column',
-    zIndex: 50, overflow: 'hidden',
-    transition: 'width 0.25s ease',
-  },
-  sidebarLogoRow: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    padding: '16px 14px', borderBottom: '1px solid var(--border)',
-    flexShrink: 0, minHeight: '60px',
-  },
-  sidebarLogoIcon: {
-    width: '32px', height: '32px', borderRadius: '8px',
-    background: 'var(--brand-light)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
-  },
-  sidebarLogoText: {
-    fontFamily: "'Sora', sans-serif", fontSize: '16px',
-    fontWeight: '700', color: 'var(--text-primary)',
-    letterSpacing: '0.08em', whiteSpace: 'nowrap',
-  },
-  sidebarNav: { display: 'flex', flexDirection: 'column', gap: '2px', padding: '12px 8px', flex: 1, overflowY: 'auto' },
-  navBtn: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    padding: '10px 10px', borderRadius: '8px',
-    border: 'none', background: 'none',
-    color: 'var(--text-muted)', cursor: 'pointer',
-    transition: 'all 0.15s', width: '100%', whiteSpace: 'nowrap',
-  },
-  navBtnActive: { background: 'var(--brand-light)', color: 'var(--brand)' },
-  navLabel: { fontSize: '14px', fontWeight: '500' },
-
-  aiAssistant: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    margin: '8px', padding: '12px',
-    background: 'var(--bg-muted)', borderRadius: '10px',
-    flexShrink: 0,
-  },
-  aiIcon: {
-    width: '32px', height: '32px', borderRadius: '8px',
-    background: 'var(--brand-light)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  aiTitle: { fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' },
-  aiSubtitle: { fontSize: '11px', color: 'var(--text-muted)' },
-
-  collapseBtn: {
-    display: 'flex', alignItems: 'center', gap: '8px',
-    padding: '12px 14px', border: 'none',
-    borderTop: '1px solid var(--border)',
-    background: 'none', color: 'var(--text-muted)',
-    cursor: 'pointer', fontSize: '13px',
-    fontFamily: "'DM Sans', sans-serif", flexShrink: 0,
-    whiteSpace: 'nowrap',
-  },
-  collapseLabel: { fontSize: '13px' },
-
-  // Main
-  main: { flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' },
-
-  topbar: {
-    height: '60px', background: 'var(--bg-card)',
-    borderBottom: '1px solid var(--border-card)',
-    display: 'flex', alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 1.5rem', position: 'sticky', top: 0, zIndex: 40, gap: '1rem',
-  },
-  searchWrap: {
-    display: 'flex', alignItems: 'center', gap: '8px',
-    background: 'var(--bg-muted)', border: '1px solid var(--border)',
-    borderRadius: '8px', padding: '0 12px',
-    flex: '0 1 380px',
-  },
-  searchInput: {
-    border: 'none', background: 'none', outline: 'none',
-    fontSize: '13px', color: 'var(--text-primary)',
-    fontFamily: "'DM Sans', sans-serif",
-    width: '100%', padding: '9px 0',
-  },
-  topRight: { display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 },
-  badge2: {
-    position: 'absolute', top: '-6px', right: '-6px',
-    width: '16px', height: '16px', background: '#ef4444',
-    color: '#fff', borderRadius: '50%', fontSize: '10px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600',
-  },
-  avatar: {
-    width: '32px', height: '32px', borderRadius: '50%',
-    background: 'var(--brand)', color: '#fff',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '11px', fontWeight: '600', flexShrink: 0,
-  },
-  avatarName: { fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', whiteSpace: 'nowrap' },
-
-  content: { flex: 1, overflowY: 'auto' },
-  inner: { padding: '1.75rem 1.5rem', maxWidth: '1400px', margin: '0 auto' },
-
-  pageHeader: { marginBottom: '1.5rem' },
-  pageTitle: { fontFamily: "'Sora', sans-serif", fontSize: '26px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' },
-  pageSub: { fontSize: '14px', color: 'var(--text-muted)' },
-
-  layout: { display: 'flex', gap: '1.5rem', alignItems: 'flex-start' },
-  leftCol: { flex: 1, minWidth: 0 },
-  rightCol: { width: '300px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '1rem' },
-
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem', marginBottom: '1.5rem' },
-  statCard: {
-    background: 'var(--bg-card)', borderRadius: '12px',
-    border: '1px solid var(--border-card)', padding: '1.25rem',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-  },
-  statLabel: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' },
-  statValue: { fontFamily: "'Sora', sans-serif", fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' },
-  statSub: { fontSize: '12px' },
-  statIconWrap: { width: '44px', height: '44px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-
-  section: { background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-card)', padding: '1.25rem' },
-  sectionHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' },
-  sectionTitle: { fontFamily: "'Sora', sans-serif", fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' },
-  sectionSub: { fontSize: '13px', color: 'var(--text-muted)' },
-  newCaseBtn: {
-    padding: '8px 18px', background: 'var(--brand)', color: '#fff',
-    border: 'none', borderRadius: '8px', fontSize: '13px',
-    fontFamily: "'Sora', sans-serif", fontWeight: '600',
-    cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0,
-  },
-
-  caseCard: { border: '1px solid var(--border)', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1rem' },
-  caseTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' },
-  caseTitleRow: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' },
-  caseTitle: { fontFamily: "'Sora', sans-serif", fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' },
-  badge: { fontSize: '11px', fontWeight: '500', padding: '3px 10px', borderRadius: '99px' },
-  caseMeta: { fontSize: '12px', color: 'var(--text-muted)' },
-  aiScore: { textAlign: 'right', flexShrink: 0, marginLeft: '1rem' },
-  aiScoreLabel: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' },
-  aiScoreValue: { fontFamily: "'Sora', sans-serif", fontSize: '22px', fontWeight: '700', color: 'var(--brand)' },
-  progressSection: { marginBottom: '1rem' },
-  progressRow: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' },
-  progressLabel: { fontSize: '12px', color: 'var(--text-muted)' },
-  progressPct: { fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' },
-  progressBg: { height: '6px', background: 'var(--border)', borderRadius: '99px', overflow: 'hidden' },
-  progressFill: { height: '100%', background: 'var(--brand)', borderRadius: '99px', transition: 'width 0.3s' },
-  caseBottom: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  nextDate: { fontSize: '12px', color: 'var(--text-muted)' },
-  viewBtn: {
-    padding: '7px 14px', background: 'none',
-    border: '1px solid var(--border)', borderRadius: '7px',
-    fontSize: '12px', fontWeight: '500',
-    color: 'var(--text-secondary)', cursor: 'pointer', transition: 'border-color 0.15s',
-  },
-
-  sideCard: { background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-card)', padding: '1.25rem' },
-  sideTitle: { fontFamily: "'Sora', sans-serif", fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '1rem' },
-
-  notifItem: { display: 'flex', gap: '10px', padding: '10px 0' },
-  notifIcon: { width: '30px', height: '30px', borderRadius: '8px', background: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  notifText: { fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '3px' },
-  notifTime: { fontSize: '11px', color: 'var(--text-muted)' },
-  viewAllBtn: { width: '100%', background: 'none', border: 'none', padding: '10px 0 0', fontSize: '13px', color: 'var(--text-muted)', cursor: 'pointer', textAlign: 'center' },
-
-  qaBtn: { width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '11px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '9px', cursor: 'pointer', transition: 'background 0.15s' },
-  qaLabel: { fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' },
-
-  activityItem: { display: 'flex', gap: '12px', padding: '12px 0' },
-  activityDot: { width: '10px', height: '10px', borderRadius: '50%', background: 'var(--brand)', flexShrink: 0, marginTop: '4px' },
-  activityTitle: { fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '2px' },
-  activityDesc: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '3px', lineHeight: '1.4' },
-  activityDate: { fontSize: '11px', color: 'var(--text-placeholder)' },
-
-  chatBtn: {
-    position: 'fixed', bottom: '1.5rem', right: '1.5rem',
-    width: '50px', height: '50px', borderRadius: '50%',
-    background: 'var(--brand)', border: 'none',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', boxShadow: '0 4px 16px rgba(42,63,143,0.35)', zIndex: 100,
-  },
 }
