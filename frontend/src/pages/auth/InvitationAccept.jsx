@@ -1,90 +1,99 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Scale, ChevronRight, AlertCircle, Clock, CheckCircle } from 'lucide-react'
+import { Scale, ChevronRight, AlertCircle, Clock, CheckCircle, Shield, UserCheck, UserPlus } from 'lucide-react'
+import { getInvitation, acceptInvitation } from '../../services/invitationService'
+
+const CONSENT_TEXT = `By proceeding, you agree to participate in online mediation facilitated through the SULAH platform under the Mediation Act, 2023. You understand that:
+
+• Mediation is a voluntary and confidential process.
+• Any information shared during mediation may be seen by the mediator and the other party.
+• Participation does not waive your right to pursue legal remedies.
+• The mediator is a neutral facilitator and does not represent either party.
+• Any settlement reached is binding only if both parties sign and agree in writing.`
 
 export default function InvitationAccept() {
   const navigate = useNavigate()
   const { token } = useParams()
 
-  const [status, setStatus] = useState('loading') // loading | valid | expired | not_found | accepted
+  // Screens: loading | valid | expired | not_found | already_used | declined | accepted
+  const [screen, setScreen] = useState('loading')
   const [caseInfo, setCaseInfo] = useState(null)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '', confirmPassword: '' })
-  const [errors, setErrors] = useState({})
+
+  // Consent screen
+  const [consentChecked, setConsentChecked] = useState(false)
+
+  // Account check screen: null | 'has_account' | 'no_account'
+  const [accountChoice, setAccountChoice] = useState(null)
+
+  // Login/Register form
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [formErrors, setFormErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [apiError, setApiError] = useState('')
 
-  // On mount — fetch invitation details
+  // Step: invitation | consent | account_check | login_form | register_form
+  const [step, setStep] = useState('invitation')
+
   useEffect(() => {
-    const fetchInvitation = async () => {
+    const fetch = async () => {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/v1/invitations/${token}`
-        )
-        if (res.status === 200) {
-          const data = await res.json()
-          if (data.status === 'expired') { setStatus('expired'); return }
-          if (data.status === 'accepted') { setStatus('already_accepted'); return }
-          setCaseInfo(data)
-          setStatus('valid')
-        } else if (res.status === 410) {
-          setStatus('expired')
-        } else if (res.status === 404) {
-          setStatus('not_found')
-        } else {
-          setStatus('not_found')
-        }
-      } catch {
-        setStatus('not_found')
+        const data = await getInvitation(token)
+        if (data.status === 'expired') { setScreen('expired'); return }
+        if (data.status === 'accepted') { setScreen('already_used'); return }
+        setCaseInfo(data)
+        setScreen('valid')
+      } catch (err) {
+        if (err.response?.status === 410) setScreen('expired')
+        else if (err.response?.status === 404) setScreen('not_found')
+        else setScreen('not_found')
       }
     }
-    fetchInvitation()
+    fetch()
   }, [token])
 
-  const validate = () => {
+  const validateLogin = () => {
     const e = {}
-    if (!form.email.trim()) e.email = 'Email is required.'
-    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Enter a valid email address.'
-    if (!form.password) e.password = 'Password is required.'
-    else if (form.password.length < 8) e.password = 'Password must be at least 8 characters.'
-    if (!form.confirmPassword) e.confirmPassword = 'Please confirm your password.'
-    else if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match.'
-    setErrors(e)
+    if (!email.trim()) e.email = 'Email is required.'
+    else if (!/\S+@\S+\.\S+/.test(email)) e.email = 'Enter a valid email.'
+    if (!password) e.password = 'Password is required.'
+    setFormErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const validateRegister = () => {
+    const e = {}
+    if (!email.trim()) e.email = 'Email is required.'
+    else if (!/\S+@\S+\.\S+/.test(email)) e.email = 'Enter a valid email.'
+    if (!password) e.password = 'Password is required.'
+    else if (password.length < 8) e.password = 'Min. 8 characters.'
+    if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match.'
+    setFormErrors(e)
     return Object.keys(e).length === 0
   }
 
   const handleAccept = async () => {
-    if (!validate()) return
+    const isValid = accountChoice === 'has_account' ? validateLogin() : validateRegister()
+    if (!isValid) return
     setLoading(true)
     setApiError('')
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/v1/invitations/${token}/accept`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: form.email, password: form.password }),
-        }
-      )
-      if (res.status === 200) {
-        const data = await res.json()
-        localStorage.setItem('nlu_token', data.access_token)
-        localStorage.setItem('nlu_role', 'against_party')
-        localStorage.setItem('nlu_user', JSON.stringify({
-          email: form.email,
-          role: 'against_party',
-          case_id: data.case_id,
-        }))
-        navigate('/party')
-      } else if (res.status === 410) {
-        setApiError('This invitation has expired. Please ask the mediator to send a new one.')
-      } else if (res.status === 409) {
-        setApiError('This invitation has already been accepted.')
-      } else {
-        setApiError('Something went wrong. Please try again.')
-      }
-    } catch {
-      setApiError('Network error. Please check your connection.')
+      const data = await acceptInvitation(token, email, password)
+      localStorage.setItem('nlu_token', data.access_token)
+      localStorage.setItem('nlu_role', 'party_user')
+      localStorage.setItem('nlu_user', JSON.stringify({
+        email,
+        role: 'party_user',
+        case_id: data.case_id,
+      }))
+      localStorage.setItem('nlu_case_role', data.role_in_this_case)
+      navigate(`/party/cases/${data.case_id}/intake`)
+    } catch (err) {
+      if (err.response?.status === 410) setApiError('This invitation has expired.')
+      else if (err.response?.status === 409) setApiError('This invitation has already been accepted.')
+      else if (err.response?.status === 401) setApiError('Incorrect password. Please try again.')
+      else setApiError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -102,50 +111,68 @@ export default function InvitationAccept() {
         .ia-logo-text { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.08em; }
         .ia-card { background: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-card); padding: 2.5rem; width: 100%; max-width: 500px; box-shadow: var(--shadow); }
 
-        /* Status screens */
-        .ia-status-icon { width: 68px; height: 68px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
-        .ia-status-icon.loading { background: var(--bg-muted); animation: pulse 1.5s ease-in-out infinite; }
-        .ia-status-icon.expired { background: #fef3c7; }
-        .ia-status-icon.error { background: var(--error-bg); }
-        .ia-status-icon.success { background: #f0fdf4; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        /* Tag + title */
+        .ia-tag { font-size: 12px; font-weight: 500; color: var(--brand); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+        .ia-title { font-family: 'Sora', sans-serif; font-size: clamp(20px, 4vw, 24px); font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+        .ia-sub { font-size: 14px; color: var(--text-muted); line-height: 1.65; margin-bottom: 1.5rem; }
 
-        .ia-status-title { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; color: var(--text-primary); text-align: center; margin-bottom: 10px; }
-        .ia-status-sub { font-size: 14px; color: var(--text-muted); text-align: center; line-height: 1.65; margin-bottom: 1.5rem; }
+        /* Status icon screens */
+        .ia-icon-wrap { width: 68px; height: 68px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
+        .ia-icon-wrap.expired { background: #fef3c7; }
+        .ia-icon-wrap.error { background: var(--error-bg); }
+        .ia-icon-wrap.success { background: #f0fdf4; }
+        .ia-icon-wrap.loading { background: var(--bg-muted); animation: ia-pulse 1.5s ease-in-out infinite; }
+        @keyframes ia-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-        /* Case info card */
-        .ia-case-info { background: var(--bg-muted); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.75rem; }
-        .ia-case-info-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
-        .ia-case-info-row:last-child { border-bottom: none; }
-        .ia-case-info-label { font-size: 12px; color: var(--text-muted); }
-        .ia-case-info-value { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+        /* Case info box */
+        .ia-case-box { background: var(--bg-muted); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+        .ia-case-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); }
+        .ia-case-row:last-child { border-bottom: none; }
+        .ia-case-label { font-size: 12px; color: var(--text-muted); }
+        .ia-case-value { font-size: 13px; font-weight: 500; color: var(--text-primary); }
 
-        /* Form */
-        .ia-divider { display: flex; align-items: center; gap: 12px; margin: 1.5rem 0; }
-        .ia-divider-line { flex: 1; height: 1px; background: var(--border); }
-        .ia-divider-text { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+        /* Consent box */
+        .ia-consent-box { background: var(--bg-muted); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; max-height: 180px; overflow-y: auto; }
+        .ia-consent-text { font-size: 13px; color: var(--text-secondary); line-height: 1.7; white-space: pre-line; }
+        .ia-checkbox-row { display: flex; align-items: flex-start; gap: 12px; padding: 1rem; background: var(--bg-muted); border: 1.5px solid var(--border); border-radius: 10px; cursor: pointer; margin-bottom: 1.5rem; transition: border-color 0.15s; }
+        .ia-checkbox-row.checked { border-color: var(--brand); background: var(--brand-light); }
+        .ia-checkbox { width: 20px; height: 20px; border-radius: 4px; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; transition: all 0.15s; background: var(--bg-card); }
+        .ia-checkbox.checked { background: var(--brand); border-color: var(--brand); }
+        .ia-checkbox-label { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+        .ia-checkbox-label strong { color: var(--text-primary); }
 
-        .ia-field { margin-bottom: 1.25rem; }
-        .ia-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; }
+        /* Account choice cards */
+        .ia-choice-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem; }
+        .ia-choice-card { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 0.15s; background: var(--bg-card); }
+        .ia-choice-card:hover { border-color: var(--brand); background: var(--brand-light); }
+        .ia-choice-card.selected { border-color: var(--brand); background: var(--brand-light); }
+        .ia-choice-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .ia-choice-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+        .ia-choice-sub { font-size: 12px; color: var(--text-muted); }
+
+        /* Form fields */
+        .ia-field { margin-bottom: 1.1rem; }
+        .ia-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 7px; }
         .ia-input { width: 100%; padding: 13px 15px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 14px; font-family: 'DM Sans', sans-serif; color: var(--text-primary); background: var(--bg-input); outline: none; transition: border-color 0.15s; }
         .ia-input:focus { border-color: var(--brand); }
         .ia-input.err { border-color: var(--error); }
-        .ia-err-text { font-size: 12px; color: var(--error); margin-top: 5px; display: flex; align-items: center; gap: 4px; }
+        .ia-err-text { font-size: 12px; color: var(--error); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
 
-        .ia-api-error { background: var(--error-bg); border: 1px solid var(--error-border); color: var(--error); border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; line-height: 1.5; }
+        .ia-api-error { background: var(--error-bg); border: 1px solid var(--error-border); color: var(--error); border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-bottom: 1rem; display: flex; gap: 8px; line-height: 1.5; }
 
-        .ia-accept-btn { width: 100%; padding: 14px; background: var(--brand); color: #fff; border: none; border-radius: 11px; font-size: 15px; font-family: 'Sora', sans-serif; font-weight: 600; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .ia-accept-btn:hover:not(:disabled) { background: var(--brand-hover); }
-        .ia-accept-btn:disabled { opacity: 0.7; cursor: not-allowed; }
-
-        .ia-show-form-btn { width: 100%; padding: 14px; background: var(--brand); color: #fff; border: none; border-radius: 11px; font-size: 15px; font-family: 'Sora', sans-serif; font-weight: 600; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 1rem; }
-        .ia-show-form-btn:hover { background: var(--brand-hover); }
-
-        .ia-login-link { text-align: center; font-size: 13px; color: var(--text-muted); }
-        .ia-login-link button { background: none; border: none; color: var(--brand); font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 0; }
-
-        .ia-back-btn { width: 100%; padding: 12px; background: none; border: 1.5px solid var(--border); border-radius: 11px; font-size: 14px; font-family: 'DM Sans', sans-serif; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
-        .ia-back-btn:hover { border-color: var(--brand); color: var(--brand); }
+        /* Buttons */
+        .ia-primary-btn { width: 100%; padding: 14px; background: var(--brand); color: #fff; border: none; border-radius: 11px; font-size: 15px; font-family: 'Sora', sans-serif; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.15s; }
+        .ia-primary-btn:hover:not(:disabled) { background: var(--brand-hover); }
+        .ia-primary-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        .ia-secondary-btn { width: 100%; padding: 12px; background: none; border: 1.5px solid var(--border); border-radius: 11px; font-size: 14px; font-family: 'DM Sans', sans-serif; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; margin-top: 10px; }
+        .ia-secondary-btn:hover { border-color: var(--brand); color: var(--brand); }
+        .ia-decline-btn { width: 100%; background: none; border: none; font-size: 13px; color: var(--text-muted); cursor: pointer; text-align: center; margin-top: 12px; font-family: 'DM Sans', sans-serif; text-decoration: underline; }
+        .ia-decline-btn:hover { color: var(--error); }
+        .ia-back-link { display: flex; align-items: center; gap: 6px; background: none; border: none; font-size: 13px; color: var(--text-muted); cursor: pointer; font-family: 'DM Sans', sans-serif; margin-bottom: 1.25rem; padding: 0; }
+        .ia-back-link:hover { color: var(--brand); }
+        .ia-divider { display: flex; align-items: center; gap: 12px; margin: 1.25rem 0; }
+        .ia-divider-line { flex: 1; height: 1px; background: var(--border); }
+        .ia-divider-text { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
         @media (max-width: 520px) {
           .ia-card { padding: 1.75rem 1.25rem; border-radius: 16px; }
@@ -160,155 +187,264 @@ export default function InvitationAccept() {
 
         <div className="ia-card">
 
-          {/* Loading */}
-          {status === 'loading' && (
-            <>
-              <div className="ia-status-icon loading" />
-              <p className="ia-status-title">Checking invitation…</p>
-              <p className="ia-status-sub">Please wait while we verify your invitation link.</p>
-            </>
+          {/* ── Loading ── */}
+          {screen === 'loading' && (
+            <div style={{ textAlign: 'center' }}>
+              <div className="ia-icon-wrap loading" style={{ margin: '0 auto 1.5rem' }} />
+              <p className="ia-title" style={{ textAlign: 'center' }}>Checking invitation…</p>
+              <p className="ia-sub" style={{ textAlign: 'center' }}>Please wait while we verify your link.</p>
+            </div>
           )}
 
-          {/* Expired */}
-          {status === 'expired' && (
-            <>
-              <div className="ia-status-icon expired">
+          {/* ── Expired ── */}
+          {screen === 'expired' && (
+            <div style={{ textAlign: 'center' }}>
+              <div className="ia-icon-wrap expired" style={{ margin: '0 auto 1.5rem' }}>
                 <Clock size={30} color="#d97706" />
               </div>
-              <p className="ia-status-title">Invitation expired</p>
-              <p className="ia-status-sub">This invitation link has expired. Invitation links are valid for 72 hours. Please ask the mediator to send you a new invitation.</p>
-              <button className="ia-back-btn" onClick={() => navigate('/auth/login')}>Go to Login</button>
-            </>
+              <p className="ia-title" style={{ textAlign: 'center' }}>Invitation expired</p>
+              <p className="ia-sub" style={{ textAlign: 'center' }}>This invitation link has expired. Links are valid for 72 hours. Please ask the mediator to send a new one.</p>
+              <button className="ia-secondary-btn" onClick={() => navigate('/auth/login')}>Go to Login</button>
+            </div>
           )}
 
-          {/* Not found */}
-          {status === 'not_found' && (
-            <>
-              <div className="ia-status-icon error">
+          {/* ── Not found ── */}
+          {screen === 'not_found' && (
+            <div style={{ textAlign: 'center' }}>
+              <div className="ia-icon-wrap error" style={{ margin: '0 auto 1.5rem' }}>
                 <AlertCircle size={30} color="var(--error)" />
               </div>
-              <p className="ia-status-title">Invitation not found</p>
-              <p className="ia-status-sub">This invitation link is invalid or has already been used. Please check the link or contact your mediator.</p>
-              <button className="ia-back-btn" onClick={() => navigate('/auth/login')}>Go to Login</button>
-            </>
+              <p className="ia-title" style={{ textAlign: 'center' }}>Invitation not found</p>
+              <p className="ia-sub" style={{ textAlign: 'center' }}>This link is invalid or has already been used. Please contact your mediator.</p>
+              <button className="ia-secondary-btn" onClick={() => navigate('/auth/login')}>Go to Login</button>
+            </div>
           )}
 
-          {/* Already accepted */}
-          {status === 'already_accepted' && (
-            <>
-              <div className="ia-status-icon success">
+          {/* ── Already used ── */}
+          {screen === 'already_used' && (
+            <div style={{ textAlign: 'center' }}>
+              <div className="ia-icon-wrap success" style={{ margin: '0 auto 1.5rem' }}>
                 <CheckCircle size={30} color="#16a34a" />
               </div>
-              <p className="ia-status-title">Already accepted</p>
-              <p className="ia-status-sub">This invitation has already been accepted. If you have an account, please log in to access your case.</p>
-              <button className="ia-accept-btn" onClick={() => navigate('/auth/login')}>
+              <p className="ia-title" style={{ textAlign: 'center' }}>Already accepted</p>
+              <p className="ia-sub" style={{ textAlign: 'center' }}>This invitation has already been accepted. Please log in to access your case.</p>
+              <button className="ia-primary-btn" onClick={() => navigate('/auth/login')}>
                 Go to Login <ChevronRight size={16} />
               </button>
-            </>
+            </div>
           )}
 
-          {/* Valid invitation */}
-          {status === 'valid' && caseInfo && (
+          {/* ── Declined ── */}
+{screen === 'declined' && (
+  <div style={{ textAlign: 'center' }}>
+    <div className="ia-icon-wrap error" style={{ margin: '0 auto 1.5rem' }}>
+      <AlertCircle size={30} color="var(--error)" />
+    </div>
+    <p className="ia-title" style={{ textAlign: 'center' }}>Invitation declined</p>
+    <p className="ia-sub" style={{ textAlign: 'center' }}>
+      You have declined to participate in this mediation. If this was a mistake, you can still accept within the 72-hour window.
+    </p>
+    <button className="ia-secondary-btn" onClick={() => navigate('/auth/login')}>Go to Login</button>
+    <button
+      className="ia-decline-btn"
+      style={{ marginTop: '10px', display: 'block', width: '100%' }}
+      onClick={() => { setScreen('valid'); setStep('invitation') }}
+    >
+      Changed your mind? Go back
+    </button>
+  </div>
+)}
+
+          {/* ── Valid invitation ── */}
+          {screen === 'valid' && caseInfo && (
             <>
-              <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
-                You've been invited
-              </p>
-              <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-                Join this mediation case
-              </h2>
-              <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-                You have been invited to participate as a party in the following mediation case.
-              </p>
-
-              {/* Case details */}
-              <div className="ia-case-info">
-                <div className="ia-case-info-row">
-                  <span className="ia-case-info-label">Dispute Type</span>
-                  <span className="ia-case-info-value">{caseInfo.dispute_type || '—'}</span>
-                </div>
-                <div className="ia-case-info-row">
-                  <span className="ia-case-info-label">Mediator</span>
-                  <span className="ia-case-info-value">{caseInfo.mediator_name || '—'}</span>
-                </div>
-                <div className="ia-case-info-row">
-                  <span className="ia-case-info-label">Status</span>
-                  <span className="ia-case-info-value" style={{ color: 'var(--brand)' }}>Pending your acceptance</span>
-                </div>
-              </div>
-
-              {!showForm ? (
+              {/* Step 1 — Case preview */}
+              {step === 'invitation' && (
                 <>
-                  <button className="ia-show-form-btn" onClick={() => setShowForm(true)}>
-                    Accept & Join Case <ChevronRight size={16} />
-                  </button>
-                  <p className="ia-login-link">
-                    Already have an account?{' '}
-                    <button onClick={() => navigate('/auth/login')}>Sign in</button>
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="ia-divider">
-                    <div className="ia-divider-line" />
-                    <span className="ia-divider-text">Create your account to accept</span>
-                    <div className="ia-divider-line" />
+                  <p className="ia-tag">You've been invited</p>
+                  <h2 className="ia-title">Join this mediation case</h2>
+                  <p className="ia-sub">You have been invited to participate as a party in the following mediation case on the SULAH platform.</p>
+
+                  <div className="ia-case-box">
+                    <div className="ia-case-row">
+                      <span className="ia-case-label">Dispute Type</span>
+                      <span className="ia-case-value">{caseInfo.dispute_type || '—'}</span>
+                    </div>
+                    <div className="ia-case-row">
+                      <span className="ia-case-label">Mediator</span>
+                      <span className="ia-case-value">{caseInfo.mediator_name || '—'}</span>
+                    </div>
+                    <div className="ia-case-row">
+                      <span className="ia-case-label">Status</span>
+                      <span className="ia-case-value" style={{ color: 'var(--brand)' }}>Pending your acceptance</span>
+                    </div>
                   </div>
+
+                  <button className="ia-primary-btn" onClick={() => setStep('consent')}>
+                    View Consent Form <ChevronRight size={16} />
+                  </button>
+                  <button className="ia-decline-btn" onClick={() => setScreen('declined')}>
+                    Decline invitation
+                  </button>
+                </>
+              )}
+
+              {/* Step 2 — Consent */}
+              {step === 'consent' && (
+                <>
+                  <button className="ia-back-link" onClick={() => setStep('invitation')}>
+                    ← Back
+                  </button>
+                  <p className="ia-tag">Consent required</p>
+                  <h2 className="ia-title">Read and accept</h2>
+                  <p className="ia-sub">Please read the consent form carefully before proceeding.</p>
+
+                  <div className="ia-consent-box">
+                    <p className="ia-consent-text">{CONSENT_TEXT}</p>
+                  </div>
+
+                  <div
+                    className={`ia-checkbox-row${consentChecked ? ' checked' : ''}`}
+                    onClick={() => setConsentChecked(p => !p)}
+                  >
+                    <div className={`ia-checkbox${consentChecked ? ' checked' : ''}`}>
+                      {consentChecked && (
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                    <p className="ia-checkbox-label">
+                      I have read and agree to the consent terms above. I understand this is a <strong>voluntary mediation process</strong> under the Mediation Act, 2023.
+                    </p>
+                  </div>
+
+                  <button
+                    className="ia-primary-btn"
+                    onClick={() => setStep('account_check')}
+                    disabled={!consentChecked}
+                  >
+                    Proceed <ChevronRight size={16} />
+                  </button>
+                </>
+              )}
+
+              {/* Step 3 — Account check */}
+              {step === 'account_check' && (
+                <>
+                  <button className="ia-back-link" onClick={() => setStep('consent')}>
+                    ← Back
+                  </button>
+                  <p className="ia-tag">Almost there</p>
+                  <h2 className="ia-title">Do you have an account?</h2>
+                  <p className="ia-sub">Choose one of the options below to continue.</p>
+
+                  <div className="ia-choice-grid">
+                    <div
+                      className={`ia-choice-card${accountChoice === 'has_account' ? ' selected' : ''}`}
+                      onClick={() => setAccountChoice('has_account')}
+                    >
+                      <div className="ia-choice-icon">
+                        <UserCheck size={20} color="var(--brand)" />
+                      </div>
+                      <div>
+                        <p className="ia-choice-title">Yes, I have an account</p>
+                        <p className="ia-choice-sub">Sign in with your existing credentials</p>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`ia-choice-card${accountChoice === 'no_account' ? ' selected' : ''}`}
+                      onClick={() => setAccountChoice('no_account')}
+                    >
+                      <div className="ia-choice-icon">
+                        <UserPlus size={20} color="var(--brand)" />
+                      </div>
+                      <div>
+                        <p className="ia-choice-title">No, create an account</p>
+                        <p className="ia-choice-sub">Register with your email and a new password</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    className="ia-primary-btn"
+                    onClick={() => setStep(accountChoice === 'has_account' ? 'login_form' : 'register_form')}
+                    disabled={!accountChoice}
+                  >
+                    Continue <ChevronRight size={16} />
+                  </button>
+                </>
+              )}
+
+              {/* Step 4a — Login form */}
+              {step === 'login_form' && (
+                <>
+                  <button className="ia-back-link" onClick={() => { setStep('account_check'); setFormErrors({}); setApiError('') }}>
+                    ← Back
+                  </button>
+                  <p className="ia-tag">Sign in</p>
+                  <h2 className="ia-title">Welcome back</h2>
+                  <p className="ia-sub">Sign in to accept this invitation and join the case.</p>
 
                   <div className="ia-field">
                     <label className="ia-label">Email</label>
-                    <input
-                      className={`ia-input${errors.email ? ' err' : ''}`}
-                      type="email"
-                      placeholder="your@email.com"
-                      value={form.email}
-                      onChange={e => { setForm(p => ({ ...p, email: e.target.value })); if (errors.email) setErrors(p => ({ ...p, email: '' })) }}
-                    />
-                    {errors.email && <p className="ia-err-text"><AlertCircle size={12} />{errors.email}</p>}
+                    <input className={`ia-input${formErrors.email ? ' err' : ''}`} type="email" placeholder="your@email.com" value={email} onChange={e => { setEmail(e.target.value); setFormErrors(p => ({ ...p, email: '' })) }} />
+                    {formErrors.email && <p className="ia-err-text"><AlertCircle size={12} />{formErrors.email}</p>}
                   </div>
 
                   <div className="ia-field">
                     <label className="ia-label">Password</label>
-                    <input
-                      className={`ia-input${errors.password ? ' err' : ''}`}
-                      type="password"
-                      placeholder="Min. 8 characters"
-                      value={form.password}
-                      onChange={e => { setForm(p => ({ ...p, password: e.target.value })); if (errors.password) setErrors(p => ({ ...p, password: '' })) }}
-                    />
-                    {errors.password && <p className="ia-err-text"><AlertCircle size={12} />{errors.password}</p>}
+                    <input className={`ia-input${formErrors.password ? ' err' : ''}`} type="password" placeholder="••••••••" value={password} onChange={e => { setPassword(e.target.value); setFormErrors(p => ({ ...p, password: '' })) }} />
+                    {formErrors.password && <p className="ia-err-text"><AlertCircle size={12} />{formErrors.password}</p>}
+                  </div>
+
+                  {apiError && <div className="ia-api-error"><AlertCircle size={16} />{apiError}</div>}
+
+                  <button className="ia-primary-btn" onClick={handleAccept} disabled={loading}>
+                    {loading ? 'Signing in…' : 'Sign in & Accept'} <ChevronRight size={16} />
+                  </button>
+                </>
+              )}
+
+              {/* Step 4b — Register form */}
+              {step === 'register_form' && (
+                <>
+                  <button className="ia-back-link" onClick={() => { setStep('account_check'); setFormErrors({}); setApiError('') }}>
+                    ← Back
+                  </button>
+                  <p className="ia-tag">Create account</p>
+                  <h2 className="ia-title">Register to accept</h2>
+                  <p className="ia-sub">Create your account to accept this invitation and join the case.</p>
+
+                  <div className="ia-field">
+                    <label className="ia-label">Email</label>
+                    <input className={`ia-input${formErrors.email ? ' err' : ''}`} type="email" placeholder="your@email.com" value={email} onChange={e => { setEmail(e.target.value); setFormErrors(p => ({ ...p, email: '' })) }} />
+                    {formErrors.email && <p className="ia-err-text"><AlertCircle size={12} />{formErrors.email}</p>}
+                  </div>
+
+                  <div className="ia-field">
+                    <label className="ia-label">Password</label>
+                    <input className={`ia-input${formErrors.password ? ' err' : ''}`} type="password" placeholder="Min. 8 characters" value={password} onChange={e => { setPassword(e.target.value); setFormErrors(p => ({ ...p, password: '' })) }} />
+                    {formErrors.password && <p className="ia-err-text"><AlertCircle size={12} />{formErrors.password}</p>}
                   </div>
 
                   <div className="ia-field">
                     <label className="ia-label">Confirm Password</label>
-                    <input
-                      className={`ia-input${errors.confirmPassword ? ' err' : ''}`}
-                      type="password"
-                      placeholder="Repeat password"
-                      value={form.confirmPassword}
-                      onChange={e => { setForm(p => ({ ...p, confirmPassword: e.target.value })); if (errors.confirmPassword) setErrors(p => ({ ...p, confirmPassword: '' })) }}
-                    />
-                    {errors.confirmPassword && <p className="ia-err-text"><AlertCircle size={12} />{errors.confirmPassword}</p>}
+                    <input className={`ia-input${formErrors.confirmPassword ? ' err' : ''}`} type="password" placeholder="Repeat password" value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setFormErrors(p => ({ ...p, confirmPassword: '' })) }} />
+                    {formErrors.confirmPassword && <p className="ia-err-text"><AlertCircle size={12} />{formErrors.confirmPassword}</p>}
                   </div>
 
-                  {apiError && (
-                    <div className="ia-api-error">
-                      <AlertCircle size={16} />{apiError}
-                    </div>
-                  )}
+                  {apiError && <div className="ia-api-error"><AlertCircle size={16} />{apiError}</div>}
 
-                  <button className="ia-accept-btn" onClick={handleAccept} disabled={loading}>
-                    {loading ? 'Joining…' : 'Create account & join'}
-                    {!loading && <ChevronRight size={16} />}
+                  <button className="ia-primary-btn" onClick={handleAccept} disabled={loading}>
+                    {loading ? 'Creating account…' : 'Create account & Accept'} <ChevronRight size={16} />
                   </button>
-
-                  <p className="ia-login-link" style={{ marginTop: '1rem' }}>
-                    Already have an account?{' '}
-                    <button onClick={() => navigate('/auth/login')}>Sign in instead</button>
-                  </p>
                 </>
               )}
             </>
           )}
+
         </div>
       </div>
     </>
