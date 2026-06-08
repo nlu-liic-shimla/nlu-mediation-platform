@@ -8,7 +8,7 @@ export default function RoleBasedRoute({ children, allowedRoles }) {
   if (!role || !allowedRoles.includes(role)) {
     // Redirect to their correct dashboard instead of login
     if (role === 'mediator') return <Navigate to="/mediator" replace />
-    if (role === 'requesting_party' || role === 'against_party') return <Navigate to="/party" replace />
+    if (role === 'party_user') return <Navigate to="/party" replace />
     return <Navigate to="/auth/login" replace />
   }
 

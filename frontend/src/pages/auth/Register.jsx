@@ -47,7 +47,7 @@ const Step2 = ({ data, onChange, errors }) => (
     <div className="rg-field">
       <label className="rg-label">Account Type</label>
       {[
-        { value: 'requesting_party', label: 'Party User', desc: 'File disputes, submit documents, and manage settlements' },
+        { value: 'party_user', label: 'Party User', desc: 'File disputes, submit documents, and manage settlements' },
         { value: 'mediator', label: 'Mediator', desc: 'Manage cases, review AI analysis, and facilitate resolutions' },
       ].map((opt, i) => (
         <div
@@ -111,7 +111,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [apiError, setApiError] = useState('')
   const [errors, setErrors] = useState({})
-  const [data, setData] = useState({ fullName: '', email: '', password: '', confirmPassword: '', role: 'requesting_party', organization: '', phone: '' })
+  const [data, setData] = useState({ fullName: '', email: '', password: '', confirmPassword: '', role: 'party_user', organization: '', phone: '' })
 
   const update = (key, value) => {
     setData(prev => ({ ...prev, [key]: value }))
