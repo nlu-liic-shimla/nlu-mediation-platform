@@ -313,7 +313,7 @@ async def retry_burst_1(
 
     # Re-queue the Burst 1 Celery task
     try:
-        from app.celery.tasks import process_burst_1
+        from app.worker.tasks import process_burst_1
         process_burst_1.delay(case_id)
     except Exception as e:
         raise HTTPException(
