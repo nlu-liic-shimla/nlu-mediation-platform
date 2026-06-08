@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
 import ForgotPassword from "../pages/auth/ForgotPassword";
-import InvitationAccept from '../pages/auth/InvitationAccept';
+import InvitationAccept from "../pages/auth/InvitationAccept";
 
 // Party pages
 import PartyDashboard from "../pages/party/Dashboard";
@@ -39,40 +39,6 @@ export default function AppRoutes() {
 
         {/* ── Party routes (requesting_party + against_party) ── */}
         <Route
-  path="/party/cases/:id/intake"
-  element={
-    <ProtectedRoute>
-      <RoleBasedRoute allowedRoles={['requesting_party', 'against_party']}>
-        <IntakeWizard />
-      </RoleBasedRoute>
-    </ProtectedRoute>
-  }
-/>
-        <Route
-          path="/party"
-          element={
-            <ProtectedRoute>
-              <RoleBasedRoute
-                allowedRoles={["requesting_party", "against_party"]}
-              >
-                <PartyDashboard />
-              </RoleBasedRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/party/cases/:id"
-          element={
-            <ProtectedRoute>
-              <RoleBasedRoute
-                allowedRoles={["requesting_party", "against_party"]}
-              >
-                <CaseDetails />
-              </RoleBasedRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/party/cases/:id/intake"
           element={
             <ProtectedRoute>
@@ -85,12 +51,40 @@ export default function AppRoutes() {
           }
         />
         <Route
+          path="/party"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["party_user"]}>
+                <PartyDashboard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/party/cases/:id"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["party_user"]}>
+                <CaseDetails />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/party/cases/:id/intake"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["party_user"]}>
+                <IntakeWizard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/party/cases/:id/questionnaire"
           element={
             <ProtectedRoute>
-              <RoleBasedRoute
-                allowedRoles={["requesting_party", "against_party"]}
-              >
+              <RoleBasedRoute allowedRoles={["party_user"]}>
                 <Questionnaire />
               </RoleBasedRoute>
             </ProtectedRoute>
@@ -100,9 +94,7 @@ export default function AppRoutes() {
           path="/party/cases/:id/proposal"
           element={
             <ProtectedRoute>
-              <RoleBasedRoute
-                allowedRoles={["requesting_party", "against_party"]}
-              >
+              <RoleBasedRoute allowedRoles={["party_user"]}>
                 <ProposalReview />
               </RoleBasedRoute>
             </ProtectedRoute>
@@ -112,9 +104,7 @@ export default function AppRoutes() {
           path="/party/cases/:id/documents"
           element={
             <ProtectedRoute>
-              <RoleBasedRoute
-                allowedRoles={["requesting_party", "against_party"]}
-              >
+              <RoleBasedRoute allowedRoles={["party_user"]}>
                 <UploadDocuments />
               </RoleBasedRoute>
             </ProtectedRoute>
@@ -124,9 +114,7 @@ export default function AppRoutes() {
           path="/party/cases/:id/settlement"
           element={
             <ProtectedRoute>
-              <RoleBasedRoute
-                allowedRoles={["requesting_party", "against_party"]}
-              >
+              <RoleBasedRoute allowedRoles={["party_user"]}>
                 <Settlement />
               </RoleBasedRoute>
             </ProtectedRoute>
@@ -134,13 +122,18 @@ export default function AppRoutes() {
         />
         <Route path="/invitations/:token" element={<InvitationAccept />} />
 
-<Route path="/party/cases/:id/intake" element={
-  <ProtectedRoute>
-    <RoleBasedRoute allowedRoles={['requesting_party', 'against_party']}>
-      <IntakeWizard />
-    </RoleBasedRoute>
-  </ProtectedRoute>
-} />
+        <Route
+          path="/party/cases/:id/intake"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute
+                allowedRoles={["requesting_party", "against_party"]}
+              >
+                <IntakeWizard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ── Mediator routes ── */}
         <Route
