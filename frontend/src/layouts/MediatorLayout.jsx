@@ -411,20 +411,19 @@ export default function MediatorLayout({ children, dark, setDark }) {
                 2
               </span>
             </button>
-
             {notifOpen && (
               <div
                 style={{
-                  position: "absolute",
-                  top: 44,
-                  right: 0,
-                  width: 290,
+                  position: "fixed",
+                  top: 64,
+                  right: 12,
+                  width: "min(290px, calc(100vw - 24px))",
                   background: tk.surface,
                   border: `1px solid ${tk.border}`,
                   borderRadius: 10,
                   boxShadow: "0 8px 32px rgba(0,0,0,.14)",
-                  zIndex: 200,
-                  overflow: "hidden",
+                  zIndex: 9999,
+                  overflow: "visible",
                 }}
               >
                 <div

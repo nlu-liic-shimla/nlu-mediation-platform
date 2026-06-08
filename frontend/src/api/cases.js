@@ -42,3 +42,27 @@ export const getAnalysisStatus = async (caseId) => {
   const response = await client.get(`/cases/${caseId}/analysis/status`);
   return response.data;
 };
+
+export const getAnalysis = async (caseId) => {
+  const response = await client.get(`/api/v1/cases/${caseId}/analysis`);
+  return response.data;
+};
+
+export const getDocuments = async (caseId) => {
+  const response = await client.get(`/api/v1/cases/${caseId}/documents`);
+  return response.data;
+};
+
+export const flagAnalysisClaim = async (caseId, claimText) => {
+  const response = await client.post(`/api/v1/cases/${caseId}/analysis/flag`, {
+    claim_text: claimText,
+  });
+  return response.data;
+};
+
+export const saveNotes = async (caseId, notes) => {
+  const response = await client.patch(`/api/v1/cases/${caseId}/notes`, {
+    notes,
+  });
+  return response.data;
+};

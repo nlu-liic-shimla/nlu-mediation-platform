@@ -38,62 +38,103 @@ export default function AppRoutes() {
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/invitations/:token" element={<InvitationAccept />} />
 
-        {/* ── Party routes ── */}
-        <Route path="/party" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["party_user"]}>
-              <PartyDashboard />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        {/* ── Party routes (requesting_party + against_party) ── */}
+        <Route
+          path="/party/cases/:id/intake"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute
+                allowedRoles={["requesting_party", "against_party"]}
+              >
+                <IntakeWizard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/party"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["party_user"]}>
+                <PartyDashboard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/party/cases/:id"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["party_user"]}>
+                <CaseDetails />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/party/cases/:id/intake"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["party_user"]}>
+                <IntakeWizard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/party/cases/:id/questionnaire"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["party_user"]}>
+                <Questionnaire />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/party/cases/:id/proposal"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["party_user"]}>
+                <ProposalReview />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/party/cases/:id/documents"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["party_user"]}>
+                <UploadDocuments />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/party/cases/:id/settlement"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["party_user"]}>
+                <Settlement />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/invitations/:token" element={<InvitationAccept />} />
 
-        <Route path="/party/cases/:id" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["party_user"]}>
-              <CaseDetails />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/party/cases/:id/intake" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["party_user"]}>
-              <IntakeWizard />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/party/cases/:id/questionnaire" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["party_user"]}>
-              <Questionnaire />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/party/cases/:id/proposal" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["party_user"]}>
-              <ProposalReview />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/party/cases/:id/documents" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["party_user"]}>
-              <UploadDocuments />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/party/cases/:id/settlement" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["party_user"]}>
-              <Settlement />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/party/cases/:id/intake"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute
+                allowedRoles={["requesting_party", "against_party"]}
+              >
+                <IntakeWizard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ── Mediator routes ── */}
         <Route path="/mediator" element={
