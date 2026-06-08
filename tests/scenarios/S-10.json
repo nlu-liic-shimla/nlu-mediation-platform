@@ -1,0 +1,18 @@
+{
+  "id": "S-10",
+  "description": "Co-founder equity dispute in early stage startup",
+  "dispute_type": "commercial_contract",
+  "party_a_statement": "I co-founded this startup with my partner in 2023 with an agreed equity split of 60-40 in my favour since I had the original idea and brought the first two clients. We never signed anything because we trusted each other. Now that the company has raised 5000000 INR in funding my partner is claiming it should be 50-50. I want the original agreement honoured. I also contributed 300000 INR of my own savings into the business.",
+  "party_b_statement": "There was never a fixed agreement on equity. We discussed multiple splits and never finalised anything in writing. I have contributed equally in terms of work — I built the entire product while my partner handled sales. Without the product there would be no clients and no funding. A 50-50 split is fair given equal contribution. I also put in 200000 INR of my own money.",
+  "metadata": {
+    "relationship_type": "business_partner",
+    "monetary_amount": 5000000,
+    "currency": "INR",
+    "prior_negotiation": true
+  },
+  "expected": {
+    "dispute_type": "commercial_contract",
+    "mediatability_band": "Medium",
+    "extraction_confidence_min": 0.7
+  }
+}

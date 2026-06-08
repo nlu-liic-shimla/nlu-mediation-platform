@@ -1,92 +1,99 @@
 """
 subsystem_c.py
 Sub-system C — Questionnaire Generation
-Owner: Rishika (built by Vaidant as support)
-Input: ConflictExtraction JSON
+Owner: Rishika
+Input: ConflictExtraction JSON from sub-system A
 Output: QuestionnaireOutput (see schemas.py)
 
-Generates 8-12 targeted questions per party based on dispute type.
-Questions are tailored — not generic.
+Runs in Burst 2 — after Burst 1 is complete.
+Mediator triggers this by clicking Send Questionnaire.
+Questions must be tailored to the specific dispute type.
+Generic questions = prompt failure.
 """
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from ai.schemas import ConflictExtraction, QuestionnaireOutput, Question
+from ai.schemas import ConflictExtraction, QuestionnaireOutput
 from ai.utils.ai_client import call_small, is_failed
 
-
 SYSTEM_PROMPT = """
-You are a legal mediator generating targeted questions for a mediation case.
-Based on the conflict details provided, generate 8-12 specific questions
-that will help clarify the dispute and assist in reaching a settlement.
+You are a legal mediator generating a targeted questionnaire for both parties
+in a dispute in India under the Mediation Act 2023.
+
+You will receive a structured conflict extraction JSON.
+Generate 8 to 10 targeted questions based on the specific dispute type and facts.
 
 RULES:
-1. Questions must be specific to the dispute type — not generic
-2. Each question must have a clear purpose
-3. Direct questions at the right party — party_a, party_b, or both
-4. Use appropriate question types:
-   - open_ended: for detailed explanations
-   - yes_no: for confirming facts
-   - scale_1_5: for measuring severity or satisfaction
-5. Never ask leading questions that favour either party
-6. Focus on facts, evidence, and desired outcomes
+1. Questions must be specific to THIS dispute — not generic
+2. Different dispute types need different questions:
+   - landlord_tenant: focus on deposit, condition, dates, notice period
+   - employment: focus on contract terms, notice period, performance records
+   - commercial_contract: focus on deliverables, deadlines, payment terms
+   - property_boundary: focus on survey records, documents, timeline of construction
+   - family_business: focus on partnership deed, contributions, profit sharing
+   - construction: focus on contract, deadlines, quality standards, payments
+   - consumer: focus on warranty, usage, complaint timeline
+   - debt_recovery: focus on loan agreement, repayment terms, evidence
+3. Each question must have a clear purpose
+4. directed_at must be "requesting_party", "against_party", or "both"
+5. question_type must be "open_ended", "yes_no", or "scale_1_5"
+6. question_id must be "q_01", "q_02" etc
+7. questionnaire_rationale explains why these questions were chosen
 
-DISPUTE TYPE SPECIFIC FOCUS:
-- landlord_tenant: lease terms, deposit receipts, condition reports, notice periods
-- employment: contract terms, termination procedure, notice given, HR records
-- commercial_contract: contract existence, deliverables, payment terms, communications
-- property_boundary: survey records, historical usage, documentation, witnesses
-- family_business: partnership agreement, contributions, profit records, valuation
-- construction: contract scope, timeline, quality standards, payment milestones
-- consumer: purchase proof, warranty terms, complaint history, repair attempts
-- other: focus on the core claimed facts and desired resolution
+QUESTION QUALITY CHECK:
+- Would this question reveal genuinely new information?
+- Is it specific to the facts of this dispute?
+- Could a mediator act on the answer?
+If the answer to any of these is no — replace the question.
 
-Return ONLY valid JSON in this exact format:
+Return ONLY valid JSON matching this exact structure:
 {
     "questions": [
         {
             "question_id": "q_01",
-            "question_text": "the question here",
-            "directed_at": "party_a or party_b or both",
-            "question_type": "open_ended or yes_no or scale_1_5",
-            "purpose": "why this question is being asked"
+            "question_text": "...",
+            "directed_at": "requesting_party",
+            "question_type": "open_ended",
+            "purpose": "..."
         }
     ],
-    "questionnaire_rationale": "brief explanation of why these questions were chosen"
+    "questionnaire_rationale": "..."
 }
 
-Generate between 8 and 12 questions. No more, no less.
+Return ONLY JSON. No explanation. No markdown.
 """
 
 
-def generate_questionnaire(conflict: ConflictExtraction) -> QuestionnaireOutput:
+def generate_questionnaire(conflict: ConflictExtraction) -> QuestionnaireOutput | dict:
     """
-    Generate targeted questionnaire based on conflict extraction.
+    Run sub-system C on ConflictExtraction output.
     Returns QuestionnaireOutput on success.
     Returns failure dict on error — always check is_failed().
     """
 
     user_message = f"""
-Dispute type: {conflict.dispute_type.value}
-Core dispute: {conflict.core_dispute}
+Generate a targeted questionnaire for this dispute:
 
-Party A claims:
+Dispute Type: {conflict.dispute_type.value}
+Core Dispute: {conflict.core_dispute}
+
+Party A (Requesting Party) Claims:
 {chr(10).join(f'- {claim}' for claim in conflict.claims_party_a)}
 
-Party B claims:
+Party B (Against Party) Claims:
 {chr(10).join(f'- {claim}' for claim in conflict.claims_party_b)}
 
-Disputed facts:
+Disputed Facts:
 {chr(10).join(f'- {fact}' for fact in conflict.disputed_facts)}
 
-Undisputed facts:
-{chr(10).join(f'- {fact}' for fact in conflict.undisputed_facts) if conflict.undisputed_facts else '- None identified'}
+Undisputed Facts:
+{chr(10).join(f'- {fact}' for fact in conflict.undisputed_facts) if conflict.undisputed_facts else 'None identified'}
 
-Monetary value: {conflict.monetary_value} INR
-Jurisdiction clear: {conflict.jurisdiction_clear}
+Monetary Value: {f'INR {conflict.monetary_value}' if conflict.monetary_value else 'Not specified'}
 
-Generate 8-12 targeted questions for this mediation case.
+Generate 8-10 specific questions that will help the mediator understand
+both parties better and identify areas of potential agreement.
 """
 
     result = call_small(
@@ -101,6 +108,7 @@ Generate 8-12 targeted questions for this mediation case.
 # ── Quick test ────────────────────────────────────────────────
 if __name__ == "__main__":
     from ai.subsystems.subsystem_a import extract_conflict
+    from ai.subsystems.subsystem_e import get_cleaned_statement
 
     party_a = """
     I vacated the flat on October 1 2025 after giving 30 days notice.
@@ -108,6 +116,7 @@ if __name__ == "__main__":
     The landlord has not returned my security deposit of 50000 INR despite
     three written requests. It has been 3 months.
     """
+
     party_b = """
     The tenant left on October 3 two days after the agreed date without
     informing me. The flat was damaged with wall marks, a broken ceiling fan
@@ -116,17 +125,24 @@ if __name__ == "__main__":
     """
 
     print("Running Sub-system A first...")
-    conflict = extract_conflict(party_a, party_b)
+    cleaned_a = get_cleaned_statement(party_a, "Party A")
+    cleaned_b = get_cleaned_statement(party_b, "Party B")
+    conflict = extract_conflict(cleaned_a, cleaned_b)
 
-    print("Running Sub-system C...")
-    result = generate_questionnaire(conflict)
-
-    if is_failed(result):
-        print(f"FAILED: {result}")
+    if is_failed(conflict):
+        print("Sub-system A failed:", conflict)
     else:
-        print(f"\n✅ Generated {len(result.questions)} questions")
-        print(f"Rationale: {result.questionnaire_rationale}\n")
-        for q in result.questions:
-            print(f"[{q.question_id}] → {q.directed_at} ({q.question_type})")
-            print(f"  Q: {q.question_text}")
-            print(f"  Purpose: {q.purpose}\n")
+        print(f"Dispute type: {conflict.dispute_type}")
+        print("\nRunning Sub-system C — Questionnaire Generation...")
+        result = generate_questionnaire(conflict)
+
+        if is_failed(result):
+            print("FAILED:", result)
+        else:
+            print(f"\nSUCCESS! Generated {len(result.questions)} questions")
+            print(f"\nRationale: {result.questionnaire_rationale}")
+            print("\nQuestions:")
+            for q in result.questions:
+                print(f"\n  [{q.question_id}] → {q.directed_at} ({q.question_type})")
+                print(f"  Q: {q.question_text}")
+                print(f"  Purpose: {q.purpose}")

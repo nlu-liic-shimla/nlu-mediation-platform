@@ -64,7 +64,8 @@ Return ONLY valid JSON in this EXACT format — field names must match exactly:
 }
 """
 
-def analyse_tone(party_a_statement: str, party_b_statement: str):
+
+def analyse_tone(party_a_statement: str, party_b_statement: str) -> ToneAnalysis | dict:
     """
     Run sub-system F on raw party statements.
     Must run on ORIGINAL text before bias removal.
@@ -92,6 +93,15 @@ a combined conflict intensity score and mediator advisory.
     )
 
     return result
+
+
+# ── Public alias expected by test_everything.py ───────────────
+def run_subsystem_f(party_a_statement: str, party_b_statement: str) -> ToneAnalysis | dict:
+    """
+    Public entry point used by tests and external callers.
+    Alias for analyse_tone.
+    """
+    return analyse_tone(party_a_statement, party_b_statement)
 
 
 # ── Quick test ────────────────────────────────────────────────
