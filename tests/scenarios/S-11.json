@@ -1,0 +1,18 @@
+{
+  "id": "S-11",
+  "description": "Debt recovery dispute between friends turned lender and borrower",
+  "dispute_type": "debt_recovery",
+  "party_a_statement": "I lent my friend 200000 INR in March 2024 when he said he was in financial trouble. He promised to return it within 6 months. It has now been over 18 months and he has not returned a single rupee despite multiple reminders on WhatsApp. I have the bank transfer records showing I sent him the money. He has now stopped responding to my messages. I want my money back with interest.",
+  "party_b_statement": "The 200000 INR was not a loan. It was an investment in a business idea we were going to start together. When the business did not move forward we mutually agreed to treat it as a loss. There was never any written loan agreement. I never agreed to return it. We had a falling out personally and now he is claiming it was a loan to harass me. I do not owe him anything.",
+  "metadata": {
+    "relationship_type": "other",
+    "monetary_amount": 200000,
+    "currency": "INR",
+    "prior_negotiation": false
+  },
+  "expected": {
+    "dispute_type": "debt_recovery",
+    "mediatability_band": "Medium",
+    "extraction_confidence_min": 0.65
+  }
+}
