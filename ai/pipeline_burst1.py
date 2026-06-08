@@ -1,125 +1,155 @@
 """
 pipeline_burst1.py
-Burst 1 Pipeline Skeleton
-Owner: Vaidant
-Week 2 — skeleton only. Steps E and F wired.
-Full pipeline (A, B, C, G) comes in Week 3.
+Burst 1 Pipeline — Complete
+Owner: Vaidant (order fix confirmed by Rishika)
 
-Pipeline order:
-Step 1: bias_removal (E) + tone_analysis (F) — run in parallel on RAW text
-Step 2: conflict_extraction (A) — on bias-removed text
-Step 3: neutral_summary (B) — on conflict extraction JSON
-Step 4: mediatability_score (G) — on conflict extraction JSON
-
-Week 2 scope: Steps E and F only.
-Week 3 scope: Full pipeline A through G.
+Pipeline order per master document Section 5.6:
+  Step 1a: F on RAW statements (tone analysis)
+  Step 1b: E on RAW Party A statement → cleaned_a
+  Step 1b: E on RAW Party B statement → cleaned_b
+  Step 2:  A on cleaned statements
+  Step 3:  B on conflict extraction JSON
+  Step 4:  G on conflict extraction JSON
 """
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from ai.subsystems.subsystem_e import remove_bias
+from ai.subsystems.subsystem_a import extract_conflict
+from ai.subsystems.subsystem_b import generate_neutral_summary
+from ai.subsystems.subsystem_e import remove_bias_from_statement
 from ai.subsystems.subsystem_f import analyse_tone
+from ai.subsystems.subsystem_g import calculate_mediatability
+from ai.schemas import Burst1Output
 from ai.utils.ai_client import is_failed
 
 
-def run_burst1_skeleton(party_a_statement: str, party_b_statement: str):
+def run_burst1_pipeline(
+    party_a_statement: str,
+    party_b_statement: str,
+    case_id: str = "test"
+) -> Burst1Output:
     """
-    Week 2 skeleton — runs sub-systems E and F only.
-    
-    In Week 3 this function will be extended to run the full pipeline:
-    E + F → A → B → G
-    
-    Returns a dict with results from each sub-system.
-    Failed sub-systems return None — pipeline continues.
+    Run the full Burst 1 pipeline.
+    Returns Burst1Output with completed steps listed.
+    Never raises — failed steps set their field to None.
     """
 
-    print("Starting Burst 1 pipeline skeleton...")
-    results = {}
+    print("\n" + "=" * 60)
+    print(f"BURST 1 PIPELINE — FULL")
+    print(f"Case: {case_id}")
+    print("=" * 60)
 
-    # ── Step 1a: Bias Removal (Sub-system E) ──────────────────
-    # Runs on RAW text — before any cleaning
-    print("Running sub-system E (bias removal) on Party A...")
-    bias_result_a = remove_bias_from_statement(party_a_statement, "Party A")
-    results["bias_removal_a"] = bias_result_a
+    output = Burst1Output()
+    completed = []
 
-    print("Running sub-system E (bias removal) on Party B...")
-    bias_result_b = remove_bias_from_statement(party_b_statement, "Party B")
-    results["bias_removal_b"] = bias_result_b
+    # ── Step 1a: Tone Analysis (F) on RAW text ────────────────
+    # Must run on original — we want true emotional signal
+    print("\n[Step 1a] Sub-system F — Tone Analysis on raw statements...")
+    try:
+        tone = analyse_tone(party_a_statement, party_b_statement)
+        if is_failed(tone):
+            print(f"  ❌ Failed: {tone.get('reason')}")
+        else:
+            print(f"  ✅ Party A hostility: {tone.party_a_tone.hostility_score}/10")
+            print(f"  ✅ Party B hostility: {tone.party_b_tone.hostility_score}/10")
+            output.tone_analysis = tone
+            completed.append("tone_analysis")
+    except Exception as e:
+        print(f"  ❌ Exception in F: {e}")
 
-    # ── Step 1b: Tone Analysis (Sub-system F) ─────────────────
-    # Runs on RAW text — must be before bias removal
-    print("Running sub-system F (tone analysis)...")
-    tone_result = analyse_tone(party_a_statement, party_b_statement)
-    if is_failed(tone_result):
-        print(f"Sub-system F failed: {tone_result['reason']}")
-        results["tone_analysis"] = None
-    else:
-        print("Sub-system F complete.")
-        results["tone_analysis"] = tone_result
+    # ── Step 1b: Bias Removal (E) on RAW statements ───────────
+    # Cleans emotional language before A extracts conflict
+    # Each party stored separately in bias_removal_a / bias_removal_b
+    print("\n[Step 1b] Sub-system E — Bias Removal on raw statements...")
+    cleaned_a = party_a_statement  # fallback
+    cleaned_b = party_b_statement  # fallback
+    try:
+        bias_a = remove_bias_from_statement(party_a_statement, "Party A")
+        bias_b = remove_bias_from_statement(party_b_statement, "Party B")
 
-    # ── Week 3: Steps A, B, G will be added here ──────────────
-    # Step 2: conflict_extraction on bias-removed text
-    # Step 3: neutral_summary on conflict extraction JSON
-    # Step 4: mediatability_score on conflict extraction JSON
+        if not is_failed(bias_a):
+            output.bias_removal_a = bias_a
+            cleaned_a = bias_a.revised_summary or party_a_statement
+            print(f"  ✅ Party A bias detected: {bias_a.bias_detected}")
+        else:
+            print(f"  ⚠️  Party A bias removal failed — using original")
 
-    return results
+        if not is_failed(bias_b):
+            output.bias_removal_b = bias_b
+            cleaned_b = bias_b.revised_summary or party_b_statement
+            print(f"  ✅ Party B bias detected: {bias_b.bias_detected}")
+        else:
+            print(f"  ⚠️  Party B bias removal failed — using original")
 
+        if not is_failed(bias_a) or not is_failed(bias_b):
+            completed.append("bias_removal")
 
-def remove_bias_from_statement(statement: str, party_label: str):
-    """
-    Helper — runs bias removal on a single party statement.
-    Returns BiasRemovalOutput or None on failure.
-    """
-    from ai.schemas import NeutralSummary
-    from ai.utils.ai_client import call_small
+    except Exception as e:
+        print(f"  ❌ Exception in E: {e}")
 
-    # For Week 2 — we run bias removal directly on the statement
-    # In Week 3 — bias removal will run on NeutralSummary output
-    BIAS_PROMPT = f"""
-You are checking the following statement from {party_label} for biased or
-emotional language. Remove bias and return a cleaned neutral version.
-"""
-    result = remove_bias_raw(statement, party_label)
-    return result
+    # ── Step 2: Conflict Extraction (A) on CLEANED text ───────
+    print("\n[Step 2] Sub-system A — Conflict Extraction on cleaned statements...")
+    try:
+        conflict = extract_conflict(cleaned_a, cleaned_b)
+        if is_failed(conflict):
+            print(f"  ❌ Failed: {conflict.get('reason')}")
+            print("  ⚠️  Pipeline cannot continue without conflict extraction")
+            output.completed_steps = completed
+            return output
+        else:
+            print(f"  ✅ Dispute type: {conflict.dispute_type}")
+            print(f"  ✅ Confidence: {conflict.extraction_confidence}")
+            if conflict.extraction_confidence < 0.5:
+                print(f"  ⚠️  Low confidence — mediator will see warning badge")
+            output.conflict_extraction = conflict
+            completed.append("conflict_extraction")
+    except Exception as e:
+        print(f"  ❌ Exception in A: {e}")
+        output.completed_steps = completed
+        return output
 
+    # ── Step 3: Neutral Summary (B) on conflict JSON ──────────
+    print("\n[Step 3] Sub-system B — Neutral Summary...")
+    try:
+        summary = generate_neutral_summary(output.conflict_extraction)
+        if is_failed(summary):
+            print(f"  ❌ Failed: {summary.get('reason')}")
+        else:
+            print(f"  ✅ Summary: {len(summary.summary)} chars")
+            print(f"  ✅ Key issues: {len(summary.key_issues)}")
+            output.neutral_summary = summary
+            completed.append("neutral_summary")
+    except Exception as e:
+        print(f"  ❌ Exception in B: {e}")
 
-def remove_bias_raw(statement: str, party_label: str):
-    """
-    Simplified bias removal for pipeline use.
-    Takes raw statement text directly.
-    """
-    from ai.utils.ai_client import call_small, is_failed
-    from pydantic import BaseModel
-    from typing import List, Optional
+    # ── Step 4: Mediatability Score (G) on conflict JSON ──────
+    print("\n[Step 4] Sub-system G — Mediatability Score...")
+    try:
+        score = calculate_mediatability(output.conflict_extraction)
+        if is_failed(score):
+            print(f"  ❌ Failed: {score.get('reason')}")
+        else:
+            print(f"  ✅ Score: {score.mediatability_score}/10")
+            print(f"  ✅ Band: {score.mediatability_band}")
+            output.mediatability = score
+            completed.append("mediatability")
+    except Exception as e:
+        print(f"  ❌ Exception in G: {e}")
 
-    class SimpleBiasOutput(BaseModel):
-        sanitised_text: str
-        bias_detected: bool
-        removals_count: int
+    # ── Summary ───────────────────────────────────────────────
+    output.completed_steps = completed
 
-    SYSTEM_PROMPT = f"""
-You are a bias removal specialist for legal mediation.
-Remove emotional language, personal attacks, and biased framing from this
-{party_label} statement. Keep all facts intact.
-Return ONLY valid JSON with these exact fields:
-{{
-    "sanitised_text": "cleaned version here",
-    "bias_detected": true or false,
-    "removals_count": number of changes made
-}}
-"""
-    result = call_small(
-        system_prompt=SYSTEM_PROMPT,
-        user_message=f"Clean this statement:\n{statement}",
-        output_model=SimpleBiasOutput
-    )
+    print("\n" + "=" * 60)
+    print("PIPELINE COMPLETE")
+    print("=" * 60)
+    for step in ["tone_analysis", "bias_removal", "conflict_extraction",
+                 "neutral_summary", "mediatability"]:
+        icon = "✅" if step in completed else "❌"
+        print(f"  {icon} {step}")
+    print(f"\n  Total: {len(completed)}/5 steps completed")
 
-    if is_failed(result):
-        print(f"Bias removal failed for {party_label}: {result['reason']}")
-        return None
-
-    return result
+    return output
 
 
 # ── Quick test ────────────────────────────────────────────────
@@ -130,7 +160,6 @@ if __name__ == "__main__":
     The landlord has not returned my security deposit of 50000 INR despite
     three written requests. It has been 3 months.
     """
-
     party_b = """
     The tenant left on October 3 two days after the agreed date without
     informing me. The flat was damaged with wall marks, a broken ceiling fan
@@ -138,29 +167,12 @@ if __name__ == "__main__":
     The deposit was 50000 INR and I am deducting repair costs.
     """
 
-    results = run_burst1_skeleton(party_a, party_b)
+    result = run_burst1_pipeline(party_a, party_b, case_id="S-01-test")
 
-    print("\n" + "="*50)
-    print("BURST 1 PIPELINE RESULTS")
-    print("="*50)
-
-    if results["bias_removal_a"]:
-        print(f"\nParty A — Bias detected: {results['bias_removal_a'].bias_detected}")
-        print(f"Party A — Changes made: {results['bias_removal_a'].removals_count}")
-        print(f"Party A — Cleaned text: {results['bias_removal_a'].sanitised_text[:200]}...")
-
-    if results["bias_removal_b"]:
-        print(f"\nParty B — Bias detected: {results['bias_removal_b'].bias_detected}")
-        print(f"Party B — Changes made: {results['bias_removal_b'].removals_count}")
-        print(f"Party B — Cleaned text: {results['bias_removal_b'].sanitised_text[:200]}...")
-
-    if results["tone_analysis"]:
-        print(f"\nParty A tone: {results['tone_analysis'].party_a_tone.tone_category}")
-        print(f"Party A hostility: {results['tone_analysis'].party_a_tone.hostility_score}/10")
-        print(f"Party B tone: {results['tone_analysis'].party_b_tone.tone_category}")
-        print(f"Party B hostility: {results['tone_analysis'].party_b_tone.hostility_score}/10")
-        print(f"Combined intensity: {results['tone_analysis'].combined_conflict_intensity}/10")
-        print(f"Mediator advisory: {results['tone_analysis'].mediator_advisory}")
-
-    print("\nBurst 1 skeleton complete!")
-    print("Week 3: Add sub-systems A, B, G to complete the full pipeline.")
+    print("\n── FINAL OUTPUT ──")
+    print(f"tone_analysis:       {'✅' if result.tone_analysis else '❌'}")
+    print(f"bias_removal_a:      {'✅' if result.bias_removal_a else '❌'}")
+    print(f"bias_removal_b:      {'✅' if result.bias_removal_b else '❌'}")
+    print(f"conflict_extraction: {'✅' if result.conflict_extraction else '❌'}")
+    print(f"neutral_summary:     {'✅' if result.neutral_summary else '❌'}")
+    print(f"mediatability:       {'✅' if result.mediatability else '❌'}")

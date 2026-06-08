@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ThemeToggle from '../../components/ui/ThemeToggle'
+import AnalysisStatusBanner from '../../components/party/AnalysisStatusBanner'
 import {
   Scale, LayoutDashboard, FilePlus, MessageSquare,
   FileText, CheckSquare, Bell, Search, ChevronRight,
@@ -108,6 +109,10 @@ const CaseCard = ({ title, status, caseId, vs, progress, aiScore, nextDate, stat
         <p className="pd-ai-score-value">{aiScore}%</p>
       </div>
     </div>
+
+    {/* ← ADD HERE */}
+    <AnalysisStatusBanner caseId={caseId} />
+
     <div className="pd-progress-section">
       <div className="pd-progress-row">
         <span className="pd-progress-label">Case Progress</span>

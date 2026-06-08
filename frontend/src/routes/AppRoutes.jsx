@@ -30,6 +30,7 @@ export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
+
         {/* ── Public routes ── */}
         <Route path="/" element={<Login />} />
         <Route path="/auth/login" element={<Login />} />
@@ -136,82 +137,65 @@ export default function AppRoutes() {
         />
 
         {/* ── Mediator routes ── */}
-        <Route
-          path="/mediator"
-          element={
-            <ProtectedRoute>
-              <RoleBasedRoute allowedRoles={["mediator"]}>
-                <MediatorDashboard />
-              </RoleBasedRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mediator/cases/:id"
-          element={
-            <ProtectedRoute>
-              <RoleBasedRoute allowedRoles={["mediator"]}>
-                <CaseOverview />
-              </RoleBasedRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mediator/cases/:id/analysis"
-          element={
-            <ProtectedRoute>
-              <RoleBasedRoute allowedRoles={["mediator"]}>
-                <Analysis />
-              </RoleBasedRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mediator/cases/:id/proposal"
-          element={
-            <ProtectedRoute>
-              <RoleBasedRoute allowedRoles={["mediator"]}>
-                <ProposalManagement />
-              </RoleBasedRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mediator/cases/:id/questionnaire"
-          element={
-            <ProtectedRoute>
-              <RoleBasedRoute allowedRoles={["mediator"]}>
-                <QuestionnaireManagement />
-              </RoleBasedRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mediator/analysis"
-          element={
-            <ProtectedRoute>
-              <RoleBasedRoute allowedRoles={["mediator"]}>
-                <Analysis />
-              </RoleBasedRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mediator/proposals"
-          element={
-            <ProtectedRoute>
-              <RoleBasedRoute allowedRoles={["mediator"]}>
-                <ProposalManagement />
-              </RoleBasedRoute>
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/mediator" element={
+          <ProtectedRoute>
+            <RoleBasedRoute allowedRoles={["mediator"]}>
+              <MediatorDashboard />
+            </RoleBasedRoute>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/mediator/cases/:id" element={
+          <ProtectedRoute>
+            <RoleBasedRoute allowedRoles={["mediator"]}>
+              <CaseOverview />
+            </RoleBasedRoute>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/mediator/cases/:id/analysis" element={
+          <ProtectedRoute>
+            <RoleBasedRoute allowedRoles={["mediator"]}>
+              <Analysis />
+            </RoleBasedRoute>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/mediator/cases/:id/proposal" element={
+          <ProtectedRoute>
+            <RoleBasedRoute allowedRoles={["mediator"]}>
+              <ProposalManagement />
+            </RoleBasedRoute>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/mediator/cases/:id/questionnaire" element={
+          <ProtectedRoute>
+            <RoleBasedRoute allowedRoles={["mediator"]}>
+              <QuestionnaireManagement />
+            </RoleBasedRoute>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/mediator/analysis" element={
+          <ProtectedRoute>
+            <RoleBasedRoute allowedRoles={["mediator"]}>
+              <Analysis />
+            </RoleBasedRoute>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/mediator/proposals" element={
+          <ProtectedRoute>
+            <RoleBasedRoute allowedRoles={["mediator"]}>
+              <ProposalManagement />
+            </RoleBasedRoute>
+          </ProtectedRoute>
+        } />
 
         {/* ── Fallback ── */}
         <Route path="*" element={<Navigate to="/" replace />} />
 
-        {/* ── Fallback ── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

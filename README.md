@@ -126,3 +126,34 @@ Week: 1 | Date: May 2026
 ---
 
 *NLU Shimla AI Mediation Platform • AI Role • Week 1-2 • Team Confidential*
+---
+
+## Week 3 — Burst 1 Pipeline Results
+
+### Full Pipeline Test — All 8 Scenarios
+Date: June 2026
+Pass rate: 8/8 (100%)
+
+| Scenario | Dispute Type | Confidence | Mediatability | Steps | Status |
+|---|---|---|---|---|---|
+| S-01 | landlord_tenant | 0.9 | 10/10 | 5/5 | ✅ Pass |
+| S-02 | commercial_contract | 0.9 | 10/10 | 5/5 | ✅ Pass |
+| S-03 | employment | 0.9 | 9/10 | 5/5 | ✅ Pass |
+| S-04 | consumer | 0.9 | 10/10 | 5/5 | ✅ Pass |
+| S-05 | family_business | 0.9 | 8/10 | 5/5 | ✅ Pass |
+| S-06 | property_boundary | 0.9 | 9/10 | 5/5 | ✅ Pass |
+| S-07 | construction | 0.9 | 9/10 | 5/5 | ✅ Pass |
+| S-08 | other (edge case) | 0.4 | 3/10 | 5/5 | ✅ Pass |
+
+### Sub-system G — Built Week 3
+Owner: Rishika (built by Vaidant as support)
+Scoring: Deterministic Python — no LLM for numbers
+Justification text: Haiku call only
+Known limitations: None currently
+
+### Pipeline Order (Final)
+1. Sub-system F — Tone Analysis (raw text)
+2. Sub-system A — Conflict Extraction (raw text)
+3. Sub-system B — Neutral Summary (conflict JSON)
+4. Sub-system E — Bias Removal (neutral summary)
+5. Sub-system G — Mediatability Score (conflict JSON)

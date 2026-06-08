@@ -72,3 +72,28 @@ class DocumentResponse(BaseModel):
 class DocumentListResponse(BaseModel):
     documents: list[DocumentResponse]
     total: int
+
+
+class DocumentWithSignedUrl(BaseModel):
+    """Single document with a short-lived signed GET URL for the mediator split screen."""
+    id: str
+    case_id: str
+    uploaded_by: str          # user_id of the party who uploaded
+    file_name: str
+    file_size: int
+    file_type: str
+    storage_path: str
+    signed_url: str           # signed GET URL — valid for 60 minutes
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DocumentsByPartyResponse(BaseModel):
+    """
+    Documents grouped by party role — used by the mediator AI analysis split screen.
+    Each list is ordered newest-first.
+    """
+    requesting_party: list[DocumentWithSignedUrl]
+    against_party: list[DocumentWithSignedUrl]
+    total: int
