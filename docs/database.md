@@ -276,3 +276,41 @@ ORDER BY tablename;
 
 -- Storage:
 -- case-documents bucket: INSERT and SELECT allowed for authenticated users
+
+-- ============================================================
+-- Week 3 Updates
+-- Database Role | Week 3
+-- ============================================================
+
+-- New Tables Added:
+
+-- application_requests
+-- Purpose: Stores party-initiated mediation applications (Path 1)
+-- Columns: id, applicant_id, dispute_type, brief_description,
+--          against_party_name, against_party_phone, against_party_email,
+--          monetary_value, status, rejection_reason, assigned_mediator, created_at
+-- RLS: Party sees own, mediator sees all, mediator can update
+-- Indexes: idx_application_requests_applicant, idx_application_requests_status
+
+-- ai_analysis_flags
+-- Purpose: Stores flagged claims from AI analysis
+-- Columns: id, case_id, claim_text, reason, flagged_by, flagged_at
+-- RLS: Enabled
+
+-- Updated Tables:
+
+-- cases
+-- Status constraint updated with 16 new states:
+-- BOTH_INVITED, FIRST_PARTY_SUBMITTED, BOTH_SUBMITTED,
+-- AI_ANALYSIS_PENDING, AI_ANALYSIS_COMPLETE, QUESTIONNAIRE_SENT,
+-- QUESTIONNAIRE_COMPLETE, PROPOSAL_DRAFTED, PROPOSAL_SENT,
+-- NEGOTIATION, SETTLEMENT_REACHED, CLOSED
+
+-- case_invitations
+-- Added columns: accepted_by, invitation_role, accepted_at, created_by
+
+-- users
+-- Added column: full_name
+
+-- audit_logs
+-- Added column: metadata (jsonb)
