@@ -179,6 +179,7 @@ export default function Dashboard() {
   ]
 
   const quickActions = [
+    { icon: <FilePlus size={17} />, label: 'Apply for Mediation', path: '/party/apply' },
   { icon: <FilePlus size={17} />, label: 'Start New Case', onClick: () => {} },
   { 
     icon: <FileText size={17} />, 
@@ -444,7 +445,13 @@ export default function Dashboard() {
                         <h2 className="pd-section-title">Active Cases</h2>
                         <p className="pd-section-sub">Track your ongoing mediation cases</p>
                       </div>
-                      <button className="pd-new-case-btn">New Case</button>
+                      
+                      <button
+  className="pd-new-case-btn"
+  onClick={() => navigate('/party/apply')}
+>
+  New Case
+</button>
                     </div>
                     {cases.map(c => (
                       <CaseCard key={c.caseId} {...c} onView={() => navigate(`/party/cases/${c.id}/intake`)} />
@@ -466,17 +473,23 @@ export default function Dashboard() {
                     ))}
                     <button className="pd-view-all">View all notifications</button>
                   </div>
-
                   <div className="pd-side-card">
-                    <h2 className="pd-side-title">Quick Actions</h2>
-                    {quickActions.map((a, i) => (
-                      <button key={i} className="pd-qa-btn" onClick={a.onClick} style={{ marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}>
-                        <span style={{ color: 'var(--brand)', display: 'flex' }}>{a.icon}</span>
-                        <span className="pd-qa-label">{a.label}</span>
-                        <ChevronRight size={15} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />
-                      </button>
-                    ))}
-                  </div>
+  <h2 className="pd-side-title">Quick Actions</h2>
+  {quickActions.map((a, i) => (
+    <button
+      key={i}
+      className="pd-qa-btn"
+      style={{ marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}
+      onClick={() => a.path && navigate(a.path)}
+    >
+      <span style={{ color: 'var(--brand)', display: 'flex' }}>{a.icon}</span>
+      <span className="pd-qa-label">{a.label}</span>
+      <ChevronRight size={15} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />
+    </button>
+  ))}
+</div>
+
+            
 
                   <div className="pd-side-card">
                     <h2 className="pd-side-title">Recent Activity</h2>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Scale, ChevronRight, AlertCircle, Clock, CheckCircle, Shield, UserCheck, UserPlus } from 'lucide-react'
-import { getInvitation, acceptInvitation } from '../../services/invitationService'
+import { getInvitation, acceptInvitation, declineInvitation} from '../../services/invitationService'
 
 const CONSENT_TEXT = `By proceeding, you agree to participate in online mediation facilitated through the SULAH platform under the Mediation Act, 2023. You understand that:
 
