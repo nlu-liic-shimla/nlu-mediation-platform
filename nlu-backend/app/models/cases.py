@@ -69,3 +69,7 @@ class AnalysisStatusResponse(BaseModel):
     status: str                                    # pending | processing | complete | failed
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+
+class FlagClaimRequest(BaseModel):
+    claim_text: str
+    reason: Optional[str] = None  # ← must be Optional

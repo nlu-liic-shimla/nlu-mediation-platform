@@ -72,7 +72,11 @@ class AcceptRequest(BaseModel):
 
 
 class DeclineRequest(BaseModel):
-    reason: Optional[str] = None   # optional — party doesn't have to explain
+    reason: Optional[str] = None
+
+
+class RegenerateRequest(BaseModel):
+    party: str  # "requesting_party" or "against_party"
 
 
 # ── ENDPOINT 1: Mediator generates invite link ─────────────────────────────────
@@ -129,7 +133,6 @@ async def create_invitation(
         "invitation_attempt_count": 0,
     }).execute()
 
-    # Audit log
     supabase.table("audit_logs").insert({
         "case_id": case_id,
         "actor_id": current_user["user_id"],
@@ -167,7 +170,6 @@ async def preview_invitation(token: str):
     token_hash = hash_token(token)
     invitation = get_valid_invitation(token_hash)
 
-    # Get mediator name
     mediator_name = "Your Mediator"
     if invitation["cases"].get("assigned_mediator"):
         mediator_result = supabase.table("users").select(
@@ -200,18 +202,12 @@ async def accept_invitation(token: str, body: AcceptRequest):
     """
     Public endpoint — no JWT required.
     Creates or links user account. Returns JWT + case_id + role_in_case.
-
-    Frontend after this call:
-        localStorage.setItem('nlu_token', access_token)
-        localStorage.setItem('nlu_active_case', case_id)
-        Then redirect to intake wizard.
     """
     from app.core.security import hash_password, verify_password, create_access_token
 
     token_hash = hash_token(token)
     invitation = get_valid_invitation(token_hash)
 
-    # ── Create or link user ────────────────────────────────────────────────────
     existing_user = supabase.table("users").select(
         "id, email, password_hash, role"
     ).eq("email", invitation["invited_email"]).execute()
@@ -256,7 +252,6 @@ async def accept_invitation(token: str, body: AcceptRequest):
         user_id = new_user.data[0]["id"]
         is_new_user = True
 
-    # ── Mark accepted ──────────────────────────────────────────────────────────
     now = datetime.now(timezone.utc).isoformat()
 
     supabase.table("case_invitations").update({
@@ -264,7 +259,6 @@ async def accept_invitation(token: str, body: AcceptRequest):
         "accepted_by": user_id,
     }).eq("token_hash", token_hash).execute()
 
-    # ── Audit log ──────────────────────────────────────────────────────────────
     supabase.table("audit_logs").insert({
         "case_id": invitation["case_id"],
         "actor_id": user_id,
@@ -280,7 +274,6 @@ async def accept_invitation(token: str, body: AcceptRequest):
         "created_at": now
     }).execute()
 
-    # ── Generate JWT ───────────────────────────────────────────────────────────
     access_token = create_access_token(data={
         "sub": str(user_id),
         "role": "party_user",
@@ -308,17 +301,11 @@ async def decline_invitation(token: str, body: DeclineRequest):
     """
     Public endpoint — no JWT required.
     Party declines the invitation.
-
-    Per flow doc:
-    - Token stays valid for 72-hour window after decline
-    - Party can change mind and re-open link before expiry
-    - invitation_attempt_count increments on each decline
-    - After 3 total declines/expiries → mediator sees MEDIATION_FAILED warning
+    Token stays valid for 72 hours — party can change mind.
+    After 3 declines, mediator is notified on case overview.
     """
     token_hash = hash_token(token)
 
-    # Get invitation — but don't block on accepted status
-    # (party might have declined previously and is declining again)
     try:
         result = supabase.table("case_invitations").select(
             "*"
@@ -331,7 +318,6 @@ async def decline_invitation(token: str, body: DeclineRequest):
 
     invitation = result.data
 
-    # Check expiry
     expires_at_str = invitation["expires_at"].replace("Z", "+00:00")
     expires_at = datetime.fromisoformat(expires_at_str)
 
@@ -341,93 +327,177 @@ async def decline_invitation(token: str, body: DeclineRequest):
             detail={"error": True, "code": "INVITATION_EXPIRED"}
         )
 
-    # Check not already accepted
     if invitation.get("accepted_at"):
         raise HTTPException(
             status_code=409,
             detail={"error": True, "code": "INVITATION_ALREADY_ACCEPTED"}
         )
 
-    # Increment attempt count
     current_count = invitation.get("invitation_attempt_count") or 0
     new_count = current_count + 1
-
     now = datetime.now(timezone.utc).isoformat()
 
-    supabase.table("case_invitations").update({
-        "invitation_attempt_count": new_count,
-        "declined_at": now,
-    }).eq("token_hash", token_hash).execute()
+    try:
+        supabase.table("case_invitations").update({
+            "invitation_attempt_count": new_count,
+        }).eq("token_hash", token_hash).execute()
+    except Exception as e:
+        logger.error(f"Failed to update attempt count: {e}")
 
-    # Audit log
-    supabase.table("audit_logs").insert({
-        "case_id": invitation["case_id"],
-        "actor_id": "anonymous",
-        "action": "INVITATION_DECLINED",
-        "old_state": None,
-        "new_state": None,
-        "metadata": {
-            "invitation_role": invitation.get("invitation_role"),
-            "attempt_count": new_count,
-            "reason": body.reason,
-        },
-        "created_at": now
-    }).execute()
+    try:
+        supabase.table("case_invitations").update({
+            "declined_at": now,
+        }).eq("token_hash", token_hash).execute()
+    except Exception:
+        pass
 
-    # Check if 3 attempts reached — notify mediator via case flag
-    # Per flow doc: after 3 total declines/expiries → MEDIATION_FAILED warning
+    try:
+        supabase.table("audit_logs").insert({
+            "case_id": invitation["case_id"],
+            "actor_id": "anonymous",
+            "action": "INVITATION_DECLINED",
+            "old_state": None,
+            "new_state": None,
+            "metadata": {
+                "invitation_role": invitation.get("invitation_role"),
+                "attempt_count": new_count,
+                "reason": body.reason,
+            },
+            "created_at": now
+        }).execute()
+    except Exception as e:
+        logger.error(f"Failed to write audit log for decline: {e}")
+
     if new_count >= 3:
         logger.warning(
-            f"Case {invitation['case_id']}: invitation declined {new_count} times — "
-            f"mediator should be notified"
+            f"Case {invitation['case_id']}: invitation declined {new_count} times"
         )
-        # Flag on case for mediator dashboard
-        # Full MEDIATION_FAILED transition is mediator-triggered (they click Close Case)
-        supabase.table("cases").update({
-            "against_party_declined": True,   # mediator dashboard reads this
-        }).eq("id", invitation["case_id"]).execute()
-
-    logger.info(
-        f"Invitation declined for case {invitation['case_id']} "
-        f"(attempt {new_count} of 3)"
-    )
+        try:
+            supabase.table("cases").update({
+                "against_party_declined": True,
+            }).eq("id", invitation["case_id"]).execute()
+        except Exception as e:
+            logger.error(f"Failed to flag against_party_declined: {e}")
 
     return {
         "declined": True,
         "message": "You have declined this invitation. Contact your mediator if you change your mind within 72 hours.",
-        "token_still_valid": True,  # party can re-open link before expiry
+        "token_still_valid": True,
         "attempt_count": new_count
     }
 
 
-# ── ENDPOINT 5: Mediator regenerates invitation link ──────────────────────────
+# ── ENDPOINT 5: Mediator closes case after 3 declines ─────────────────────────
+
+@router.post("/cases/{case_id}/close-declined")
+async def close_declined_case(
+    case_id: str,
+    current_user: dict = Depends(require_role(["mediator"]))
+):
+    """
+    Mediator closes a case where against party declined 3 times.
+    Transitions to MEDIATION_FAILED.
+    """
+    from app.core.state_machine import transition, CaseState
+
+    case_result = supabase.table("cases").select(
+        "status, against_party_declined"
+    ).eq("id", case_id).execute()
+
+    if not case_result.data:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": True, "code": "CASE_NOT_FOUND"}
+        )
+
+    case = case_result.data[0]
+
+    if not case.get("against_party_declined"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": True,
+                "code": "AGAINST_PARTY_NOT_DECLINED",
+                "message": "Against party has not declined 3 times"
+            }
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    transition(
+        case_id,
+        CaseState.MEDIATION_FAILED,
+        actor_id=current_user["user_id"]
+    )
+
+    supabase.table("audit_logs").insert({
+        "case_id": case_id,
+        "actor_id": current_user["user_id"],
+        "action": "CASE_CLOSED_PARTY_DECLINED",
+        "old_state": case["status"],
+        "new_state": "MEDIATION_FAILED",
+        "metadata": {
+            "reason": "Against party declined mediation invitation 3 times"
+        },
+        "created_at": now
+    }).execute()
+
+    return {
+        "status": "MEDIATION_FAILED",
+        "message": "Case closed. Requesting party has been notified."
+    }
+
+
+# ── ENDPOINT 6: Mediator regenerates invitation link ──────────────────────────
 
 @router.post("/cases/{case_id}/invitations/regenerate")
 async def regenerate_invitation(
     case_id: str,
-    body: InviteRequest,
+    body: RegenerateRequest,
     current_user: dict = Depends(require_role(["mediator"]))
 ):
     """
     Invalidates old token immediately and generates a new one.
-    Mediator must confirm before calling — frontend shows warning modal.
+    Frontend sends { party: "requesting_party" | "against_party" }
+    Returns new raw token once — never stored.
     """
+    if body.party not in ["requesting_party", "against_party"]:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": True, "code": "INVALID_PARTY"}
+        )
+
     case_result = supabase.table("cases").select(
-        "assigned_mediator"
+        "assigned_mediator, requesting_party_email, against_party_email"
     ).eq("id", case_id).execute()
 
     if not case_result.data:
-        raise HTTPException(status_code=404, detail={"error": True, "code": "CASE_NOT_FOUND"})
+        raise HTTPException(
+            status_code=404,
+            detail={"error": True, "code": "CASE_NOT_FOUND"}
+        )
 
-    if case_result.data[0]["assigned_mediator"] != current_user["user_id"]:
-        raise HTTPException(status_code=403, detail={"error": True, "code": "FORBIDDEN"})
+    case = case_result.data[0]
 
-    # Delete old unaccepted invitation for this role
+    if case["assigned_mediator"] != current_user["user_id"]:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": True, "code": "FORBIDDEN"}
+        )
+
+    email = (
+        case.get("requesting_party_email") or ""
+        if body.party == "requesting_party"
+        else case.get("against_party_email") or ""
+    )
+
     existing = supabase.table("case_invitations").select(
         "id"
     ).eq("case_id", case_id).eq(
-        "invitation_role", body.invitation_role
+        "invitation_role", body.party
     ).is_("accepted_at", "null").execute()
+
+    now = datetime.now(timezone.utc).isoformat()
 
     if existing.data:
         supabase.table("case_invitations").delete().eq(
@@ -441,22 +511,21 @@ async def regenerate_invitation(
             "old_state": None,
             "new_state": None,
             "metadata": {
-                "invitation_role": body.invitation_role,
+                "invitation_role": body.party,
                 "reason": "Mediator regenerated link — old token invalidated"
             },
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": now
         }).execute()
 
-    # Generate new token
     raw_token = secrets.token_urlsafe(32)
     token_hash = hash_token(raw_token)
     expires_at = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
 
     result = supabase.table("case_invitations").insert({
         "case_id": case_id,
-        "invited_email": body.email,
+        "invited_email": email,
         "token_hash": token_hash,
-        "invitation_role": body.invitation_role,
+        "invitation_role": body.party,
         "expires_at": expires_at,
         "created_by": current_user["user_id"],
         "invitation_attempt_count": 0,
@@ -466,5 +535,5 @@ async def regenerate_invitation(
         "token": raw_token,
         "expires_at": expires_at,
         "invitation_id": result.data[0]["id"],
-        "message": "Old link invalidated. Copy new token now — not shown again."
+        "message": "Old link invalidated. Copy new token now."
     }

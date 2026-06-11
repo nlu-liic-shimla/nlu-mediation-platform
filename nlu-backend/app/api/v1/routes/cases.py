@@ -162,32 +162,124 @@ async def list_cases(current_user: dict = Depends(get_current_user)):
 
 # ── GET /cases/{case_id} ───────────────────────────────────────────────────────
 
-@router.get("/{case_id}", response_model=CaseResponse)
+@router.get("/{case_id}")
 async def get_case(
     case_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Returns case detail.
+    Returns enriched case detail.
+    Includes party submission status, party names, and active invitation tokens.
     Party access verified via case_invitations — 403 if not on this case.
     """
     case = verify_case_access(case_id, current_user)
 
-    case_response = CaseResponse(**case)
+    # ── Build base response dict ───────────────────────────────
+    response = {
+        "id": case["id"],
+        "dispute_type": case.get("dispute_type"),
+        "brief_description": case.get("brief_description"),
+        "status": case["status"],
+        "created_by": case.get("created_by"),
+        "assigned_mediator": case.get("assigned_mediator"),
+        "requesting_party_email": case.get("requesting_party_email"),
+        "against_party_email": case.get("against_party_email"),
+        "negotiation_round": case.get("negotiation_round", 0),
+        "max_rounds": case.get("max_rounds", 3),
+        "mediator_notes": case.get("mediator_notes"),
+        "created_at": case.get("created_at"),
+        "updated_at": case.get("updated_at"),
+        # Use brief_description as title — no separate title field
+        "title": case.get("brief_description") or case.get("dispute_type") or "Untitled Case",
+        # Use dispute_type as case_type for frontend compatibility
+        "case_type": case.get("dispute_type"),
+        "party_a_submitted": False,
+        "party_b_submitted": False,
+        "party_a_name": None,
+        "party_b_name": None,
+        "requesting_party_token": None,
+        "against_party_token": None,
+        "requesting_party_token_expires": None,
+        "against_party_token_expires": None,
+        "your_role_in_this_case": None,
+    }
 
-    # Attach role label for party_user
+    # ── Get invitation details ─────────────────────────────────
+    invitations = supabase.table("case_invitations").select(
+        "id, invitation_role, accepted_by, accepted_at, token_hash, expires_at"
+    ).eq("case_id", case_id).execute()
+
+    inv_data = invitations.data or []
+
+    for inv in inv_data:
+        role_label = inv.get("invitation_role")
+        accepted_by = inv.get("accepted_by")
+        accepted_at = inv.get("accepted_at")
+
+        # Check if submitted
+        if accepted_by:
+            sub_check = supabase.table("submissions").select("id").eq(
+                "case_id", case_id
+            ).eq("party_id", accepted_by).execute()
+
+            submitted = bool(sub_check.data)
+
+            # Get party name
+            user_result = supabase.table("users").select(
+                "full_name, email"
+            ).eq("id", accepted_by).execute()
+
+            party_name = None
+            if user_result.data:
+                party_name = (
+                    user_result.data[0].get("full_name")
+                    or user_result.data[0].get("email")
+                )
+
+            if role_label == "requesting_party":
+                response["party_a_submitted"] = submitted
+                response["party_a_name"] = party_name
+            elif role_label == "against_party":
+                response["party_b_submitted"] = submitted
+                response["party_b_name"] = party_name
+
+        # Expose token hash as display token for mediator
+        # We expose the token_hash for display only — not the raw token
+        # Mediator uses this to construct the invitation URL for sharing
+        if current_user["role"] == "mediator" and not accepted_at:
+            # Only expose active (not yet accepted) invitation identifiers
+            # Frontend constructs: /invitations/{token_identifier}
+            # We use a separate lookup table field for this
+            pass
+
+    # ── Expose invitation token identifiers for mediator ──────
+    # These are the invitation IDs (not raw tokens) for regenerate buttons
+    if current_user["role"] == "mediator":
+        for inv in inv_data:
+            if not inv.get("accepted_at"):
+                # Active invitation — expose the invitation ID for regenerate
+                role_label = inv.get("invitation_role")
+                inv_id = inv.get("id")
+                expires_at = inv.get("expires_at")
+
+                if role_label == "requesting_party":
+                    response["requesting_party_invitation_id"] = inv_id
+                    response["requesting_party_token_expires"] = expires_at
+                    # Construct shareable link identifier from invitation ID
+                    response["requesting_party_token"] = inv_id
+                elif role_label == "against_party":
+                    response["against_party_invitation_id"] = inv_id
+                    response["against_party_token_expires"] = expires_at
+                    response["against_party_token"] = inv_id
+
+    # ── Attach role for party_user ─────────────────────────────
     if current_user["role"] == "party_user":
-        inv = supabase.table("case_invitations").select(
-            "invitation_role"
-        ).eq("case_id", case_id).eq(
-            "accepted_by", current_user["user_id"]
-        ).execute()
+        for inv in inv_data:
+            if inv.get("accepted_by") == current_user["user_id"]:
+                response["your_role_in_this_case"] = inv.get("invitation_role")
+                break
 
-        if inv.data:
-            case_response.your_role_in_this_case = inv.data[0]["invitation_role"]
-
-    return case_response
-
+    return response
 
 # ── GET /cases/{case_id}/my-role ───────────────────────────────────────────────
 
@@ -227,7 +319,7 @@ async def list_submissions(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Mediator: sees both submissions.
+    Mediator: sees both submissions enriched with invitation_role.
     party_user: sees only their own submission.
     """
     verify_case_access(case_id, current_user)
@@ -237,14 +329,37 @@ async def list_submissions(
 
     if role == "mediator":
         result = supabase.table("submissions").select(
-            "id, party_id, relationship_type, submitted_at"
-        ).eq("case_id", case_id).execute()
+            "id, party_id, relationship_type, statement, "
+            "desired_outcome, monetary_amount, timeline, "
+            "prior_negotiation, submitted_at"
+        ).eq("case_id", case_id).order("submitted_at").execute()
+
+        submissions = result.data or []
+
+        # Enrich each submission with invitation_role and party_email
+        # so frontend can correctly identify requesting vs against party
+        for sub in submissions:
+            inv = supabase.table("case_invitations").select(
+                "invitation_role, invited_email"
+            ).eq("case_id", case_id).eq(
+                "accepted_by", sub["party_id"]
+            ).execute()
+
+            if inv.data:
+                sub["invitation_role"] = inv.data[0]["invitation_role"]
+                sub["party_email"] = inv.data[0]["invited_email"]
+            else:
+                sub["invitation_role"] = None
+                sub["party_email"] = None
+
     else:
+        # Party sees only their own submission — no statement field for security
         result = supabase.table("submissions").select(
             "id, party_id, relationship_type, submitted_at"
         ).eq("case_id", case_id).eq("party_id", user_id).execute()
+        submissions = result.data or []
 
-    return {"submissions": result.data if result.data else []}
+    return {"submissions": submissions}
 
 
 # ── POST /cases/{case_id}/submissions ─────────────────────────────────────────
@@ -475,8 +590,121 @@ async def flag_ai_claim(
     }).execute()
 
     return {"flagged": True}
+@router.delete("/{case_id}/analysis/flag")
+async def unflag_ai_claim(
+    case_id: str,
+    request: FlagClaimRequest,
+    current_user: dict = Depends(require_role(["mediator"]))
+):
+    """
+    Mediator removes a flag they previously set.
+    Deletes the flag record from ai_analysis_flags table.
+    """
+    verify_case_access(case_id, current_user)
 
+    supabase.table("ai_analysis_flags").delete().eq(
+        "case_id", case_id
+    ).eq(
+        "claim_text", request.claim_text
+    ).eq(
+        "flagged_by", current_user["user_id"]
+    ).execute()
 
+    return {"unflagged": True}
+
+@router.get("/{case_id}/invitation-status")
+async def get_invitation_status(
+    case_id: str,
+    current_user: dict = Depends(require_role(["mediator"]))
+):
+    verify_case_access(case_id, current_user)
+
+    invitations = supabase.table("case_invitations").select(
+        "invitation_role, accepted_at, accepted_by, "
+        "invitation_attempt_count, declined_at"
+    ).eq("case_id", case_id).execute()
+
+    result = {
+        "requesting_party": {
+            "link_generated": False,
+            "accepted": False,
+            "attempt_count": 0,
+        },
+        "against_party": {
+            "link_generated": False,
+            "accepted": False,
+            "attempt_count": 0,
+        }
+    }
+
+    for inv in (invitations.data or []):
+        role_key = inv.get("invitation_role")
+        if role_key not in result:
+            continue
+        result[role_key]["link_generated"] = True
+        if inv.get("accepted_at"):
+            result[role_key]["accepted"] = True
+        # Sum attempt_count across all invitations for this role
+        # (mediator may have regenerated multiple times)
+        result[role_key]["attempt_count"] += (inv.get("invitation_attempt_count") or 0)
+
+    return result
+@router.post("/{case_id}/close-declined")
+async def close_declined_case(
+    case_id: str,
+    current_user: dict = Depends(require_role(["mediator"]))
+):
+    """Close a case where a party declined 3 times."""
+    from app.core.state_machine import transition, CaseState
+
+    verify_case_access(case_id, current_user)
+
+    case_result = supabase.table("cases").select(
+        "status, against_party_declined"
+    ).eq("id", case_id).execute()
+
+    if not case_result.data:
+        raise HTTPException(status_code=404, detail={"error": True, "code": "CASE_NOT_FOUND"})
+
+    case = case_result.data[0]
+
+    now = datetime.utcnow().isoformat()
+
+    # Allow closing from BOTH_INVITED or FIRST_PARTY_SUBMITTED
+    try:
+        transition(case_id, CaseState.MEDIATION_FAILED, actor_id=current_user["user_id"])
+    except Exception as e:
+        raise HTTPException(
+            status_code=409,
+            detail={"error": True, "code": "TRANSITION_FAILED", "message": str(e)}
+        )
+
+    supabase.table("audit_logs").insert({
+        "case_id": case_id,
+        "actor_id": current_user["user_id"],
+        "action": "CASE_CLOSED_PARTY_DECLINED",
+        "old_state": case["status"],
+        "new_state": "MEDIATION_FAILED",
+        "metadata": {"reason": "Party declined mediation invitation 3 times"},
+        "created_at": now
+    }).execute()
+
+    return {"status": "MEDIATION_FAILED", "message": "Case closed."}
+@router.get("/{case_id}/analysis/flags")
+async def get_flags(
+    case_id: str,
+    current_user: dict = Depends(require_role(["mediator"]))
+):
+    """Returns all flags the mediator has set for this case."""
+    verify_case_access(case_id, current_user)
+
+    result = supabase.table("ai_analysis_flags").select(
+        "claim_text"
+    ).eq("case_id", case_id).eq(
+        "flagged_by", current_user["user_id"]
+    ).execute()
+
+    return {"flags": [{"claim_text": row["claim_text"]} for row in (result.data or [])]}
 # ── PATCH /cases/{case_id}/notes ──────────────────────────────────────────────
 
 @router.patch("/{case_id}/notes")

@@ -48,7 +48,7 @@ MAX_FILE_SIZES = {
 async def get_upload_url(
     case_id: str,
     request: UploadUrlRequest,
-    current_user: dict = Depends(require_role(["requesting_party", "against_party"]))
+    current_user: dict = Depends(require_role(["requesting_party", "against_party", "party_user"]))
 ):
     # Verify case exists
     case_result = supabase.table("cases").select("id").eq("id", case_id).execute()
@@ -116,7 +116,7 @@ async def get_upload_url(
 async def confirm_upload(
     case_id: str,
     request: DocumentConfirmRequest,
-    current_user: dict = Depends(require_role(["requesting_party", "against_party"]))
+    current_user: dict = Depends(require_role(["requesting_party", "against_party", "party_user"]))
 ):
     # Verify case exists
     case_result = supabase.table("cases").select("id").eq("id", case_id).execute()

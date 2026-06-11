@@ -76,6 +76,10 @@
 #         print(f"[ERROR] Burst 1 failed for case {case_id}: {e}")
 #         transition(case_id, "PROCESSING_FAILED")
 #         raise
+
+
+
+
 # tasks.py
 # Location: nlu-backend/tasks.py  (root level — do NOT move this file)
 # Updated: Week 3 — full Burst 1 AI pipeline
@@ -146,6 +150,9 @@ celery_app.conf.update(
     # This prevents cases from being stuck in BURST_1_PROCESSING forever
     task_time_limit=360,
     task_soft_time_limit=300,
+    # Prevent duplicate task redelivery after Redis reconnect
+    task_acks_late=True,
+    worker_cancel_long_running_tasks_on_connection_loss=True,
 )
 
 logger = logging.getLogger(__name__)
@@ -208,8 +215,26 @@ def process_burst_1(self, case_id: str):
     from app.core.state_machine import transition, CaseState
 
     try:
+        # ── Idempotency guard ─────────────────────────────────────────────────
+        # Prevents 409 crash on duplicate task delivery after Redis reconnect.
+        current = supabase.table("cases").select("status").eq("id", case_id).single().execute()
+        current_status = current.data.get("status") if current.data else None
+
+        if current_status == CaseState.BURST_1_PROCESSING:
+            logger.warning(
+                f"[Burst 1] Case {case_id} already BURST_1_PROCESSING "
+                f"— duplicate delivery, skipping."
+            )
+            return {"status": "skipped", "case_id": case_id, "reason": "already processing"}
+
+        if current_status != CaseState.BOTH_SUBMITTED:
+            logger.warning(
+                f"[Burst 1] Unexpected status '{current_status}' for case {case_id} — skipping."
+            )
+            return {"status": "skipped", "case_id": case_id, "reason": f"unexpected status: {current_status}"}
+
         # ── Transition to BURST_1_PROCESSING ──────────────────────────────────
-        
+        transition(case_id, CaseState.BURST_1_PROCESSING, actor_id="system")
 
         # ── Create ai_analysis tracking record ────────────────────────────────
         # This record is what GET /cases/{id}/analysis/status reads
@@ -458,3 +483,27 @@ def process_burst_1(self, case_id: str):
             "case_id": case_id,
             "error": str(e),
         }
+
+
+# ── Process submission received ───────────────────────────────────────────────
+
+@celery_app.task(name="tasks.process_submission_received")
+def process_submission_received(case_id: str):
+    """
+    Triggered when a submission is received.
+    Checks if both parties have submitted — if so, fires process_burst_1.
+    """
+    supabase = get_supabase()
+
+    submissions = supabase.table("submissions").select(
+        "party_id"
+    ).eq("case_id", case_id).execute()
+
+    count = len(submissions.data) if submissions.data else 0
+    logger.info(f"[Submission] Case {case_id} has {count}/2 submissions")
+
+    if count >= 2:
+        logger.info(f"[Submission] Both submitted for case {case_id} — queuing Burst 1")
+        process_burst_1.delay(case_id)
+    
+    return {"status": "ok", "case_id": case_id, "submission_count": count}

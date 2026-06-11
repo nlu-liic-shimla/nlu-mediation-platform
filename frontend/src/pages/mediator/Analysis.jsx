@@ -1,10 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   getAnalysis,
   getDocuments,
   flagAnalysisClaim,
+  unflagAnalysisClaim,
   saveNotes,
+  getSubmissions,
+  getFlags,
+  getFlaggedClaims,
+  getCaseById,
 } from "../../api/cases";
 import {
   AlertTriangle,
@@ -41,21 +46,20 @@ function useWindowWidth() {
 }
 
 /* ── BiasBadge ──────────────────────────────────────────── */
-function BiasBadge({ status }) {
+function BiasBadge({ biasRemoval }) {
+  let status = "none";
+  if (biasRemoval) {
+    if (!biasRemoval.bias_detected) status = "none";
+    else if (biasRemoval.bias_check_passed) status = "corrected";
+    else status = "unresolved";
+  }
+
   const config = {
     none: { color: "#16a34a", bg: "#dcfce7", label: "✓ No bias detected" },
-    corrected: {
-      color: "#d97706",
-      bg: "#fef9c3",
-      label: "⚠ Bias detected and corrected",
-    },
-    unresolved: {
-      color: "#dc2626",
-      bg: "#fee2e2",
-      label: "✗ Potential bias — review carefully",
-    },
+    corrected: { color: "#d97706", bg: "#fef9c3", label: "⚠ Bias detected and corrected" },
+    unresolved: { color: "#dc2626", bg: "#fee2e2", label: "✗ Potential bias — review carefully" },
   };
-  const c = config[status] || config.none;
+  const c = config[status];
   return (
     <span
       style={{
@@ -75,34 +79,23 @@ function BiasBadge({ status }) {
 
 /* ── MediatabilityBar ───────────────────────────────────── */
 function MediatabilityBar({ score, band, tk }) {
-  const color = score >= 75 ? "#16a34a" : score >= 50 ? "#d97706" : "#dc2626";
+  const percentage = score ? score * 10 : 0;
+  const color =
+    percentage >= 70 ? "#16a34a" : percentage >= 40 ? "#d97706" : "#dc2626";
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: 6,
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
         <span style={{ fontSize: 13, color: tk.sub }}>Mediatability Score</span>
         <span style={{ fontSize: 13, fontWeight: 700, color }}>
-          {score}/100 — {band}
+          {score || 0}/10 — {band || "—"}
         </span>
       </div>
-      <div
-        style={{
-          height: 8,
-          borderRadius: 4,
-          background: tk.border,
-          overflow: "hidden",
-        }}
-      >
+      <div style={{ height: 8, borderRadius: 4, background: tk.border, overflow: "hidden" }}>
         <div
           style={{
             height: "100%",
             borderRadius: 4,
-            width: `${score}%`,
+            width: `${percentage}%`,
             background: color,
             transition: "width 0.6s ease",
           }}
@@ -131,16 +124,11 @@ function ClaimRow({ claim, confidence, flagged, onFlag, tk }) {
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: 13, color: tk.text }}>{claim}</p>
-        <span
-          style={{
-            fontSize: 11,
-            color: confColor,
-            marginTop: 4,
-            display: "block",
-          }}
-        >
-          Confidence: {Math.round(confidence * 100)}%
+        <p style={{ margin: 0, fontSize: 13, color: tk.text }}>
+          {typeof claim === "string" ? claim : claim?.text || String(claim)}
+        </p>
+        <span style={{ fontSize: 11, color: confColor, marginTop: 4, display: "block" }}>
+          Confidence: {Math.round((confidence || 0) * 100)}%
         </span>
       </div>
       <button
@@ -162,7 +150,7 @@ function ClaimRow({ claim, confidence, flagged, onFlag, tk }) {
 }
 
 /* ── DocumentList ───────────────────────────────────────── */
-function DocumentList({ docs, label, tk }) {
+function DocumentList({ docs, tk }) {
   if (!docs || docs.length === 0)
     return (
       <p style={{ fontSize: 13, color: tk.sub, margin: "8px 0" }}>
@@ -187,10 +175,11 @@ function DocumentList({ docs, label, tk }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <FileText size={14} color={tk.sub} />
             <span style={{ fontSize: 13, color: tk.text }}>
-              {doc.file_name}
+              {doc.file_name || doc.filename || "Document"}
             </span>
           </div>
           <a
+          
             href={doc.signed_url}
             target="_blank"
             rel="noreferrer"
@@ -224,10 +213,9 @@ export default function Analysis() {
   const [dark, setDark] = useState(false);
 
   const [analysis, setAnalysis] = useState(null);
-  const [documents, setDocuments] = useState({
-    requesting_party: [],
-    against_party: [],
-  });
+  const [analysisStatus, setAnalysisStatus] = useState("pending");
+  const [documents, setDocuments] = useState({ requesting_party: [], against_party: [] });
+  const [submissions, setSubmissions] = useState({ requesting_party: null, against_party: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -243,26 +231,63 @@ export default function Analysis() {
   const width = useWindowWidth();
   const isSmall = width < 900;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [analysisData, docsData] = await Promise.all([
-          getAnalysis(id),
-          getDocuments(id),
-        ]);
-        setAnalysis(analysisData);
-        setNotes(analysisData?.mediator_notes || "");
-        setDocuments(docsData || { requesting_party: [], against_party: [] });
-      } catch (err) {
-        setError("Failed to load analysis");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [id]);
+useEffect(() => {
+  if (!id) return;
 
-  // No case ID guard
+  const fetchData = async () => {
+    try {
+      const [analysisResponse, docsData, subsData, flagsData, caseResult] =
+        await Promise.all([
+          getAnalysis(id),
+          getDocuments(id).catch(() => ({ requesting_party: [], against_party: [] })),
+          getSubmissions(id).catch(() => ({ submissions: [] })),
+          getFlaggedClaims(id).catch(() => ({ flags: [] })),
+          getCaseById(id).catch(() => null),
+        ]);
+
+      const status = analysisResponse?.status || "pending";
+      setAnalysisStatus(status);
+
+      if (status === "complete") {
+        const aiData = analysisResponse?.data || analysisResponse;
+        setAnalysis(aiData);
+      } else {
+        setAnalysis(null);
+      }
+
+      setNotes(caseResult?.mediator_notes || "");
+
+      const flagMap = {};
+      (flagsData?.flags || []).forEach((flag) => {
+        flagMap[flag.claim_text] = true;
+      });
+      setFlagged(flagMap);
+
+      setDocuments(docsData || { requesting_party: [], against_party: [] });
+
+      const subs = subsData?.submissions || [];
+      const subMap = { requesting_party: null, against_party: null };
+      subs.forEach((sub) => {
+        if (sub.invitation_role === "requesting_party") subMap.requesting_party = sub;
+        else if (sub.invitation_role === "against_party") subMap.against_party = sub;
+      });
+      if (!subMap.requesting_party && !subMap.against_party) {
+        if (subs[0]) subMap.requesting_party = subs[0];
+        if (subs[1]) subMap.against_party = subs[1];
+      }
+      setSubmissions(subMap);
+    } catch (err) {
+      console.error("Analysis fetch error:", err);
+      setError("Failed to load analysis");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+}, [id]);
+
+  /* ── Guards ── */
   if (!id)
     return (
       <MediatorLayout dark={dark} setDark={setDark}>
@@ -294,28 +319,6 @@ export default function Analysis() {
         </div>
       </MediatorLayout>
     );
-
-  const handleFlag = async (claimText) => {
-    try {
-      await flagAnalysisClaim(id, claimText);
-      setFlagged((prev) => ({ ...prev, [claimText]: !prev[claimText] }));
-    } catch {
-      // fail silently
-    }
-  };
-
-  const handleSaveNotes = async () => {
-    setNotesLoading(true);
-    try {
-      await saveNotes(id, notes);
-      setNotesSaved(true);
-      setTimeout(() => setNotesSaved(false), 2000);
-    } catch {
-      alert("Failed to save notes");
-    } finally {
-      setNotesLoading(false);
-    }
-  };
 
   if (loading)
     return (
@@ -381,7 +384,11 @@ export default function Analysis() {
           }}
         >
           <p style={{ color: tk.sub, fontSize: 15 }}>
-            No analysis available yet
+            {analysisStatus === "processing"
+              ? "AI analysis is in progress — check back shortly"
+              : analysisStatus === "failed"
+              ? "AI analysis failed — ask mediator to retry"
+              : "AI analysis not yet available for this case"}
           </p>
           <button
             onClick={() => navigate(`/mediator/cases/${id}`)}
@@ -401,11 +408,42 @@ export default function Analysis() {
       </MediatorLayout>
     );
 
+  /* ── Safe destructure ── */
   const ce = analysis.conflict_extraction || {};
   const ns = analysis.neutral_summary || {};
   const med = analysis.mediatability || {};
   const tone = analysis.tone_analysis || {};
+  const biasRemoval = analysis.bias_removal || null;
 
+  /* ── Handlers ── */
+  const handleFlag = async (claimText) => {
+  const isCurrentlyFlagged = !!flagged[claimText];
+  try {
+    if (isCurrentlyFlagged) {
+      await unflagAnalysisClaim(id, claimText);
+    } else {
+      await flagAnalysisClaim(id, claimText);
+    }
+    setFlagged((prev) => ({ ...prev, [claimText]: !prev[claimText] }));
+  } catch {
+    // fail silently
+  }
+};
+
+  const handleSaveNotes = async () => {
+    setNotesLoading(true);
+    try {
+      await saveNotes(id, notes);
+      setNotesSaved(true);
+      setTimeout(() => setNotesSaved(false), 2000);
+    } catch {
+      alert("Failed to save notes");
+    } finally {
+      setNotesLoading(false);
+    }
+  };
+
+  /* ── Render ── */
   return (
     <MediatorLayout dark={dark} setDark={setDark}>
       {/* ── Header ── */}
@@ -439,9 +477,34 @@ export default function Analysis() {
         </h1>
         <p style={{ fontSize: 13, color: tk.sub, margin: 0 }}>
           Case {id?.slice(0, 8).toUpperCase()}
-          {ce.dispute_type && ` • ${ce.dispute_type}`}
+          {ce.dispute_type &&
+            ` • ${String(ce.dispute_type)
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase())}`}
         </p>
       </div>
+
+      {/* ── Low confidence warning ── */}
+      {ce.extraction_confidence !== undefined && ce.extraction_confidence < 0.5 && (
+        <div
+          style={{
+            padding: "12px 16px",
+            borderRadius: 10,
+            background: "#fefce8",
+            border: "1px solid #fde047",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <AlertTriangle size={16} color="#ca8a04" />
+          <span style={{ fontSize: 13, color: "#92400e" }}>
+            Low confidence extraction ({Math.round(ce.extraction_confidence * 100)}%) —
+            review the conflict claims carefully before proceeding.
+          </span>
+        </div>
+      )}
 
       {/* ── Stat cards ── */}
       <div
@@ -463,15 +526,10 @@ export default function Analysis() {
           {
             label: "Key Claims",
             value:
-              (ce.claims_party_a?.length || 0) +
-              (ce.claims_party_b?.length || 0),
+              (ce.claims_party_a?.length || 0) + (ce.claims_party_b?.length || 0),
             color: "#10b981",
           },
-          {
-            label: "Disputed Facts",
-            value: ce.disputed_facts?.length || 0,
-            color: "#f59e0b",
-          },
+          { label: "Disputed Facts", value: ce.disputed_facts?.length || 0, color: "#f59e0b" },
           {
             label: "Confidence",
             value: ce.extraction_confidence
@@ -489,9 +547,7 @@ export default function Analysis() {
               padding: "14px 16px",
             }}
           >
-            <div style={{ fontSize: 12, color: tk.sub, marginBottom: 4 }}>
-              {label}
-            </div>
+            <div style={{ fontSize: 12, color: tk.sub, marginBottom: 4 }}>{label}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
           </div>
         ))}
@@ -507,7 +563,18 @@ export default function Analysis() {
         }}
       >
         {/* ══ LEFT — Raw submissions + documents ══ */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            position: isSmall ? "static" : "sticky",
+            top: isSmall ? "auto" : 16,
+            alignSelf: "start",
+            maxHeight: isSmall ? "none" : "calc(100vh - 80px)",
+            overflowY: isSmall ? "visible" : "auto",
+          }}
+        >
           {/* Requesting Party Submission */}
           <div
             style={{
@@ -538,17 +605,9 @@ export default function Analysis() {
                   whiteSpace: "pre-wrap",
                 }}
               >
-                {analysis.requesting_party_statement ||
-                  "No statement submitted yet"}
+                {submissions.requesting_party?.statement || "No statement available"}
               </p>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: tk.sub,
-                  marginBottom: 8,
-                }}
-              >
+              <div style={{ fontSize: 12, fontWeight: 600, color: tk.sub, marginBottom: 8 }}>
                 DOCUMENTS
               </div>
               <DocumentList docs={documents.requesting_party} tk={tk} />
@@ -585,17 +644,9 @@ export default function Analysis() {
                   whiteSpace: "pre-wrap",
                 }}
               >
-                {analysis.against_party_statement ||
-                  "No statement submitted yet"}
+                {submissions.against_party?.statement || "No statement available"}
               </p>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: tk.sub,
-                  marginBottom: 8,
-                }}
-              >
+              <div style={{ fontSize: 12, fontWeight: 600, color: tk.sub, marginBottom: 8 }}>
                 DOCUMENTS
               </div>
               <DocumentList docs={documents.against_party} tk={tk} />
@@ -605,6 +656,7 @@ export default function Analysis() {
 
         {/* ══ RIGHT — AI output ══ */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
           {/* Neutral Summary */}
           <div
             style={{
@@ -621,44 +673,86 @@ export default function Analysis() {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                flexWrap: "wrap",
+                gap: 8,
               }}
             >
               <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>
                 AI Neutral Summary
               </span>
-              <BiasBadge status={ns.bias_status || "none"} />
+              <BiasBadge biasRemoval={biasRemoval} />
             </div>
             <div style={{ padding: "16px 18px" }}>
-              {ns.edited_content ? (
+              {analysis.mediator_edited_content ? (
                 <>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: tk.text,
-                      lineHeight: 1.7,
-                      margin: "0 0 8px",
-                    }}
-                  >
-                    {ns.edited_content}
+                  <p style={{ fontSize: 13, color: tk.text, lineHeight: 1.7, margin: "0 0 8px" }}>
+                    {analysis.mediator_edited_content}
                   </p>
                   <span style={{ fontSize: 11, color: tk.sub }}>
                     Mediator edited —{" "}
-                    {ns.edited_at
-                      ? new Date(ns.edited_at).toLocaleString()
-                      : ""}
+                    {analysis.edited_at ? new Date(analysis.edited_at).toLocaleString() : ""}
+                  </span>
+                </>
+              ) : biasRemoval?.bias_detected && biasRemoval?.revised_summary ? (
+                <>
+                  <p style={{ fontSize: 13, color: tk.text, lineHeight: 1.7, margin: "0 0 8px" }}>
+                    {biasRemoval.revised_summary}
+                  </p>
+                  <span style={{ fontSize: 11, color: "#d97706" }}>
+                    Bias was detected and corrected in this summary
                   </span>
                 </>
               ) : (
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: tk.text,
-                    lineHeight: 1.7,
-                    margin: 0,
-                  }}
-                >
+                <p style={{ fontSize: 13, color: tk.text, lineHeight: 1.7, margin: 0 }}>
                   {ns.summary || "Summary not yet generated"}
                 </p>
+              )}
+
+              {(ns.party_a_position || ns.party_b_position) && (
+                <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                  {ns.party_a_position && (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: tk.sub, marginBottom: 4 }}>
+                        REQUESTING PARTY POSITION
+                      </div>
+                      <p style={{ fontSize: 12, color: tk.text, lineHeight: 1.6, margin: 0 }}>
+                        {ns.party_a_position}
+                      </p>
+                    </div>
+                  )}
+                  {ns.party_b_position && (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: tk.sub, marginBottom: 4 }}>
+                        AGAINST PARTY POSITION
+                      </div>
+                      <p style={{ fontSize: 12, color: tk.text, lineHeight: 1.6, margin: 0 }}>
+                        {ns.party_b_position}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {ns.key_issues?.length > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: tk.sub, marginBottom: 6 }}>
+                    KEY ISSUES
+                  </div>
+                  {ns.key_issues.map((issue, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: 12,
+                        color: tk.text,
+                        padding: "4px 0",
+                        borderBottom:
+                          i < ns.key_issues.length - 1 ? `1px solid ${tk.border}` : "none",
+                      }}
+                    >
+                      {i + 1}. {issue}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -673,12 +767,10 @@ export default function Analysis() {
             }}
           >
             <MediatabilityBar
-              score={med.total_score || 0}
-              band={med.band || "—"}
+              score={med.mediatability_score || 0}
+              band={med.mediatability_band || "—"}
               tk={tk}
             />
-
-            {/* 7-factor breakdown */}
             <button
               onClick={() => setFactorsOpen((o) => !o)}
               style={{
@@ -694,52 +786,29 @@ export default function Analysis() {
                 padding: 0,
               }}
             >
-              {factorsOpen ? (
-                <ChevronUp size={14} />
-              ) : (
-                <ChevronDown size={14} />
-              )}
+              {factorsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               {factorsOpen ? "Hide" : "Show"} factor breakdown
             </button>
 
-            {factorsOpen && med.factors && (
-              <div
-                style={{
-                  marginTop: 12,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                {med.factors.map((f, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      fontSize: 13,
-                    }}
-                  >
-                    <span style={{ color: tk.text }}>{f.name}</span>
-                    <span style={{ fontWeight: 600, color: tk.sub }}>
-                      {f.score}/{f.max}
-                    </span>
-                  </div>
+            {factorsOpen && (
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                {med.positive_factors?.map((f, i) => (
+                  <div key={i} style={{ fontSize: 13, color: "#16a34a" }}>+ {f}</div>
                 ))}
+                {med.negative_factors?.map((f, i) => (
+                  <div key={i} style={{ fontSize: 13, color: "#ef4444" }}>− {f}</div>
+                ))}
+                {med.recommended_approach && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: tk.sub, fontStyle: "italic" }}>
+                    {med.recommended_approach}
+                  </div>
+                )}
               </div>
             )}
 
-            {med.justification && (
-              <p
-                style={{
-                  fontSize: 13,
-                  color: tk.sub,
-                  marginTop: 12,
-                  lineHeight: 1.6,
-                }}
-              >
-                {med.justification}
+            {med.score_justification && (
+              <p style={{ fontSize: 13, color: tk.sub, marginTop: 12, lineHeight: 1.6 }}>
+                {med.score_justification}
               </p>
             )}
           </div>
@@ -754,12 +823,7 @@ export default function Analysis() {
                 overflow: "hidden",
               }}
             >
-              <div
-                style={{
-                  padding: "14px 18px",
-                  borderBottom: `1px solid ${tk.border}`,
-                }}
-              >
+              <div style={{ padding: "14px 18px", borderBottom: `1px solid ${tk.border}` }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>
                   Conflict Claims
                 </span>
@@ -770,28 +834,23 @@ export default function Analysis() {
               <div style={{ padding: "16px 18px" }}>
                 {ce.claims_party_a?.length > 0 && (
                   <>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: tk.sub,
-                        marginBottom: 8,
-                      }}
-                    >
+                    <div style={{ fontSize: 12, fontWeight: 600, color: tk.sub, marginBottom: 8 }}>
                       REQUESTING PARTY
                     </div>
-                    {ce.claims_party_a.map((claim, i) => (
-                      <ClaimRow
-                        key={i}
-                        claim={claim.text || claim}
-                        confidence={
-                          claim.confidence || ce.extraction_confidence || 0.8
-                        }
-                        flagged={!!flagged[claim.text || claim]}
-                        onFlag={() => handleFlag(claim.text || claim)}
-                        tk={tk}
-                      />
-                    ))}
+                    {ce.claims_party_a.map((claim, i) => {
+                      const claimText =
+                        typeof claim === "string" ? claim : claim?.text || String(claim);
+                      return (
+                        <ClaimRow
+                          key={i}
+                          claim={claimText}
+                          confidence={ce.extraction_confidence || 0.8}
+                          flagged={!!flagged[claimText]}
+                          onFlag={() => handleFlag(claimText)}
+                          tk={tk}
+                        />
+                      );
+                    })}
                   </>
                 )}
                 {ce.claims_party_b?.length > 0 && (
@@ -806,18 +865,20 @@ export default function Analysis() {
                     >
                       AGAINST PARTY
                     </div>
-                    {ce.claims_party_b.map((claim, i) => (
-                      <ClaimRow
-                        key={i}
-                        claim={claim.text || claim}
-                        confidence={
-                          claim.confidence || ce.extraction_confidence || 0.8
-                        }
-                        flagged={!!flagged[claim.text || claim]}
-                        onFlag={() => handleFlag(claim.text || claim)}
-                        tk={tk}
-                      />
-                    ))}
+                    {ce.claims_party_b.map((claim, i) => {
+                      const claimText =
+                        typeof claim === "string" ? claim : claim?.text || String(claim);
+                      return (
+                        <ClaimRow
+                          key={i}
+                          claim={claimText}
+                          confidence={ce.extraction_confidence || 0.8}
+                          flagged={!!flagged[claimText]}
+                          onFlag={() => handleFlag(claimText)}
+                          tk={tk}
+                        />
+                      );
+                    })}
                   </>
                 )}
               </div>
@@ -825,7 +886,7 @@ export default function Analysis() {
           )}
 
           {/* Tone Analysis */}
-          {(tone.requesting_party || tone.against_party) && (
+          {(tone.party_a_tone || tone.party_b_tone) && (
             <div
               style={{
                 background: tk.surface,
@@ -859,77 +920,126 @@ export default function Analysis() {
               </button>
 
               {toneOpen && (
-                <div
-                  style={{
-                    padding: "16px 18px",
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 16,
-                  }}
-                >
-                  {[
-                    { label: "Requesting Party", data: tone.requesting_party },
-                    { label: "Against Party", data: tone.against_party },
-                  ].map(
-                    ({ label, data }) =>
-                      data && (
-                        <div key={label}>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: tk.sub,
-                              marginBottom: 8,
-                            }}
-                          >
-                            {label.toUpperCase()}
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 6,
-                            }}
-                          >
-                            <div style={{ fontSize: 13, color: tk.text }}>
-                              Category: <strong>{data.tone_category}</strong>
+                <div style={{ padding: "16px 18px" }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 16,
+                      marginBottom: 16,
+                    }}
+                  >
+                    {[
+                      { label: "Requesting Party", data: tone.party_a_tone },
+                      { label: "Against Party", data: tone.party_b_tone },
+                    ].map(
+                      ({ label, data }) =>
+                        data && (
+                          <div key={label}>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: tk.sub,
+                                marginBottom: 8,
+                              }}
+                            >
+                              {label.toUpperCase()}
                             </div>
-                            <div style={{ fontSize: 13, color: tk.text }}>
-                              Hostility:{" "}
-                              <strong
-                                style={{
-                                  color:
-                                    data.hostility_score >= 7
-                                      ? "#ef4444"
-                                      : data.hostility_score >= 4
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <div style={{ fontSize: 13, color: tk.text }}>
+                                Category: <strong>{data.tone_category}</strong>
+                              </div>
+                              <div style={{ fontSize: 13, color: tk.text }}>
+                                Hostility:{" "}
+                                <strong
+                                  style={{
+                                    color:
+                                      data.hostility_score >= 7
+                                        ? "#ef4444"
+                                        : data.hostility_score >= 4
                                         ? "#f59e0b"
                                         : "#16a34a",
-                                }}
-                              >
-                                {data.hostility_score}/10
-                              </strong>
+                                  }}
+                                >
+                                  {data.hostility_score}/10
+                                </strong>
+                              </div>
+                              <div style={{ fontSize: 13, color: tk.text }}>
+                                Openness:{" "}
+                                <strong style={{ color: "#16a34a" }}>
+                                  {data.openness_score}/10
+                                </strong>
+                              </div>
+                              {data.tone_summary && (
+                                <p
+                                  style={{
+                                    fontSize: 12,
+                                    color: tk.sub,
+                                    margin: "4px 0 0",
+                                    lineHeight: 1.5,
+                                  }}
+                                >
+                                  {data.tone_summary}
+                                </p>
+                              )}
                             </div>
-                            <div style={{ fontSize: 13, color: tk.text }}>
-                              Openness:{" "}
-                              <strong style={{ color: "#16a34a" }}>
-                                {data.openness_score}/10
-                              </strong>
-                            </div>
-                            {data.tone_summary && (
-                              <p
-                                style={{
-                                  fontSize: 12,
-                                  color: tk.sub,
-                                  margin: "4px 0 0",
-                                  lineHeight: 1.5,
-                                }}
-                              >
-                                {data.tone_summary}
-                              </p>
-                            )}
                           </div>
-                        </div>
-                      ),
+                        )
+                    )}
+                  </div>
+
+                  {tone.combined_conflict_intensity !== undefined && (
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 8,
+                        background: tk.bg,
+                        border: `1px solid ${tk.border}`,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <span style={{ fontSize: 13, color: tk.sub }}>
+                        Combined conflict intensity:{" "}
+                      </span>
+                      <strong
+                        style={{
+                          color:
+                            tone.combined_conflict_intensity >= 7
+                              ? "#ef4444"
+                              : tone.combined_conflict_intensity >= 4
+                              ? "#f59e0b"
+                              : "#16a34a",
+                        }}
+                      >
+                        {tone.combined_conflict_intensity}/10
+                      </strong>
+                    </div>
+                  )}
+
+                  {tone.mediator_advisory && (
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 8,
+                        background: "#eff6ff",
+                        border: "1px solid #bfdbfe",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#1e40af",
+                          marginBottom: 4,
+                        }}
+                      >
+                        MEDIATOR ADVISORY
+                      </div>
+                      <p style={{ fontSize: 13, color: "#1e40af", margin: 0, lineHeight: 1.6 }}>
+                        {tone.mediator_advisory}
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
@@ -945,17 +1055,12 @@ export default function Analysis() {
               overflow: "hidden",
             }}
           >
-            <div
-              style={{
-                padding: "14px 18px",
-                borderBottom: `1px solid ${tk.border}`,
-              }}
-            >
+            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${tk.border}` }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>
                 Internal Notes
               </span>
               <p style={{ fontSize: 12, color: tk.sub, margin: "2px 0 0" }}>
-                Private — never shown to parties
+                Private — never shown to parties. Fed to AI during proposal revision.
               </p>
             </div>
             <div style={{ padding: "16px 18px" }}>
@@ -1000,11 +1105,7 @@ export default function Analysis() {
                 }}
               >
                 {notesSaved ? <CheckCircle2 size={14} /> : <Save size={14} />}
-                {notesSaved
-                  ? "Saved!"
-                  : notesLoading
-                    ? "Saving..."
-                    : "Save Notes"}
+                {notesSaved ? "Saved!" : notesLoading ? "Saving..." : "Save Notes"}
               </button>
             </div>
           </div>
