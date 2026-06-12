@@ -177,6 +177,105 @@ def call_small(system_prompt: str, user_message: str, output_model: Type[T]) -> 
     """
     return call_with_retry(system_prompt, user_message, output_model, SMALL_MODEL)
 
+def call_large_text(system_prompt: str, user_message: str) -> str | dict:
+    """
+    Use when you need plain text back — not JSON or Pydantic model.
+    Used by proposal_draft.py and subsystem_h.py.
+    Returns plain string on success.
+    Returns failure dict on error — check is_failed() before using.
+    """
+    from dotenv import load_dotenv
+    load_dotenv()
+    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+
+    try:
+        response = client.chat.completions.create(
+            model=LARGE_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt.strip()},
+                {"role": "user",   "content": user_message},
+            ],
+            max_tokens=1500,
+            temperature=0.1,
+        )
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        return {
+            "status":     "failed",
+            "reason":     f"API error: {str(e)}",
+            "last_error": str(e),
+        }
+
+
+def call_large_json(system_prompt: str, user_message: str) -> dict:
+    """
+    Use when you need a plain JSON dict back — not a Pydantic model.
+    Used by subsystem_h.py for revision output.
+    Returns parsed dict on success.
+    Returns failure dict on error — check is_failed() before using.
+    """
+    from dotenv import load_dotenv
+    load_dotenv()
+    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+
+    full_system = system_prompt.strip() + "\n\n" + JSON_INSTRUCTION.strip()
+    messages = [
+        {"role": "system", "content": full_system},
+        {"role": "user",   "content": user_message},
+    ]
+
+    last_error = ""
+    last_raw = ""
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        if attempt > 1:
+            messages.append({"role": "assistant", "content": last_raw})
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"Your previous response failed:\n{last_error}\n\n"
+                    f"Return only corrected JSON. No explanation. No markdown."
+                )
+            })
+
+        try:
+            response = client.chat.completions.create(
+                model=LARGE_MODEL,
+                messages=messages,
+                max_tokens=1500,
+                temperature=0.1,
+            )
+            raw = response.choices[0].message.content.strip()
+            last_raw = raw
+
+            # Strip markdown fences
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+                raw = raw.strip()
+
+            try:
+                parsed = json.loads(raw)
+                return parsed
+            except json.JSONDecodeError as e:
+                last_error = f"Invalid JSON on attempt {attempt}: {e}"
+                continue
+
+        except Exception as e:
+            return {
+                "status":     "failed",
+                "reason":     f"API error on attempt {attempt}: {str(e)}",
+                "last_error": str(e),
+            }
+
+    return {
+        "status":     "failed",
+        "reason":     f"Failed after {MAX_RETRIES} attempts. Last error: {last_error}",
+        "last_error": last_error,
+    }
+
 
 # ── Helper ────────────────────────────────────────────────────────────────────
 

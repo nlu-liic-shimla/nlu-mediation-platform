@@ -40,7 +40,7 @@ RULES:
 1. Score based on HOW they say things not WHAT they say
 2. A party can have legitimate grievances and still have low hostility
 3. key_emotional_phrases: maximum 5 phrases that best show the tone
-4. mediator_advisory: practical advice for the mediator on how to approach the session
+4. mediator_advisory: one sentence only — maximum 250 characters — practical advice for the mediator. Be concise.
 5. This output is MEDIATOR ONLY — never shown to parties
 
 Return ONLY valid JSON in this EXACT format — field names must match exactly:
@@ -60,7 +60,7 @@ Return ONLY valid JSON in this EXACT format — field names must match exactly:
         "tone_summary": "one sentence summary"
     },
     "combined_conflict_intensity": 5,
-    "mediator_advisory": "advice for mediator here"
+    "mediator_advisory": "one sentence under 250 characters"
 }
 """
 
