@@ -507,3 +507,369 @@ def process_submission_received(case_id: str):
         process_burst_1.delay(case_id)
     
     return {"status": "ok", "case_id": case_id, "submission_count": count}
+
+    # ─────────────────────────────────────────────────────────────────────────────
+# ADD THESE THREE TASKS TO YOUR EXISTING tasks.py
+# Do NOT replace your whole tasks.py — just append these to the bottom.
+# Niharika (Backend 2) will fill in the AI logic inside process_burst_2.
+# Your job here is to define the task signatures and state transitions
+# so she can import and call them.
+# ─────────────────────────────────────────────────────────────────────────────
+
+from app.core.state_machine import transition, CaseState
+from app.core.database import supabase
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+# ── Task 1: Burst 2 AI Pipeline ────────────────────────────────────────────────
+# WHO OWNS THIS: Niharika fills the AI logic (lines marked with # NIHARIKA)
+# YOUR JOB: The skeleton, state transitions, error handling, timeout
+
+@celery_app.task(bind=True, time_limit=300, soft_time_limit=270)
+def process_burst_2(self, case_id: str):
+    """
+    Burst 2 AI Pipeline — BATNA/WATNA Analysis
+
+    TRIGGERED BY:
+        questionnaires.py → submit_questionnaire_response()
+        when response_count >= 2 (both parties answered)
+
+    WHAT IT DOES:
+        1. Transitions to BURST_2_PROCESSING
+        2. Fetches conflict_extraction from ai_analysis (burst_number=1)
+        3. Fetches both parties' questionnaire responses
+        4. Calls Sub-system D (BATNA/WATNA)
+        5. Saves BatnaWatnaOutput to ai_analysis (burst_number=2)
+        6. Transitions to BURST_2_COMPLETE
+
+    ON ANY FAILURE:
+        Transitions to PROCESSING_FAILED
+        Mediator can retry via POST /cases/{id}/analysis/retry-burst-2
+
+    WHY bind=True:
+        Allows self.retry() if we want to add retry logic.
+        Also gives us self.request.id (the Celery task ID) for logging.
+
+    WHY time_limit=300, soft_time_limit=270:
+        Hard limit: Celery kills the task at 300 seconds (5 min)
+        Soft limit: Raises SoftTimeLimitExceeded at 270 seconds
+        The 30-second gap gives us time to catch the soft limit,
+        transition to PROCESSING_FAILED, and log cleanly before
+        the hard kill happens.
+    """
+    logger.info(f"[Burst 2] Starting for case {case_id}")
+
+    try:
+        # Step 1: Transition to BURST_2_PROCESSING
+        transition(
+            case_id=case_id,
+            new_state=CaseState.BURST_2_PROCESSING,
+            actor_id="system",
+            metadata={"celery_task_id": self.request.id},
+        )
+
+        # Step 2: Fetch conflict_extraction from Burst 1 results
+        analysis_resp = supabase.table("ai_analysis") \
+            .select("conflict_extraction") \
+            .eq("case_id", case_id) \
+            .eq("burst_number", 1) \
+            .single() \
+            .execute()
+
+        if not analysis_resp.data or not analysis_resp.data.get("conflict_extraction"):
+            raise ValueError(f"No Burst 1 conflict_extraction found for case {case_id}")
+
+        conflict_extraction = analysis_resp.data["conflict_extraction"]
+
+        # Step 3: Fetch the questionnaire and both parties' responses
+        q_resp = supabase.table("questionnaires") \
+            .select("id") \
+            .eq("case_id", case_id) \
+            .single() \
+            .execute()
+
+        if not q_resp.data:
+            raise ValueError(f"No questionnaire found for case {case_id}")
+
+        questionnaire_id = q_resp.data["id"]
+
+        responses_resp = supabase.table("questionnaire_responses") \
+            .select("respondent_id, answers") \
+            .eq("questionnaire_id", questionnaire_id) \
+            .execute()
+
+        if not responses_resp.data or len(responses_resp.data) < 2:
+            raise ValueError(
+                f"Expected 2 questionnaire responses for case {case_id}, "
+                f"found {len(responses_resp.data or [])}"
+            )
+
+        # Build a dict of { respondent_id: answers } for Sub-system D
+        questionnaire_responses = {
+            r["respondent_id"]: r["answers"]
+            for r in responses_resp.data
+        }
+
+        # ── NIHARIKA: Fill in the Sub-system D call here ──────────────────────
+        # Expected call:
+        #   from ai.subsystems.subsystem_d import generate_batna_watna
+        #   result = generate_batna_watna(conflict_extraction, questionnaire_responses)
+        #
+        # result should be a BatnaWatnaOutput Pydantic model (or dict after .dict())
+        # The BATNA invariant (batna_score >= watna_score) is enforced inside
+        # Sub-system D via Pydantic model_validator.
+        #
+        # Placeholder so the skeleton is importable without Sub-system D:
+        result = None  # NIHARIKA: replace with real Sub-system D call
+        # ── END NIHARIKA SECTION ─────────────────────────────────────────────
+
+        if result is None:
+            raise ValueError("Sub-system D returned no result (placeholder not yet replaced)")
+
+        # Convert Pydantic model to dict if needed
+        if hasattr(result, "dict"):
+            result_dict = result.dict()
+        elif hasattr(result, "model_dump"):
+            result_dict = result.model_dump()
+        else:
+            result_dict = result
+
+        # Step 5: Save Burst 2 results to ai_analysis table
+        supabase.table("ai_analysis").insert({
+            "case_id":      case_id,
+            "burst_number": 2,
+            "batna_watna":  result_dict,
+        }).execute()
+
+        # Step 6: Transition to BURST_2_COMPLETE
+        transition(
+            case_id=case_id,
+            new_state=CaseState.BURST_2_COMPLETE,
+            actor_id="system",
+            metadata={"celery_task_id": self.request.id},
+        )
+
+        logger.info(f"[Burst 2] Completed successfully for case {case_id}")
+
+    except Exception as e:
+        logger.error(f"[Burst 2] FAILED for case {case_id}: {e}", exc_info=True)
+
+        # Always transition to PROCESSING_FAILED on any unhandled exception.
+        # This ensures the mediator sees a clear failure state and can retry,
+        # instead of the case being stuck in BURST_2_PROCESSING forever.
+        try:
+            transition(
+                case_id=case_id,
+                new_state=CaseState.PROCESSING_FAILED,
+                actor_id="system",
+                metadata={"error": str(e), "celery_task_id": self.request.id},
+            )
+        except Exception as transition_error:
+            # If even the failure transition fails, just log — do not raise.
+            # The task is already failed; we do not want to mask the original error.
+            logger.error(f"[Burst 2] Could not transition to PROCESSING_FAILED: {transition_error}")
+
+        raise  # Re-raise so Celery marks the task as FAILED in its backend
+
+
+# ── Task 2: Background proposal structure extraction ──────────────────────────
+# This runs silently in the background after mediator saves a proposal.
+# Mediator never sees this — the output is used by Sub-system H for revision.
+
+@celery_app.task
+def extract_proposal_structure(proposal_id: str):
+    """
+    Extracts structured JSON from a proposal's raw text.
+
+    TRIGGERED BY:
+        POST /cases/{id}/proposals     (on create)
+        PATCH /cases/{id}/proposals/{p_id} (on save)
+
+    WHY this exists:
+        Mediators write proposals in natural language (free text).
+        Sub-system H needs structured data (terms, conditions, timeline)
+        to generate precise revision suggestions.
+        We extract structure silently so mediators can write naturally.
+
+    FAILURE HANDLING:
+        If this fails, the proposal still exists and is usable.
+        The mediator can still publish it.
+        Sub-system H will just receive less structured input.
+        We log but do not crash — this is a background enhancement, not critical path.
+    """
+    logger.info(f"[ProposalStructure] Starting extraction for proposal {proposal_id}")
+
+    try:
+        proposal_resp = supabase.table("proposals") \
+            .select("raw_text") \
+            .eq("id", proposal_id) \
+            .single() \
+            .execute()
+
+        if not proposal_resp.data:
+            logger.warning(f"[ProposalStructure] Proposal {proposal_id} not found")
+            return
+
+        raw_text = proposal_resp.data["raw_text"]
+
+        # ── NIHARIKA or VAIDANT: Fill in the structurer call here ────────────
+        # Expected call:
+        #   from ai.subsystems.proposal_structurer import extract_structure
+        #   structured = extract_structure(raw_text)
+        #   # structured should be: { "terms": [...], "conditions": [...], "timeline": "..." }
+        #
+        # Placeholder:
+        structured = {"terms": [], "conditions": [], "timeline": "", "raw_text_length": len(raw_text)}
+        # ── END SECTION ──────────────────────────────────────────────────────
+
+        supabase.table("proposals").update({
+            "structured_json": structured,
+        }).eq("id", proposal_id).execute()
+
+        logger.info(f"[ProposalStructure] Completed for proposal {proposal_id}")
+
+    except Exception as e:
+        # Non-critical — log and continue. Do not crash.
+        logger.error(f"[ProposalStructure] Failed for proposal {proposal_id}: {e}")
+
+
+# ── Task 3: Sub-system H — Proposal revision after rejection ──────────────────
+
+@celery_app.task(time_limit=300)
+def generate_proposal_revision(case_id: str, proposal_id: str):
+    """
+    Runs Sub-system H to generate a revised proposal draft after rejection.
+
+    TRIGGERED BY:
+        POST /cases/{id}/proposals/{p_id}/respond
+        when any party rejects and case transitions to MEDIATION_IN_PROGRESS
+
+    WHAT IT DOES:
+        1. Fetches the current proposal text
+        2. Fetches both parties' rejection reasons (if they rejected)
+        3. Fetches BATNA/WATNA data for context
+        4. Fetches mediator's private notes (fed as professional context)
+        5. Calls Sub-system H
+        6. Saves { revised_draft, changes_summary } to proposals.revision_suggestions
+
+    MEDIATOR SEES:
+        LEFT panel: previous proposal, rejection reasons, AI changes list
+        RIGHT panel: editable text area pre-filled with revised_draft
+        Mediator edits freely then publishes as new round.
+
+    FAILURE HANDLING:
+        If Sub-system H fails, revision_suggestions stays null.
+        Mediator still sees the rejection reasons.
+        Mediator can write their own revision from scratch.
+        Log the error but do not block the mediator.
+    """
+    logger.info(f"[ProposalRevision] Starting Sub-system H for case {case_id}, proposal {proposal_id}")
+
+    try:
+        # Fetch proposal raw text
+        proposal_resp = supabase.table("proposals") \
+            .select("raw_text, round_number") \
+            .eq("id", proposal_id) \
+            .single() \
+            .execute()
+
+        if not proposal_resp.data:
+            raise ValueError(f"Proposal {proposal_id} not found")
+
+        raw_text     = proposal_resp.data["raw_text"]
+        round_number = proposal_resp.data.get("round_number", 1)
+
+        # Fetch rejection reasons from proposal_responses
+        responses_resp = supabase.table("proposal_responses") \
+            .select("party_id, decision, rejection_reason") \
+            .eq("proposal_id", proposal_id) \
+            .execute()
+
+        requesting_reason = None
+        against_reason    = None
+
+        for r in (responses_resp.data or []):
+            if r["decision"] != "reject":
+                continue
+            # Identify which party this is
+            inv = supabase.table("case_invitations") \
+                .select("invitation_role") \
+                .eq("case_id", case_id) \
+                .eq("accepted_by", r["party_id"]) \
+                .single() \
+                .execute()
+            if inv.data:
+                if inv.data["invitation_role"] == "requesting_party":
+                    requesting_reason = r["rejection_reason"]
+                else:
+                    against_reason = r["rejection_reason"]
+
+        # Fetch BATNA/WATNA for Sub-system H context
+        batna_resp = supabase.table("ai_analysis") \
+            .select("batna_watna") \
+            .eq("case_id", case_id) \
+            .eq("burst_number", 2) \
+            .single() \
+            .execute()
+
+        batna_watna = batna_resp.data.get("batna_watna") if batna_resp.data else {}
+
+        # Fetch mediator's private notes (fed as professional context to Sub-system H)
+        case_resp = supabase.table("cases") \
+            .select("mediator_notes") \
+            .eq("id", case_id) \
+            .single() \
+            .execute()
+
+        mediator_notes = case_resp.data.get("mediator_notes") if case_resp.data else None
+
+        # ── VAIDANT: Fill in the Sub-system H call here ──────────────────────
+        # Expected call:
+        #   from ai.subsystems.subsystem_h import generate_proposal_revision as run_h
+        #   result = run_h(
+        #       proposal_raw_text=raw_text,
+        #       requesting_party_rejection_reason=requesting_reason,
+        #       against_party_rejection_reason=against_reason,
+        #       batna_watna=batna_watna,
+        #       round_number=round_number,
+        #       mediator_notes=mediator_notes,
+        #   )
+        #   # result: { "revised_draft": str, "changes_summary": list[str], "reasoning": str }
+        #
+        # Placeholder:
+        result = {
+            "revised_draft":    raw_text,
+            "changes_summary":  ["Sub-system H placeholder — Vaidant to implement"],
+            "reasoning":        "Placeholder",
+        }
+        # ── END VAIDANT SECTION ──────────────────────────────────────────────
+
+        # Save revision suggestions to the proposal
+        supabase.table("proposals").update({
+            "revision_suggestions": result,
+        }).eq("id", proposal_id).execute()
+
+        logger.info(
+            f"[ProposalRevision] Completed for case {case_id}, proposal {proposal_id}. "
+            f"Changes: {len(result.get('changes_summary', []))}"
+        )
+
+    except Exception as e:
+        # Non-critical path — mediator can still create revision manually.
+        logger.error(
+            f"[ProposalRevision] Sub-system H failed for case {case_id}, "
+            f"proposal {proposal_id}: {e}",
+            exc_info=True,
+        )
+        # Save a failure marker so mediator UI can show "AI revision unavailable"
+        try:
+            supabase.table("proposals").update({
+                "revision_suggestions": {
+                    "error": True,
+                    "message": "AI revision generation failed. Please write your revision manually.",
+                },
+            }).eq("id", proposal_id).execute()
+        except Exception:
+            pass  # If even saving the error fails, just log and move on
