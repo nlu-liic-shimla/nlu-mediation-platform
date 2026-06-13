@@ -622,7 +622,10 @@ def process_burst_2(self, case_id: str):
         # Sub-system D via Pydantic model_validator.
         #
         # Placeholder so the skeleton is importable without Sub-system D:
-        result = None  # NIHARIKA: replace with real Sub-system D call
+        from ai.subsystems.subsystem_d import generate_batna_watna
+        from ai.schemas import ConflictExtraction
+        conflict_obj = ConflictExtraction(**conflict_extraction)
+        result = generate_batna_watna(conflict_obj, questionnaire_responses)
         # ── END NIHARIKA SECTION ─────────────────────────────────────────────
 
         if result is None:
