@@ -1,0 +1,18 @@
+{
+  "id": "S-12",
+  "description": "Rental agency double booking and refund dispute",
+  "dispute_type": "commercial_contract",
+  "party_a_statement": "I booked a holiday villa through this agency in Coorg for December 2025 and paid the full amount of 85000 INR in October 2025. Two weeks before my trip they informed me the villa was double booked and offered me a different property which was smaller and in a worse location. I had already booked flights and planned the trip for my family. I rejected the alternative and asked for a full refund plus compensation for the flights I had booked worth 32000 INR. They have only offered to refund 85000 INR with no compensation.",
+  "party_b_statement": "The double booking occurred due to a technical error on our booking platform. As soon as we discovered it we informed the customer and offered an alternative property of similar standard. The customer refused the alternative without even viewing it. Our terms and conditions clearly state that in case of unavailability we are liable only for a full refund of the booking amount and not for any consequential losses such as flights or travel costs. We have already processed the full refund of 85000 INR.",
+  "metadata": {
+    "relationship_type": "consumer_business",
+    "monetary_amount": 32000,
+    "currency": "INR",
+    "prior_negotiation": true
+  },
+  "expected": {
+    "dispute_type": "commercial_contract",
+    "mediatability_band": "High",
+    "extraction_confidence_min": 0.75
+  }
+}
