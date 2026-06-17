@@ -314,3 +314,56 @@ ORDER BY tablename;
 
 -- audit_logs
 -- Added column: metadata (jsonb)
+-- ============================================================
+-- Week 4 Updates
+-- Database Role | Week 4
+-- ============================================================
+
+-- New Tables Added:
+
+-- questionnaires
+-- Purpose: Stores AI-generated questionnaire questions per case
+-- Columns: id, case_id, created_by, questions (jsonb), created_at
+-- RLS: anon full access (backend uses anon key)
+-- Index: case_id
+
+-- questionnaire_responses
+-- Purpose: Stores party answers to questionnaire
+-- Columns: id, questionnaire_id, respondent_id, answers (jsonb), submitted_at
+-- RLS: anon full access
+-- Index: questionnaire_id
+-- Constraint: UNIQUE(questionnaire_id, respondent_id)
+
+-- proposals
+-- Purpose: Stores mediator proposal drafts and revisions
+-- Columns: id, case_id, created_by, raw_text, structured_json,
+--          revision_suggestions, is_published, round_number,
+--          published_at, created_at, updated_at
+-- RLS: anon full access
+-- Index: case_id
+
+-- proposal_responses
+-- Purpose: Stores party accept/reject decisions on proposals
+-- Columns: id, proposal_id, party_id, decision, rejection_reason, responded_at
+-- RLS: anon full access
+-- Index: proposal_id
+-- Constraint: UNIQUE(proposal_id, party_id), decision CHECK (accept/reject)
+
+-- settlement_confirmations
+-- Purpose: Stores typed name + signature confirmation from each party
+-- Columns: id, case_id, party_id, typed_name, signature_url, confirmed_at
+-- RLS: anon full access
+-- Index: case_id
+-- Constraint: UNIQUE(case_id, party_id)
+
+-- mediation_reports
+-- Purpose: Stores generated settlement PDF metadata
+-- Columns: id, case_id, pdf_url, generated_at, case_summary_json
+-- RLS: anon full access
+-- Index: case_id
+
+-- Verification:
+-- audit_logs confirmed INSERT-only (no UPDATE/DELETE policy exists)
+-- Policies found: audit_logs_service_select (SELECT),
+--                 audit_logs_anon_insert (INSERT),
+--                 audit_logs_anon_select (SELECT)
