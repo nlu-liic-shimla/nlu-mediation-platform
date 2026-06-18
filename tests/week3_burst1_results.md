@@ -11,4 +11,4 @@
 | S-05.json | Business partnership dissolution dispute | DisputeType.FAMILY_BUSINESS | 0.9 | 6 | 5/5 | ✅ PASS |
 | S-06.json | Property boundary dispute between neighbours | DisputeType.PROPERTY_BOUNDARY | 0.9 | 7 | 5/5 | ✅ PASS |
 | S-07.json | Construction delay and quality dispute | DisputeType.CONSTRUCTION | 0.9 | 7 | 5/5 | ✅ PASS |
-| S-08.json | Vague and ambiguous dispute - edge case test | DisputeType.OTHER | 0.6 | 4 | 5/5 | ✅ PASS |
+| S-08.json | Vague and ambiguous dispute - edge case test | DisputeType.OTHER | 0.4 | 3 | 5/5 | ✅ PASS |
