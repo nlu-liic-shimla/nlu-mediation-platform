@@ -7,16 +7,18 @@ import {
 } from 'lucide-react'
 import client from '../../api/client'
 import AnalysisStatusBanner from '../../components/party/AnalysisStatusBanner'
+import BatnaWatnaPartyDisplay from '../../components/party/BatnaWatnaPartyDisplay'
 
-// Case status → timeline step mapping
+// ── Timeline steps ────────────────────────────────────────────────────────────
 const TIMELINE_STEPS = [
-  { key: 'INVITED',              label: 'Invited',              desc: 'You accepted the invitation' },
-  { key: 'SUBMISSION_RECEIVED',  label: 'Statement submitted',  desc: 'Your dispute statement was received' },
-  { key: 'BOTH_SUBMITTED',       label: 'Both parties submitted', desc: 'AI analysis has begun' },
-  { key: 'AI_PROCESSING',        label: 'AI Analysis',          desc: 'Analysing your statements' },
-  { key: 'QUESTIONNAIRE_SENT',   label: 'Questionnaire',        desc: 'Answer AI-generated questions' },
-  { key: 'PROPOSAL_SENT',        label: 'Proposal',             desc: 'Review mediator proposal' },
-  { key: 'SETTLEMENT',           label: 'Settlement',           desc: 'Case concluded' },
+  { key: 'INVITED',            label: 'Invited',                desc: 'You accepted the invitation' },
+  { key: 'SUBMITTED',         label: 'Statement submitted',    desc: 'Your dispute statement was received' },
+  { key: 'BOTH_SUBMITTED',    label: 'Both parties submitted', desc: 'AI analysis has begun' },
+  { key: 'AI_ANALYSIS',       label: 'AI Analysis',            desc: 'Analysing your statements' },
+  { key: 'QUESTIONNAIRE',     label: 'Questionnaire',          desc: 'Answer AI-generated questions' },
+  { key: 'BATNA_WATNA',       label: 'Case Analysis',          desc: 'Your BATNA/WATNA is ready' },
+  { key: 'PROPOSAL',          label: 'Proposal',               desc: 'Review mediator\'s proposal' },
+  { key: 'SETTLEMENT',        label: 'Settlement',             desc: 'Case concluded' },
 ]
 
 const STATUS_STEP_MAP = {
@@ -26,31 +28,62 @@ const STATUS_STEP_MAP = {
   BURST_1_PROCESSING:       3,
   BURST_1_COMPLETE:         3,
   PROCESSING_FAILED:        3,
+  // Week 4 statuses
+  QUESTIONNAIRE_ACTIVE:     4,
+  QUESTIONNAIRE_COMPLETE:   4,
+  BURST_2_PROCESSING:       5,
+  BURST_2_COMPLETE:         5,
+  PROPOSAL_DRAFT:           6,
+  PROPOSAL_PUBLISHED:       6,
+  MEDIATION_IN_PROGRESS:    6,
+  MEDIATION_COMPLETE:       7,
+  MEDIATION_FAILED:         6,
+  // Legacy
   QUESTIONNAIRE_PENDING:    4,
-  MEDIATION_IN_PROGRESS:    5,
-  PROPOSAL_PENDING:         5,
-  SETTLED:                  6,
-  CLOSED:                   6,
+  PROPOSAL_PENDING:         6,
+  SETTLED:                  7,
+  CLOSED:                   7,
 }
 
+// Statuses where BATNA/WATNA section should be shown
+const BURST_2_STATUSES = new Set([
+  'BURST_2_COMPLETE',
+  'PROPOSAL_DRAFT',
+  'PROPOSAL_PUBLISHED',
+  'MEDIATION_IN_PROGRESS',
+  'MEDIATION_COMPLETE',
+  'MEDIATION_FAILED',
+])
+
 const RELATIONSHIP_LABELS = {
-  landlord_tenant:     'Landlord / Tenant',
-  employer_employee:   'Employer / Employee',
-  commercial:          'Commercial / Business',
-  family:              'Family',
-  other:               'Other',
+  landlord_tenant:   'Landlord / Tenant',
+  employer_employee: 'Employer / Employee',
+  commercial:        'Commercial / Business',
+  family:            'Family',
+  other:             'Other',
 }
 
 const ACTION_NEEDED = {
-  BOTH_INVITED:             { msg: 'Please submit your dispute statement.',              action: null },
-  FIRST_PARTY_SUBMITTED:    { msg: 'Waiting for the other party to submit.',             action: null },
-  BOTH_SUBMITTED:           { msg: 'Both statements received. AI analysis starting.',    action: null },
-  BURST_1_PROCESSING:       { msg: 'AI is analysing the dispute. Please wait.',          action: null },
-  BURST_1_COMPLETE:         { msg: 'Analysis complete. Mediator is reviewing results.',  action: null },
-  PROCESSING_FAILED:        { msg: 'Analysis failed. Your mediator has been notified.',  action: null },
-  QUESTIONNAIRE_PENDING:    { msg: 'Please answer the AI-generated questionnaire.',      action: 'questionnaire' },
-  PROPOSAL_PENDING:         { msg: 'A proposal is ready for your review.',               action: 'proposal' },
-  SETTLED:                  { msg: 'This case has been settled.',                        action: 'settlement' },
+  BOTH_INVITED:            { msg: 'Please submit your dispute statement.',             action: null },
+  FIRST_PARTY_SUBMITTED:   { msg: 'Waiting for the other party to submit.',            action: null },
+  BOTH_SUBMITTED:          { msg: 'Both statements received. AI analysis starting.',   action: null },
+  BURST_1_PROCESSING:      { msg: 'AI is analysing the dispute. Please wait.',         action: null },
+  BURST_1_COMPLETE:        { msg: 'Analysis complete. Mediator is reviewing results.', action: null },
+  PROCESSING_FAILED:       { msg: 'Analysis failed. Your mediator has been notified.', action: null },
+  // Week 4
+  QUESTIONNAIRE_ACTIVE:    { msg: 'Please answer the AI-generated questionnaire.',     action: 'questionnaire' },
+  QUESTIONNAIRE_COMPLETE:  { msg: 'Questionnaire submitted. Awaiting analysis.',       action: null },
+  BURST_2_PROCESSING:      { msg: 'Analysing questionnaire responses. Please wait.',   action: null },
+  BURST_2_COMPLETE:        { msg: 'Your case analysis is ready. Review below.',        action: null },
+  PROPOSAL_DRAFT:          { msg: 'The mediator is preparing a proposal.',             action: null },
+  PROPOSAL_PUBLISHED:      { msg: 'A proposal is ready for your review.',              action: 'proposal' },
+  MEDIATION_IN_PROGRESS:   { msg: 'The mediator is reviewing feedback. Stand by.',     action: null },
+  MEDIATION_COMPLETE:      { msg: 'Both parties accepted. Confirm your settlement.',   action: 'settlement' },
+  MEDIATION_FAILED:        { msg: 'Mediation could not be completed.',                 action: null },
+  // Legacy
+  QUESTIONNAIRE_PENDING:   { msg: 'Please answer the AI-generated questionnaire.',     action: 'questionnaire' },
+  PROPOSAL_PENDING:        { msg: 'A proposal is ready for your review.',              action: 'proposal' },
+  SETTLED:                 { msg: 'This case has been settled.',                       action: 'settlement' },
 }
 
 export default function CaseDetails() {
@@ -83,7 +116,8 @@ export default function CaseDetails() {
   }, [caseId])
 
   const currentStep = STATUS_STEP_MAP[caseData?.status] ?? 0
-  const actionInfo = ACTION_NEEDED[caseData?.status]
+  const actionInfo  = ACTION_NEEDED[caseData?.status]
+  const showBatna   = BURST_2_STATUSES.has(caseData?.status)
 
   return (
     <>
@@ -93,7 +127,6 @@ export default function CaseDetails() {
 
         .cd { min-height: 100vh; background: var(--bg-page); font-family: 'DM Sans', sans-serif; padding: 2rem 1.25rem; max-width: 800px; margin: 0 auto; }
 
-        /* Header */
         .cd-back { display: flex; align-items: center; gap: 6px; background: none; border: none; font-size: 13px; color: var(--text-muted); cursor: pointer; font-family: 'DM Sans', sans-serif; margin-bottom: 1.5rem; padding: 0; }
         .cd-back:hover { color: var(--brand); }
         .cd-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.75rem; gap: 1rem; flex-wrap: wrap; }
@@ -101,18 +134,16 @@ export default function CaseDetails() {
         .cd-sub { font-size: 13px; color: var(--text-muted); }
         .cd-role-badge { font-size: 11px; font-weight: 500; padding: 4px 12px; border-radius: 99px; background: var(--brand-light); color: var(--brand); white-space: nowrap; }
 
-        /* Cards */
         .cd-card { background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border-card); padding: 1.5rem; margin-bottom: 1.25rem; }
         .cd-card-title { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px; }
 
-        /* Timeline stepper */
         .cd-timeline { display: flex; flex-direction: column; gap: 0; }
         .cd-timeline-item { display: flex; gap: 14px; }
         .cd-timeline-left { display: flex; flex-direction: column; align-items: center; }
         .cd-timeline-circle { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; font-weight: 600; transition: all 0.2s; }
-        .cd-timeline-circle.done { background: var(--brand); color: #fff; }
+        .cd-timeline-circle.done   { background: var(--brand); color: #fff; }
         .cd-timeline-circle.active { background: var(--brand-light); border: 2px solid var(--brand); color: var(--brand); }
-        .cd-timeline-circle.pending { background: var(--bg-muted); border: 2px solid var(--border); color: var(--text-muted); }
+        .cd-timeline-circle.pending{ background: var(--bg-muted); border: 2px solid var(--border); color: var(--text-muted); }
         .cd-timeline-line { width: 2px; flex: 1; min-height: 20px; background: var(--border); margin: 2px 0; }
         .cd-timeline-line.done { background: var(--brand); }
         .cd-timeline-content { padding-bottom: 20px; }
@@ -121,37 +152,31 @@ export default function CaseDetails() {
         .cd-timeline-label.pending { color: var(--text-muted); }
         .cd-timeline-desc { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
 
-        /* Action banner */
         .cd-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: var(--brand-light); border: 1.5px solid var(--brand); border-radius: 12px; margin-bottom: 1.25rem; flex-wrap: wrap; }
         .cd-action-text { font-size: 13px; color: var(--brand); font-weight: 500; display: flex; align-items: center; gap: 8px; }
         .cd-action-btn { display: flex; align-items: center; gap: 6px; background: var(--brand); color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-family: 'Sora', sans-serif; font-weight: 600; cursor: pointer; white-space: nowrap; }
         .cd-action-btn:hover { background: var(--brand-hover); }
 
-        /* Info grid */
         .cd-info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
         .cd-info-item { background: var(--bg-muted); border-radius: 10px; padding: 12px; }
         .cd-info-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
         .cd-info-value { font-size: 13px; font-weight: 500; color: var(--text-primary); }
 
-        /* Submission card */
         .cd-submission-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
         .cd-submission-row:last-child { border-bottom: none; }
         .cd-submission-label { font-size: 12px; color: var(--text-muted); }
         .cd-submission-value { font-size: 13px; font-weight: 500; color: var(--text-primary); }
 
-        /* No submission */
         .cd-empty { text-align: center; padding: 1.5rem; }
         .cd-empty-icon { width: 48px; height: 48px; border-radius: 10px; background: var(--bg-muted); display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem; }
         .cd-empty-text { font-size: 13px; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5; }
         .cd-submit-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--brand); color: #fff; border: none; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-family: 'Sora', sans-serif; font-weight: 600; cursor: pointer; }
         .cd-submit-btn:hover { background: var(--brand-hover); }
 
-        /* Loading / error */
         .cd-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--text-muted); font-size: 14px; }
         .cd-error { background: var(--error-bg); border: 1px solid var(--error-border); color: var(--error); border-radius: 12px; padding: 1rem 1.25rem; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 
         @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-
         @media (max-width: 520px) {
           .cd { padding: 1.25rem 1rem; }
           .cd-info-grid { grid-template-columns: 1fr; }
@@ -163,7 +188,6 @@ export default function CaseDetails() {
           <ChevronLeft size={16} /> Back to Dashboard
         </button>
 
-        {/* Loading */}
         {loading && (
           <div className="cd-loading">
             <Loader size={28} style={{ animation: 'spin 1s linear infinite' }} />
@@ -171,14 +195,12 @@ export default function CaseDetails() {
           </div>
         )}
 
-        {/* Error */}
         {!loading && error && (
           <div className="cd-error">
             <AlertCircle size={16} /> {error}
           </div>
         )}
 
-        {/* Content */}
         {!loading && !error && caseData && (
           <>
             {/* Page header */}
@@ -194,7 +216,7 @@ export default function CaseDetails() {
               )}
             </div>
 
-            {/* Action needed banner */}
+            {/* Action banner */}
             {actionInfo && (
               <div className="cd-action">
                 <p className="cd-action-text">
@@ -213,13 +235,13 @@ export default function CaseDetails() {
                 )}
                 {actionInfo.action === 'settlement' && (
                   <button className="cd-action-btn" onClick={() => navigate(`/party/cases/${caseId}/settlement`)}>
-                    View Settlement <ChevronRight size={14} />
+                    Confirm Settlement <ChevronRight size={14} />
                   </button>
                 )}
               </div>
             )}
 
-            {/* Analysis status polling */}
+            {/* Analysis status polling (existing) */}
             <AnalysisStatusBanner caseId={caseId} />
 
             {/* Case info */}
@@ -250,13 +272,18 @@ export default function CaseDetails() {
               <p className="cd-card-title"><Clock size={16} color="var(--brand)" /> Case Progress</p>
               <div className="cd-timeline">
                 {TIMELINE_STEPS.map((s, i) => {
-                  const isDone = i < currentStep
+                  const isDone   = i < currentStep
                   const isActive = i === currentStep
                   return (
                     <div key={s.key} className="cd-timeline-item">
                       <div className="cd-timeline-left">
                         <div className={`cd-timeline-circle ${isDone ? 'done' : isActive ? 'active' : 'pending'}`}>
-                          {isDone ? <CheckCircle size={14} /> : isActive ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> : i + 1}
+                          {isDone
+                            ? <CheckCircle size={14} />
+                            : isActive
+                              ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                              : i + 1
+                          }
                         </div>
                         {i < TIMELINE_STEPS.length - 1 && (
                           <div className={`cd-timeline-line ${isDone ? 'done' : ''}`} />
@@ -271,6 +298,13 @@ export default function CaseDetails() {
                 })}
               </div>
             </div>
+
+            {/* ── BATNA/WATNA — visible from Burst 2 onwards ── */}
+            {showBatna && (
+              <div className="cd-card">
+                <BatnaWatnaPartyDisplay caseId={caseId} />
+              </div>
+            )}
 
             {/* Submission summary */}
             <div className="cd-card">
