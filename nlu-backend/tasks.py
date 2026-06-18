@@ -622,7 +622,10 @@ def process_burst_2(self, case_id: str):
         # Sub-system D via Pydantic model_validator.
         #
         # Placeholder so the skeleton is importable without Sub-system D:
-        result = None  # NIHARIKA: replace with real Sub-system D call
+        from ai.subsystems.subsystem_d import generate_batna_watna
+        from ai.schemas import ConflictExtraction
+        conflict_obj = ConflictExtraction(**conflict_extraction)
+        result = generate_batna_watna(conflict_obj, questionnaire_responses)
         # ── END NIHARIKA SECTION ─────────────────────────────────────────────
 
         if result is None:
@@ -890,3 +893,32 @@ def generate_proposal_revision(case_id: str, proposal_id: str):
         except Exception:
             pass  # If even saving the error fails, just log and move on
 
+        # ── Task 4: Settlement PDF Generation ────────────────────────────────────────
+# TRIGGERED BY: POST /cases/{id}/settlement/confirm (after both parties confirm)
+# WHAT IT DOES: Calls pdf_generator.py → ReportLab PDF → saves to Storage → saves URL to mediation_reports
+
+@celery_app.task(name="tasks.generate_settlement_pdf_task", time_limit=120)
+def generate_settlement_pdf_task(case_id: str):
+    """
+    Generates the settlement PDF after both parties confirm.
+    Saves PDF to Supabase Storage and URL to mediation_reports table.
+    Non-critical path — if this fails, confirmations are still saved.
+    Mediator can manually retry if needed.
+    """
+    logger.info(f"[SettlementPDF] Starting PDF generation for case {case_id}")
+
+    try:
+        # pdf_generator.py lives at app/services/pdf_generator.py
+        from app.services.pdf_generator import generate_settlement_pdf
+        signed_url = generate_settlement_pdf(case_id)
+        logger.info(f"[SettlementPDF] PDF generated successfully for case {case_id}")
+        return {"status": "complete", "case_id": case_id, "pdf_url": signed_url}
+
+    except Exception as e:
+        logger.error(
+            f"[SettlementPDF] PDF generation failed for case {case_id}: {e}",
+            exc_info=True
+        )
+        # Non-critical — do not transition case state on failure
+        # Mediator can retry PDF generation manually
+        return {"status": "failed", "case_id": case_id, "error": str(e)}
