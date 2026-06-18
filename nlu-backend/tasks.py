@@ -853,6 +853,22 @@ def generate_proposal_revision(case_id: str, proposal_id: str):
         supabase.table("proposals").update({
             "revision_suggestions": result,
         }).eq("id", proposal_id).execute()
+        # Write audit log — PROPOSAL_REVISION_GENERATED
+        # Required by Week 4 Section 13 logging requirements
+        import datetime
+        supabase.table("audit_logs").insert({
+            "case_id":   case_id,
+            "actor_id":  "system",
+            "action":    "PROPOSAL_REVISION_GENERATED",
+            "old_state": "MEDIATION_IN_PROGRESS",
+            "new_state": "MEDIATION_IN_PROGRESS",
+            "metadata":  {
+                "proposal_id": proposal_id,
+                "has_requesting_reason": requesting_reason is not None,
+                "has_against_reason":    against_reason is not None,
+            },
+            "created_at": datetime.datetime.utcnow().isoformat(),
+        }).execute()
 
         logger.info(
             f"[ProposalRevision] Completed for case {case_id}, proposal {proposal_id}. "
