@@ -219,6 +219,7 @@ import IntakeWizard from "../pages/party/IntakeWizard";
 import ProposalReview from "../pages/party/ProposalReview";
 import Questionnaire from "../pages/party/Questionnaire";
 import Settlement from "../pages/party/Settlement";
+import ApplyForMediation from '../pages/party/ApplyForMediation';
 import UploadDocuments from "../pages/party/UploadDocuments";
 
 import MediatorDashboard from "../pages/mediator/DashboardPage";
@@ -260,6 +261,13 @@ export default function AppRoutes() {
             </RoleBasedRoute>
           </ProtectedRoute>
         } />
+        <Route path="/party/apply" element={
+  <ProtectedRoute>
+    <RoleBasedRoute allowedRoles={["party_user"]}>
+      <ApplyForMediation />
+    </RoleBasedRoute>
+  </ProtectedRoute>
+} />
 
         <Route path="/party/cases/:id/intake" element={
           <ProtectedRoute>

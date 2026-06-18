@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ThemeToggle from '../../components/ui/ThemeToggle'
+import client from '../../services/api'
 import AnalysisStatusBanner from '../../components/party/AnalysisStatusBanner'
 import {
   Scale, LayoutDashboard, FilePlus, MessageSquare,
@@ -19,9 +20,11 @@ const NAV_ITEMS = [
 
 const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile, mobileOpen, onMobileClose }) => (
   <>
+    {/* Mobile overlay */}
     {isMobile && mobileOpen && (
       <div className="pd-overlay" onClick={onMobileClose} />
     )}
+
     <aside className={`pd-sidebar ${collapsed && !isMobile ? 'collapsed' : ''} ${isMobile ? (mobileOpen ? 'mobile-open' : 'mobile-closed') : ''}`}>
       <div className="pd-sidebar-logo">
         <div className="pd-logo-icon">
@@ -92,8 +95,7 @@ const StatCard = ({ label, value, sub, subColor, icon, iconBg }) => (
   </div>
 )
 
-// FIX: caseId is now the real UUID from the cases array
-const CaseCard = ({ title, status, caseId, vs, progress, aiScore, nextDate, statusColor, statusBg, onView }) => (
+const CaseCard = ({ title, status, caseId, displayId, vs, progress, aiScore, nextDate, statusColor, statusBg, onView }) => (
   <div className="pd-case-card">
     <div className="pd-case-top">
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -101,8 +103,7 @@ const CaseCard = ({ title, status, caseId, vs, progress, aiScore, nextDate, stat
           <h3 className="pd-case-title">{title}</h3>
           <span className="pd-case-badge" style={{ color: statusColor, background: statusBg }}>{status}</span>
         </div>
-        {/* Show a short display ID derived from UUID, not the raw UUID */}
-        <p className="pd-case-meta">Case: {caseId.slice(0, 8).toUpperCase()}… • vs. {vs}</p>
+        <p className="pd-case-meta">Case ID: {displayId || caseId} • vs. {vs}</p>
       </div>
       <div className="pd-ai-score">
         <p className="pd-ai-score-label">AI Score</p>
@@ -110,7 +111,7 @@ const CaseCard = ({ title, status, caseId, vs, progress, aiScore, nextDate, stat
       </div>
     </div>
 
-    {/* AnalysisStatusBanner receives real UUID */}
+    {/* ← ADD HERE */}
     <AnalysisStatusBanner caseId={caseId} />
 
     <div className="pd-progress-section">
@@ -127,7 +128,6 @@ const CaseCard = ({ title, status, caseId, vs, progress, aiScore, nextDate, stat
         <Calendar size={13} color="var(--text-muted)" />
         <span className="pd-next-date">Next: {nextDate}</span>
       </div>
-      {/* FIX: onView now correctly uses caseId (the UUID) */}
       <button className="pd-view-btn" onClick={onView}>View Details</button>
     </div>
   </div>
@@ -135,58 +135,17 @@ const CaseCard = ({ title, status, caseId, vs, progress, aiScore, nextDate, stat
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [activeNav, setActiveNav]   = useState('dashboard')
-  const [collapsed, setCollapsed]   = useState(false)
-  const [search, setSearch]         = useState('')
+  const [activeNav, setActiveNav] = useState('dashboard')
+  const [collapsed, setCollapsed] = useState(false)
+  const [search, setSearch] = useState('')
   const [showNotifs, setShowNotifs] = useState(false)
-  const [isMobile, setIsMobile]     = useState(window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // FIX: cases loaded from API, not hardcoded
-  const [cases, setCases]     = useState([])
-  const [loadingCases, setLoadingCases] = useState(true)
-
-  const user        = JSON.parse(localStorage.getItem('nlu_user') || '{}')
-  const userEmail   = user.email || 'User'
+  const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
+  const userEmail = user.email || 'User'
   const userInitials = userEmail.substring(0, 2).toUpperCase()
-  const userName    = userEmail.split('@')[0]
-
-  const token = localStorage.getItem('nlu_token')
-
-  // Fetch real cases from backend on mount
-  useEffect(() => {
-    const fetchCases = async () => {
-      if (!token) { setLoadingCases(false); return }
-      try {
-        const res = await fetch('/api/v1/cases', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (res.ok) {
-          const data = await res.json()
-          // Map backend fields to what CaseCard expects
-          const mapped = (data.cases || data || []).map(c => ({
-            caseId:      c.id,           // real UUID — used for all API calls
-            title:       c.title || c.case_title || 'Untitled Case',
-            status:      formatStatus(c.status),
-            statusColor: statusColour(c.status).text,
-            statusBg:    statusColour(c.status).bg,
-            vs:          c.against_party_name || c.respondent_name || 'Counterparty',
-            progress:    deriveProgress(c.status),
-            aiScore:     c.ai_score ?? 0,
-            nextDate:    c.next_session_date
-                           ? new Date(c.next_session_date).toLocaleDateString()
-                           : 'TBD',
-          }))
-          setCases(mapped)
-        }
-      } catch (e) {
-        console.error('Failed to fetch cases:', e)
-      } finally {
-        setLoadingCases(false)
-      }
-    }
-    fetchCases()
-  }, [token])
+  const userName = userEmail.split('@')[0]
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)
@@ -201,28 +160,41 @@ export default function Dashboard() {
     navigate('/auth/login')
   }
 
+  const sidebarWidth = isMobile ? 0 : (collapsed ? 60 : 240)
+
+  const [cases, setCases] = useState([])
+
+useEffect(() => {
+  client.get('/cases').then(res => {
+    const data = res.data
+    const arr = Array.isArray(data) ? data : data.cases || data.data || []
+    console.log('RAW:', JSON.stringify(arr[0]))  // ← change to this
+    setCases(arr)
+  }).catch(() => setCases([]))
+}, [])
+
   const notifications = [
-    { text: 'New settlement proposal received', time: '2 hours ago' },
+    { text: 'New settlement proposal received for CASE-2024-001', time: '2 hours ago' },
     { text: 'Upcoming mediation session on May 25 at 2:00 PM', time: '5 hours ago' },
     { text: 'Document analysis completed', time: '1 day ago' },
   ]
 
   const activities = [
     { title: 'Settlement Proposal Submitted', desc: 'Mediator submitted revised settlement proposal', date: '5/21/2026' },
-    { title: 'Mediation Session #3',          desc: 'Virtual session discussing payment terms',        date: '5/18/2026' },
-    { title: 'Document Analysis Completed',   desc: 'AI analysis of all submitted evidence',           date: '5/15/2026' },
+    { title: 'Mediation Session #3', desc: 'Virtual session discussing payment terms', date: '5/18/2026' },
+    { title: 'Document Analysis Completed', desc: 'AI analysis of all submitted evidence', date: '5/15/2026' },
   ]
 
   const quickActions = [
-    { icon: <FilePlus size={17} />,  label: 'Start New Case',   onClick: () => {} },
-    {
-      icon: <FileText size={17} />,
-      label: 'Upload Documents',
-      // FIX: use first real case UUID if available
-      onClick: () => cases[0] && navigate(`/party/cases/${cases[0].caseId}/documents`)
-    },
-    { icon: <Calendar size={17} />, label: 'Schedule Session', onClick: () => {} },
-  ]
+    { icon: <FilePlus size={17} />, label: 'Apply for Mediation', path: '/party/apply' },
+  { icon: <FilePlus size={17} />, label: 'Start New Case', path: '/party/apply' },
+  { 
+    icon: <FileText size={17} />, 
+    label: 'Upload Documents', 
+    onClick: () => cases[0] && navigate(`/party/cases/${cases[0].id}/documents`)
+  },
+  { icon: <Calendar size={17} />, label: 'Schedule Session', path: null },
+]
 
   return (
     <>
@@ -233,8 +205,10 @@ export default function Dashboard() {
 
         .pd-page { display: flex; min-height: 100vh; background: var(--bg-page); font-family: 'DM Sans', sans-serif; }
 
+        /* ── Overlay ── */
         .pd-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 49; }
 
+        /* ── Sidebar ── */
         .pd-sidebar {
           position: fixed; top: 0; left: 0; bottom: 0;
           width: 240px; background: var(--bg-card);
@@ -245,7 +219,7 @@ export default function Dashboard() {
         }
         .pd-sidebar.collapsed { width: 60px; }
         .pd-sidebar.mobile-closed { transform: translateX(-100%); width: 240px; }
-        .pd-sidebar.mobile-open  { transform: translateX(0);    width: 240px; }
+        .pd-sidebar.mobile-open { transform: translateX(0); width: 240px; }
 
         .pd-sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 14px; min-height: 60px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
         .pd-logo-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -262,7 +236,7 @@ export default function Dashboard() {
         .pd-ai-box { display: flex; align-items: center; gap: 10px; margin: 8px; padding: 12px; background: var(--bg-muted); border-radius: 10px; flex-shrink: 0; }
         .pd-ai-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .pd-ai-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-        .pd-ai-sub   { font-size: 11px; color: var(--text-muted); }
+        .pd-ai-sub { font-size: 11px; color: var(--text-muted); }
 
         .pd-collapse-btn { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border: none; border-top: 1px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; flex-shrink: 0; white-space: nowrap; }
         .pd-collapse-btn:hover { color: var(--text-primary); }
@@ -270,8 +244,10 @@ export default function Dashboard() {
         .pd-signout-sidebar { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border: none; border-top: 1px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; flex-shrink: 0; width: 100%; }
         .pd-signout-sidebar:hover { color: #ef4444; }
 
+        /* ── Main ── */
         .pd-main { flex: 1; display: flex; flex-direction: column; min-height: 100vh; transition: margin-left 0.25s ease; }
 
+        /* ── Topbar ── */
         .pd-topbar { height: 60px; background: var(--bg-card); border-bottom: 1px solid var(--border-card); display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; position: sticky; top: 0; z-index: 40; gap: 1rem; }
         .pd-hamburger { background: none; border: none; cursor: pointer; color: var(--text-secondary); display: none; align-items: center; padding: 4px; }
         .pd-search-wrap { display: flex; align-items: center; gap: 8px; background: var(--bg-muted); border: 1px solid var(--border); border-radius: 8px; padding: 0 12px; flex: 0 1 360px; min-width: 0; }
@@ -294,6 +270,7 @@ export default function Dashboard() {
         .pd-signout-btn { display: flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
         .pd-signout-btn:hover { border-color: #ef4444; color: #ef4444; }
 
+        /* ── Content ── */
         .pd-content { flex: 1; overflow-y: auto; }
         .pd-inner { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
         .pd-page-header { margin-bottom: 1.5rem; }
@@ -304,6 +281,7 @@ export default function Dashboard() {
         .pd-left-col { flex: 1; min-width: 0; }
         .pd-right-col { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; gap: 1rem; }
 
+        /* Stats */
         .pd-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
         .pd-stat-card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-card); padding: 1.1rem; display: flex; justify-content: space-between; align-items: flex-start; min-width: 0; }
         .pd-stat-info { flex: 1; min-width: 0; }
@@ -312,6 +290,7 @@ export default function Dashboard() {
         .pd-stat-sub { font-size: 11px; }
         .pd-stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 8px; }
 
+        /* Section */
         .pd-section { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-card); padding: 1.25rem; }
         .pd-section-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; gap: 1rem; }
         .pd-section-title { font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
@@ -319,6 +298,7 @@ export default function Dashboard() {
         .pd-new-case-btn { padding: 8px 16px; background: var(--brand); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-family: 'Sora', sans-serif; font-weight: 600; cursor: pointer; transition: background 0.15s; flex-shrink: 0; }
         .pd-new-case-btn:hover { background: var(--brand-hover); }
 
+        /* Case card */
         .pd-case-card { border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1rem; }
         .pd-case-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; gap: 1rem; }
         .pd-case-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
@@ -339,8 +319,7 @@ export default function Dashboard() {
         .pd-view-btn { padding: 7px 14px; background: none; border: 1px solid var(--border); border-radius: 7px; font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: border-color 0.15s; }
         .pd-view-btn:hover { border-color: var(--brand); color: var(--brand); }
 
-        .pd-empty-cases { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 14px; }
-
+        /* Side cards */
         .pd-side-card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-card); padding: 1.1rem; }
         .pd-side-title { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; }
         .pd-notif-item { display: flex; gap: 10px; padding: 10px 0; }
@@ -361,6 +340,7 @@ export default function Dashboard() {
         .pd-chat-btn { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 50px; height: 50px; border-radius: 50%; background: var(--brand); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 16px rgba(42,63,143,0.35); z-index: 100; }
         .pd-chat-btn:hover { background: var(--brand-hover); }
 
+        /* ── Responsive ── */
         @media (max-width: 1200px) {
           .pd-stats-grid { grid-template-columns: repeat(2, 1fr); }
           .pd-right-col { width: 260px; }
@@ -395,17 +375,24 @@ export default function Dashboard() {
 
       <div className="pd-page">
         <Sidebar
-          active={activeNav}
-          onNavigate={setActiveNav}
-          collapsed={collapsed}
-          onToggle={() => setCollapsed(p => !p)}
-          onSignOut={handleSignOut}
-          isMobile={isMobile}
-          mobileOpen={mobileOpen}
-          onMobileClose={() => setMobileOpen(false)}
-        />
+  active={activeNav}
+  onNavigate={(id) => {
+    setActiveNav(id)
+    if (id === 'new-case') navigate('/party/apply')
+    if (id === 'questionnaire') navigate(`/party/cases/${cases[0]?.id}/questionnaire`)
+    if (id === 'proposals') navigate(`/party/cases/${cases[0]?.id}/proposal`)
+if (id === 'settlement') navigate(`/party/cases/${cases[0]?.id}/settlement`)
+    // dashboard stays on same page
+  }}
+  collapsed={collapsed}
+  onToggle={() => setCollapsed(p => !p)}
+  onSignOut={handleSignOut}
+  isMobile={isMobile}
+  mobileOpen={mobileOpen}
+  onMobileClose={() => setMobileOpen(false)}
+/>
 
-        <div className="pd-main" style={{ marginLeft: isMobile ? 0 : (collapsed ? 60 : 240) }}>
+        <div className="pd-main" style={{ marginLeft: isMobile ? 0 : (collapsed ? 60 : 240), transition: 'margin-left 0.25s ease' }}>
           {/* Topbar */}
           <header className="pd-topbar">
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
@@ -414,12 +401,7 @@ export default function Dashboard() {
               </button>
               <div className="pd-search-wrap">
                 <Search size={15} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                <input
-                  className="pd-search-input"
-                  placeholder="Search cases, documents, or proposals..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                />
+                <input className="pd-search-input" placeholder="Search cases, documents, or proposals..." value={search} onChange={e => setSearch(e.target.value)} />
               </div>
             </div>
             <div className="pd-topbar-right">
@@ -465,10 +447,10 @@ export default function Dashboard() {
               <div className="pd-layout">
                 <div className="pd-left-col">
                   <div className="pd-stats-grid">
-                    <StatCard label="Active Cases"        value={cases.length}   sub="+1 this month"      subColor="#16a34a" iconBg="#eef1fb" icon={<FileText    size={22} color="#2a3f8f" />} />
-                    <StatCard label="Pending Proposals"   value="3"              sub="2 require action"                      iconBg="#fff7ed" icon={<Clock       size={22} color="#ea8c0d" />} />
-                    <StatCard label="Completed"           value="5"              sub="100% success rate"  subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
-                    <StatCard label="Avg. Resolution Time" value="45 days"       sub="-12 days vs avg"    subColor="#dc2626" iconBg="#fdf4ff" icon={<TrendingUp  size={22} color="#9333ea" />} />
+                    <StatCard label="Active Cases" value="2" sub="+1 this month" subColor="#16a34a" iconBg="#eef1fb" icon={<FileText size={22} color="#2a3f8f" />} />
+                    <StatCard label="Pending Proposals" value="3" sub="2 require action" iconBg="#fff7ed" icon={<Clock size={22} color="#ea8c0d" />} />
+                    <StatCard label="Completed" value="5" sub="100% success rate" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
+                    <StatCard label="Avg. Resolution Time" value="45 days" sub="-12 days vs avg" subColor="#dc2626" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
                   </div>
 
                   <div className="pd-section">
@@ -477,23 +459,30 @@ export default function Dashboard() {
                         <h2 className="pd-section-title">Active Cases</h2>
                         <p className="pd-section-sub">Track your ongoing mediation cases</p>
                       </div>
-                      <button className="pd-new-case-btn">New Case</button>
+                      
+                      <button
+  className="pd-new-case-btn"
+  onClick={() => navigate('/party/apply')}
+>
+  New Case
+</button>
                     </div>
-
-                    {loadingCases ? (
-                      <p className="pd-empty-cases">Loading cases...</p>
-                    ) : cases.length === 0 ? (
-                      <p className="pd-empty-cases">No active cases yet.</p>
-                    ) : (
-                      cases.map(c => (
-                        <CaseCard
-                          key={c.caseId}
-                          {...c}
-                          // FIX: navigate uses the real UUID from c.caseId
-                          onView={() => navigate(`/party/cases/${c.caseId}/intake`)}
-                        />
-                      ))
-                    )}
+                    {cases.map(c => (
+  <CaseCard
+    key={c.id}
+    title={c.title || c.case_number}
+    status={c.status}
+    statusColor="#1a56b0"
+    statusBg="#dbeafe"
+    caseId={c.id}              // UUID → for API calls & navigation
+    displayId={c.case_number}  // human-readable → for UI text
+    vs={c.respondent_name || '—'}
+    progress={c.progress || 0}
+    aiScore={c.ai_score || 0}
+    nextDate={c.next_date || '—'}
+    onView={() => navigate(`/party/cases/${c.id}/intake`)}
+  />
+))}
                   </div>
                 </div>
 
@@ -511,17 +500,23 @@ export default function Dashboard() {
                     ))}
                     <button className="pd-view-all">View all notifications</button>
                   </div>
-
                   <div className="pd-side-card">
-                    <h2 className="pd-side-title">Quick Actions</h2>
-                    {quickActions.map((a, i) => (
-                      <button key={i} className="pd-qa-btn" onClick={a.onClick} style={{ marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}>
-                        <span style={{ color: 'var(--brand)', display: 'flex' }}>{a.icon}</span>
-                        <span className="pd-qa-label">{a.label}</span>
-                        <ChevronRight size={15} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />
-                      </button>
-                    ))}
-                  </div>
+  <h2 className="pd-side-title">Quick Actions</h2>
+  {quickActions.map((a, i) => (
+    <button
+      key={i}
+      className="pd-qa-btn"
+      style={{ marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}
+      onClick={() => a.path && navigate(a.path)}
+    >
+      <span style={{ color: 'var(--brand)', display: 'flex' }}>{a.icon}</span>
+      <span className="pd-qa-label">{a.label}</span>
+      <ChevronRight size={15} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />
+    </button>
+  ))}
+</div>
+
+            
 
                   <div className="pd-side-card">
                     <h2 className="pd-side-title">Recent Activity</h2>
@@ -546,34 +541,4 @@ export default function Dashboard() {
       </div>
     </>
   )
-}
-
-// ── Helpers ───────────────────────────────────────────────────
-
-function formatStatus(status) {
-  if (!status) return 'unknown'
-  return status.toLowerCase().replace(/_/g, ' ')
-}
-
-function statusColour(status) {
-  const s = (status || '').toUpperCase()
-  if (s.includes('COMPLETE') || s.includes('SETTLED'))
-    return { text: '#16a34a', bg: '#f0fdf4' }
-  if (s.includes('FAILED') || s.includes('REJECTED'))
-    return { text: '#dc2626', bg: '#fef2f2' }
-  if (s.includes('PROPOSAL') || s.includes('REVIEW'))
-    return { text: '#7c3aed', bg: '#ede9fe' }
-  // default — in progress
-  return { text: '#1a56b0', bg: '#dbeafe' }
-}
-
-function deriveProgress(status) {
-  const s = (status || '').toUpperCase()
-  if (s.includes('SETTLED') || s.includes('COMPLETE')) return 100
-  if (s.includes('PROPOSAL'))  return 80
-  if (s.includes('BURST_2'))   return 65
-  if (s.includes('BURST_1'))   return 45
-  if (s.includes('SUBMITTED')) return 30
-  if (s.includes('INTAKE'))    return 15
-  return 10
 }
