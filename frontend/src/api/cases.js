@@ -110,3 +110,48 @@ export const getFlags = async (caseId) => {
   const response = await client.get(`/cases/${caseId}/analysis/flags`);
   return response.data;
 };
+export const getBatnaWatna = async (caseId) => {
+  const response = await client.get(`/cases/${caseId}/analysis/batna-watna`);
+  return response.data;
+};
+
+export const getQuestionnaireResponses = async (caseId, qId) => {
+  const response = await client.get(`/cases/${caseId}/questionnaires/${qId}/responses`);
+  return response.data;
+};
+
+export const createProposal = async (caseId) => {
+  const response = await client.post(`/cases/${caseId}/proposals`);
+  return response.data;
+};
+
+export const updateProposal = async (caseId, proposalId, rawText) => {
+  const response = await client.patch(`/cases/${caseId}/proposals/${proposalId}`, {
+    raw_text: rawText,
+  });
+  return response.data;
+};
+
+export const publishProposal = async (caseId, proposalId) => {
+  const response = await client.post(`/cases/${caseId}/proposals/${proposalId}/publish`);
+  return response.data;
+};
+
+export const finaliseCase = async (caseId) => {
+  const response = await client.post(`/cases/${caseId}/finalise`);
+  return response.data;
+};
+
+export const getSettlementStatus = async (caseId) => {
+  const response = await client.get(`/cases/${caseId}/settlement/status`);
+  return response.data;
+};
+
+export const getAuditLog = async (caseId) => {
+  const response = await client.get(`/cases/${caseId}/audit-log`);
+  return response.data;
+};
+export const getQuestionnaires = async (caseId) => {
+  const response = await client.get(`/cases/${caseId}/questionnaires`);
+  return response.data;
+};

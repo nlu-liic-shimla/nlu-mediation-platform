@@ -231,13 +231,18 @@ import QuestionnaireManagement from "../pages/mediator/QuestionnaireManagement";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleBasedRoute from "./RoleBasedRoute";
 
+import BatnaWatna from "../pages/mediator/BatnaWatna";
+import ProposalEditor from "../pages/mediator/ProposalEditor";
+import ProposalRevision from "../pages/mediator/ProposalRevision";
+import FinaliseCase from "../pages/mediator/FinaliseCase";
+import AuditLog from "../pages/mediator/AuditLog";
+
 const PARTY_ROLES = ["party_user", "requesting_party", "against_party"];
 
 export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-
         {/* ── Public ── */}
         <Route path="/" element={<Login />} />
         <Route path="/auth/login" element={<Login />} />
@@ -246,129 +251,217 @@ export default function AppRoutes() {
         <Route path="/invitations/:token" element={<InvitationAccept />} />
 
         {/* ── Party ── */}
-        <Route path="/party" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={PARTY_ROLES}>
-              <PartyDashboard />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/party"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={PARTY_ROLES}>
+                <PartyDashboard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/party/cases/:id" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={PARTY_ROLES}>
-              <CaseDetails />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
-        <Route path="/party/apply" element={
-  <ProtectedRoute>
-    <RoleBasedRoute allowedRoles={["party_user"]}>
-      <ApplyForMediation />
-    </RoleBasedRoute>
-  </ProtectedRoute>
-} />
+        <Route
+          path="/party/cases/:id"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={PARTY_ROLES}>
+                <CaseDetails />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/party/cases/:id/intake" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={PARTY_ROLES}>
-              <IntakeWizard />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/party/cases/:id/intake"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={PARTY_ROLES}>
+                <IntakeWizard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/party/cases/:id/questionnaire" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={PARTY_ROLES}>
-              <Questionnaire />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/party/cases/:id/questionnaire"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={PARTY_ROLES}>
+                <Questionnaire />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/party/cases/:id/proposal" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={PARTY_ROLES}>
-              <ProposalReview />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/party/cases/:id/proposal"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={PARTY_ROLES}>
+                <ProposalReview />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/party/cases/:id/documents" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={PARTY_ROLES}>
-              <UploadDocuments />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/party/cases/:id/documents"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={PARTY_ROLES}>
+                <UploadDocuments />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/party/cases/:id/settlement" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={PARTY_ROLES}>
-              <Settlement />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/party/cases/:id/settlement"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={PARTY_ROLES}>
+                <Settlement />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ── Mediator ── */}
-        <Route path="/mediator" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["mediator"]}>
-              <MediatorDashboard />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/mediator"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <MediatorDashboard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/mediator/cases/:id" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["mediator"]}>
-              <CaseOverview />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/mediator/cases/:id"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <CaseOverview />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/mediator/cases/:id/analysis" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["mediator"]}>
-              <Analysis />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/mediator/cases/:id/analysis"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <Analysis />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/mediator/cases/:id/proposal" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["mediator"]}>
-              <ProposalManagement />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/mediator/cases/:id/proposal"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <ProposalManagement />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/mediator/cases/:id/questionnaire" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["mediator"]}>
-              <QuestionnaireManagement />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/mediator/cases/:id/questionnaire"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <QuestionnaireManagement />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/mediator/analysis" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["mediator"]}>
-              <Analysis />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/mediator/analysis"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <Analysis />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/mediator/proposals" element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["mediator"]}>
-              <ProposalManagement />
-            </RoleBasedRoute>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/mediator/proposals"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <ProposalManagement />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mediator/cases/:id/batna-watna"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <BatnaWatna />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mediator/cases/:id/proposals/new"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <ProposalEditor />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mediator/cases/:id/proposals/:p_id/revise"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <ProposalRevision />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mediator/cases/:id/finalise"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <FinaliseCase />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mediator/cases/:id/audit-log"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <AuditLog />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ── Fallback ── */}
         <Route path="*" element={<Navigate to="/" replace />} />
-
       </Routes>
     </BrowserRouter>
   );
