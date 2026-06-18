@@ -73,32 +73,53 @@ export default function InvitationAccept() {
     return Object.keys(e).length === 0
   }
 
-  const handleAccept = async () => {
-    const isValid = accountChoice === 'has_account' ? validateLogin() : validateRegister()
-    if (!isValid) return
-    setLoading(true)
-    setApiError('')
-    try {
-      const data = await acceptInvitation(token, email, password)
-      localStorage.setItem('nlu_token', data.access_token)
-      localStorage.setItem('nlu_role', 'party_user')
-      localStorage.setItem('nlu_user', JSON.stringify({
-        email,
-        role: 'party_user',
-        case_id: data.case_id,
-      }))
-      localStorage.setItem('nlu_active_case', data.case_id)
-      localStorage.setItem('nlu_case_role', data.role_in_case)
-      navigate(`/party/cases/${data.case_id}/intake`)
-    } catch (err) {
-      if (err.response?.status === 410) setApiError('This invitation has expired.')
-      else if (err.response?.status === 409) setApiError('This invitation has already been accepted.')
-      else if (err.response?.status === 401) setApiError('Incorrect password. Please try again.')
-      else setApiError('Something went wrong. Please try again.')
-    } finally {
-      setLoading(false)
+const handleAccept = async () => {
+  const isValid = accountChoice === 'has_account' ? validateLogin() : validateRegister()
+  if (!isValid) return
+  setLoading(true)
+  setApiError('')
+  try {
+    const data = await acceptInvitation(token, email, password)
+    localStorage.setItem('nlu_token', data.access_token)
+    localStorage.setItem('nlu_role', 'party_user')
+    localStorage.setItem('nlu_user', JSON.stringify({
+      email,
+      role: 'party_user',
+      case_id: data.case_id,
+    }))
+    localStorage.setItem('nlu_case_role', data.role_in_this_case)
+    navigate(`/party/cases/${data.case_id}/intake`)
+  } catch (err) {
+    if (err.response?.status === 410) {
+      setApiError('This invitation has expired.')
+    } else if (err.response?.status === 409) {
+      setApiError('This invitation has already been accepted.')
+    } else if (err.response?.status === 401) {
+      // 401 means wrong password — account exists
+      if (accountChoice === 'no_account') {
+        // They said no account but email already exists
+        setApiError(
+          'This email already has an account. Please go back and select "Yes, I have an account" instead.'
+        )
+      } else {
+        setApiError('Incorrect password. Please try again.')
+      }
+    } else if (err.response?.status === 400) {
+      // Backend says email already registered — on register path
+      if (accountChoice === 'no_account') {
+        setApiError(
+          'This email is already registered. Please go back and select "Yes, I have an account".'
+        )
+      } else {
+        setApiError('Something went wrong. Please try again.')
+      }
+    } else {
+      setApiError('Something went wrong. Please try again.')
     }
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <>
@@ -400,8 +421,18 @@ export default function InvitationAccept() {
                     {formErrors.password && <p className="ia-err-text"><AlertCircle size={12} />{formErrors.password}</p>}
                   </div>
 
-                  {apiError && <div className="ia-api-error"><AlertCircle size={16} />{apiError}</div>}
-
+                  {apiError && (
+  <div>
+    <div className="ia-api-error"><AlertCircle size={16} />{apiError}</div>
+    <button
+      className="ia-back-link"
+      style={{ marginTop: '8px', justifyContent: 'center' }}
+      onClick={() => { setStep('account_check'); setApiError(''); setFormErrors({}) }}
+    >
+      ← Change my selection
+    </button>
+  </div>
+)}
                   <button className="ia-primary-btn" onClick={handleAccept} disabled={loading}>
                     {loading ? 'Signing in…' : 'Sign in & Accept'} <ChevronRight size={16} />
                   </button>
