@@ -9,7 +9,7 @@ import {
   ChevronLeft, Calendar, TrendingUp, Clock, AlertCircle,
   Bot, LogOut, Menu, X
 } from 'lucide-react'
-
+const TEST_CASE_ID = '019d4f9b-e3f0-4f20-8641-ddef7df1ef59'
 const NAV_ITEMS = [
   { id: 'dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'new-case',      icon: FilePlus,        label: 'New Case' },
@@ -379,9 +379,9 @@ useEffect(() => {
   onNavigate={(id) => {
     setActiveNav(id)
     if (id === 'new-case') navigate('/party/apply')
-    if (id === 'questionnaire') navigate(`/party/cases/${cases[0]?.id}/questionnaire`)
-    if (id === 'proposals') navigate(`/party/cases/${cases[0]?.id}/proposal`)
-if (id === 'settlement') navigate(`/party/cases/${cases[0]?.id}/settlement`)
+   if (id === 'questionnaire') navigate(`/party/cases/${cases[0]?.id || TEST_CASE_ID}/questionnaire`)
+if (id === 'proposals') navigate(`/party/cases/${cases[0]?.id || TEST_CASE_ID}/proposal`)
+if (id === 'settlement') navigate(`/party/cases/${cases[0]?.id || TEST_CASE_ID}/settlement`)
     // dashboard stays on same page
   }}
   collapsed={collapsed}
