@@ -103,6 +103,7 @@ export default function Dashboard() {
   const [showNewCase, setShowNewCase] = useState(false);
   const [newCaseForm, setNewCaseForm] = useState({
     title: '',
+    dispute_type: '', 
     brief_description: '',
     requesting_party_email: '',
     against_party_email: '',
@@ -150,10 +151,22 @@ export default function Dashboard() {
       const data = await getCases();
       setCases(data);
     } catch (err) {
-      setNewCaseError(err?.response?.data?.detail || 'Failed to create case. Try again.');
-    } finally {
-      setNewCaseLoading(false);
-    }
+  const detail = err?.response?.data?.detail;
+  let msg = 'Failed to create case. Try again.';
+
+  if (typeof detail === 'string') {
+    msg = detail;
+  } else if (Array.isArray(detail) && detail.length > 0) {
+    msg = detail
+      .map(e => {
+        const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : 'field';
+        return `${field}: ${e.msg}`;
+      })
+      .join(' · ');
+  }
+
+  setNewCaseError(msg);
+}
   };
 
   /* ── filter cases by tab ── */
