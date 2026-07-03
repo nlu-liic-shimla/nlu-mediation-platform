@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { updateProposal, publishProposal } from "../../api/cases";
 import { AlertTriangle } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
+import client from "../../services/api";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -135,23 +136,42 @@ export default function ProposalRevision() {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  // Load revision data from location state or API
+  // ── Load revision data from API ──────────────────────────
+  // Fetches the proposal by p_id, then reads revision_suggestions
+  // which is populated by Sub-system H (Celery task) after a rejection.
   useEffect(() => {
     const loadRevision = async () => {
       try {
-        // Data passed via navigation state from previous screen
-        const state = window.history.state?.usr;
-        if (state) {
-          setRevisedText(state.revised_draft || "");
-          setRoundNumber(state.round_number || 1);
-          setMaxRounds(state.max_rounds || 3);
-          setPreviousProposal(state.previous_proposal || "");
-          setRequestingReason(state.requesting_reason || "");
-          setAgainstReason(state.against_reason || "");
-          setChangesSummary(state.changes_summary || []);
+        // Fetch all proposals for this case, find the one matching p_id
+        const res = await client.get(`/cases/${id}/proposals`);
+        const proposals = Array.isArray(res.data)
+          ? res.data
+          : res.data?.proposals ?? [];
+
+        const proposal = proposals.find((p) => p.id === p_id) ?? proposals[proposals.length - 1];
+
+        if (!proposal) {
+          setError("Proposal not found.");
+          return;
         }
+
+        // revision_suggestions is set by Sub-system H after rejection
+        // shape: { revised_draft, changes_summary, requesting_reason, against_reason }
+        const suggestions = proposal.revision_suggestions || {};
+
+        setRevisedText(suggestions.revised_draft || proposal.content || proposal.raw_text || "");
+        setRoundNumber(proposal.round_number || proposal.round || 1);
+        setPreviousProposal(proposal.content || proposal.raw_text || "");
+        setRequestingReason(suggestions.requesting_reason || "");
+        setAgainstReason(suggestions.against_reason || "");
+        setChangesSummary(suggestions.changes_summary || []);
+
+        // Get max_rounds from the case
+        const caseRes = await client.get(`/cases/${id}`);
+        setMaxRounds(caseRes.data?.max_rounds || 3);
+
       } catch {
-        setError("Failed to load revision data");
+        setError("Failed to load revision data. Please go back and try again.");
       } finally {
         setLoading(false);
       }
@@ -385,6 +405,27 @@ export default function ProposalRevision() {
           </div>
         )}
 
+        {/* Sub-system H not ready yet notice */}
+        {changesSummary.length === 0 && !revisedText && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              background: "#fff7ed",
+              border: "1px solid #fed7aa",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <AlertTriangle size={16} color="#f59e0b" />
+            <span style={{ fontSize: 13, color: "#92400e" }}>
+              AI revision suggestions are still being generated. You can write your own revision in the editor on the right, or wait a moment and refresh.
+            </span>
+          </div>
+        )}
+
         {/* ── Split layout ── */}
         <div
           style={{
@@ -610,7 +651,7 @@ export default function ProposalRevision() {
               <textarea
                 value={revisedText}
                 onChange={(e) => setRevisedText(e.target.value)}
-                placeholder="Revised proposal will appear here..."
+                placeholder="Revised proposal will appear here once AI suggestions are ready, or write your own revision..."
                 style={{
                   width: "100%",
                   minHeight: isSmall ? 300 : "calc(100vh - 380px)",
