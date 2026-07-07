@@ -40,7 +40,16 @@ STRUCTURE YOUR SUMMARY AS:
 - Key issues: specific points that remain unresolved
 - Common ground: any shared interests if they exist
 
-Return ONLY valid JSON matching the required schema. Nothing else.
+Return ONLY valid JSON with these exact top-level keys:
+{
+  "summary": "<string>",
+  "party_a_position": "<string>",
+  "party_b_position": "<string>",
+  "key_issues": ["<string>", ...],
+  "common_ground": "<string or null>",
+  "bias_check_required": true
+}
+Do NOT nest the output. No markdown. No extra keys.
 """
 
 def generate_neutral_summary(conflict: ConflictExtraction):
