@@ -227,6 +227,7 @@ import CaseOverview from "../pages/mediator/CaseOverview";
 import Analysis from "../pages/mediator/Analysis";
 import ProposalManagement from "../pages/mediator/ProposalManagement";
 import QuestionnaireManagement from "../pages/mediator/QuestionnaireManagement";
+import AdminPanel from "../pages/mediator/AdminPanel";
 
 import ProtectedRoute from "./ProtectedRoute";
 import RoleBasedRoute from "./RoleBasedRoute";
@@ -257,6 +258,17 @@ export default function AppRoutes() {
             <ProtectedRoute>
               <RoleBasedRoute allowedRoles={PARTY_ROLES}>
                 <PartyDashboard />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/party/apply"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={PARTY_ROLES}>
+                <ApplyForMediation />
               </RoleBasedRoute>
             </ProtectedRoute>
           }
@@ -406,6 +418,26 @@ export default function AppRoutes() {
           }
         />
         <Route
+  path="/mediator/cases/:id/proposals"
+  element={
+    <ProtectedRoute>
+      <RoleBasedRoute allowedRoles={["mediator"]}>
+        <ProposalManagement />
+      </RoleBasedRoute>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/mediator/cases/:id/questionnaires"
+  element={
+    <ProtectedRoute>
+      <RoleBasedRoute allowedRoles={["mediator"]}>
+        <QuestionnaireManagement />
+      </RoleBasedRoute>
+    </ProtectedRoute>
+  }
+/>
+        <Route
           path="/mediator/cases/:id/batna-watna"
           element={
             <ProtectedRoute>
@@ -455,6 +487,17 @@ export default function AppRoutes() {
             <ProtectedRoute>
               <RoleBasedRoute allowedRoles={["mediator"]}>
                 <AuditLog />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mediator/admin"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <AdminPanel />
               </RoleBasedRoute>
             </ProtectedRoute>
           }

@@ -87,6 +87,7 @@ export default function Questionnaire() {
   }
 
   const goNext = () => {
+    if (!question) return
     if (!isAnswered()) {
       setValidationErr(
         question.type === 'open_ended'
@@ -106,6 +107,7 @@ export default function Questionnaire() {
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    if (!question) return
     if (!isAnswered()) {
       setValidationErr(
         question.type === 'open_ended'
@@ -259,6 +261,25 @@ export default function Questionnaire() {
           <div className="qs-center">
             <div className="qs-page-error">
               <AlertCircle size={16} /> {error}
+            </div>
+            <button className="qs-done-btn" style={{ marginTop: '1rem' }} onClick={() => navigate(`/party/cases/${caseId}`)}>
+              Back to Case
+            </button>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // ── No questions found ────────────────────────────────────────────────────
+  if (total === 0) {
+    return (
+      <>
+        <style>{styles}</style>
+        <div className="qs">
+          <div className="qs-center">
+            <div className="qs-page-error" style={{ color: 'var(--text-primary)', background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              <AlertCircle size={16} /> No questions are available for your role at this stage of the mediation.
             </div>
             <button className="qs-done-btn" style={{ marginTop: '1rem' }} onClick={() => navigate(`/party/cases/${caseId}`)}>
               Back to Case

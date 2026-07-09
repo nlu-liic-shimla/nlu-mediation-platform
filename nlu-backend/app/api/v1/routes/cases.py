@@ -36,6 +36,8 @@ def verify_case_access(case_id: str, current_user: dict) -> dict:
     """
     Verify the current user has access to this case.
     Returns the case row if access is granted.
+    For mediators, also checks application_requests table as fallback
+    (applications are not yet in the cases table).
     Raises 403 (never 404) for party_user on wrong case — security through obscurity.
     Raises 404 only for mediator (they should know the case doesn't exist).
     """
@@ -45,7 +47,36 @@ def verify_case_access(case_id: str, current_user: dict) -> dict:
     case_result = supabase.table("cases").select("*").eq("id", case_id).execute()
 
     if not case_result.data:
+        # For mediators, also check application_requests table
+        # Applications use the same ID space but live in a different table
         if role == "mediator":
+            app_result = supabase.table("application_requests").select("*").eq(
+                "id", case_id
+            ).eq("assigned_mediator", user_id).execute()
+
+            if app_result.data:
+                # Return a case-shaped dict so the rest of the code works
+                app = app_result.data[0]
+                return {
+                    "id": app["id"],
+                    "dispute_type": app.get("dispute_type"),
+                    "brief_description": app.get("brief_description"),
+                    "status": app.get("status", "APPLICATION_PENDING"),
+                    "created_by": user_id,
+                    "assigned_mediator": user_id,
+                    "requesting_party_email": None,
+                    "against_party_email": app.get("against_party_email"),
+                    "negotiation_round": 0,
+                    "max_rounds": 3,
+                    "mediator_notes": None,
+                    "created_at": app.get("created_at"),
+                    "updated_at": app.get("updated_at"),
+                    "_is_application": True,  # marker for downstream code
+                    "_applicant_id": app.get("applicant_id"),
+                    "_against_party_name": app.get("against_party_name"),
+                    "_monetary_value": app.get("monetary_value"),
+                }
+
             raise HTTPException(status_code=404, detail={
                 "error": True, "code": "CASE_NOT_FOUND"
             })
@@ -127,6 +158,28 @@ async def list_cases(current_user: dict = Depends(get_current_user)):
         ).order("created_at", desc=True).execute()
 
         cases = [CaseResponse(**row) for row in result.data] if result.data else []
+
+        # Also fetch application_requests assigned to this mediator
+        # so the dashboard "Applications" tab can display them.
+        # These are NOT real cases yet — we map them into CaseResponse shape.
+        app_result = supabase.table("application_requests").select("*").eq(
+            "assigned_mediator", user_id
+        ).order("created_at", desc=True).execute()
+
+        for app in (app_result.data or []):
+            cases.append(CaseResponse(
+                id=app["id"],
+                dispute_type=app.get("dispute_type"),
+                brief_description=app.get("brief_description"),
+                status=app.get("status", "APPLICATION_PENDING"),
+                created_by=user_id,  # mediator is the assigned reviewer
+                assigned_mediator=user_id,
+                requesting_party_email=None,
+                against_party_email=app.get("against_party_email"),
+                created_at=app.get("created_at"),
+                updated_at=app.get("updated_at"),
+            ))
+
         return CaseListResponse(cases=cases, total=len(cases))
 
     else:
@@ -204,6 +257,22 @@ async def get_case(
         "your_role_in_this_case": None,
     }
 
+    # ── Early return for application_requests (not yet real cases) ──
+    # These don't have invitations or submissions — skip all downstream queries
+    if case.get("_is_application"):
+        # Enrich with applicant info for the mediator review screen
+        applicant_id = case.get("_applicant_id")
+        if applicant_id:
+            applicant = supabase.table("users").select(
+                "email, full_name"
+            ).eq("id", applicant_id).execute()
+            if applicant.data:
+                response["requesting_party_email"] = applicant.data[0].get("email")
+                response["party_a_name"] = applicant.data[0].get("full_name") or applicant.data[0].get("email")
+        response["against_party_name"] = case.get("_against_party_name")
+        response["monetary_value"] = case.get("_monetary_value")
+        return response
+
     # ── Get invitation details ─────────────────────────────────
     invitations = supabase.table("case_invitations").select(
         "id, invitation_role, accepted_by, accepted_at, token_hash, expires_at"
@@ -278,6 +347,19 @@ async def get_case(
             if inv.get("accepted_by") == current_user["user_id"]:
                 response["your_role_in_this_case"] = inv.get("invitation_role")
                 break
+
+    # ── Check if current user has submitted questionnaire response ──
+    response["user_has_submitted_questionnaire"] = False
+    if current_user["role"] == "party_user":
+        q_list = supabase.table("questionnaires").select("id").eq("case_id", case_id).order("created_at", desc=True).limit(1).execute()
+        if q_list.data:
+            latest_q_id = q_list.data[0]["id"]
+            resp_check = supabase.table("questionnaire_responses") \
+                .select("id") \
+                .eq("questionnaire_id", latest_q_id) \
+                .eq("respondent_id", current_user["user_id"]) \
+                .execute()
+            response["user_has_submitted_questionnaire"] = bool(resp_check.data)
 
     return response
 
@@ -977,6 +1059,12 @@ async def accept_application(
 
     now = datetime.utcnow().isoformat()
 
+    # Look up applicant's email from users table
+    applicant_result = supabase.table("users").select(
+        "email"
+    ).eq("id", app["applicant_id"]).execute()
+    applicant_email = applicant_result.data[0]["email"] if applicant_result.data else None
+
     # Create formal case — created_by is ALWAYS mediator
     case_result = supabase.table("cases").insert({
         "dispute_type": app["dispute_type"],
@@ -984,7 +1072,7 @@ async def accept_application(
         "status": "BOTH_INVITED",
         "created_by": mediator_id,              # ALWAYS mediator
         "assigned_mediator": mediator_id,        # ALWAYS mediator
-        "requesting_party_email": None,          # set from invitation
+        "requesting_party_email": applicant_email,
         "against_party_email": app.get("against_party_email"),
         "monetary_value": app.get("monetary_value"),
         "negotiation_round": 0,
@@ -1062,32 +1150,60 @@ async def accept_application(
 
 # ── PATCH /cases/{application_id}/reject ──────────────────────────────────────
 
+class RejectApplicationRequest(BaseModel):
+    rejection_reason: str
+
+
 @router.patch("/{application_id}/reject")
 async def reject_application(
     application_id: str,
+    request: RejectApplicationRequest = None,
     current_user: dict = Depends(require_role(["mediator"]))
 ):
     """
-    Path 1: Mediator rejects application with mandatory reason.
-    Party sees reason on their dashboard with Apply Again button.
+    Path 1: Mediator rejects application with optional reason.
+    Party sees reason on their dashboard.
     """
-    from pydantic import BaseModel
+    mediator_id = current_user["user_id"]
 
-    class RejectRequest(BaseModel):
-        rejection_reason: str   # mandatory per flow doc
+    app_result = supabase.table("application_requests").select(
+        "*"
+    ).eq("id", application_id).eq(
+        "assigned_mediator", mediator_id
+    ).execute()
 
-    raise HTTPException(
-        status_code=422,
-        detail={
-            "error": True,
-            "code": "BODY_REQUIRED",
-            "message": "Use POST body with rejection_reason field"
-        }
-    )
+    if not app_result.data:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": True, "code": "APPLICATION_NOT_FOUND"}
+        )
 
+    app = app_result.data[0]
 
-class RejectApplicationRequest(BaseModel):
-    rejection_reason: str
+    if app["status"] != "APPLICATION_PENDING":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": True,
+                "code": "INVALID_STATE",
+                "message": f"Application is not PENDING. Current: {app['status']}"
+            }
+        )
+
+    reason = request.rejection_reason if request else "No reason provided"
+
+    supabase.table("application_requests").update({
+        "status": "APPLICATION_REJECTED",
+        "rejection_reason": reason,
+        "updated_at": datetime.utcnow().isoformat(),
+    }).eq("id", application_id).execute()
+
+    return {
+        "status": "APPLICATION_REJECTED",
+        "application_id": application_id,
+        "message": "Application has been rejected."
+    }
+
 
 
 @router.patch("/{application_id}/reject/submit")

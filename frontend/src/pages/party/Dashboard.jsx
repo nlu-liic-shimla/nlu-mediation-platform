@@ -379,9 +379,15 @@ useEffect(() => {
   onNavigate={(id) => {
     setActiveNav(id)
     if (id === 'new-case') navigate('/party/apply')
-    if (id === 'questionnaire') navigate(`/party/cases/${cases[0]?.id}/questionnaire`)
-    if (id === 'proposals') navigate(`/party/cases/${cases[0]?.id}/proposal`)
-if (id === 'settlement') navigate(`/party/cases/${cases[0]?.id}/settlement`)
+   if (id === 'questionnaire') {
+     if (cases[0]?.id) navigate(`/party/cases/${cases[0].id}/questionnaire`)
+   }
+   if (id === 'proposals') {
+     if (cases[0]?.id) navigate(`/party/cases/${cases[0].id}/proposal`)
+   }
+   if (id === 'settlement') {
+     if (cases[0]?.id) navigate(`/party/cases/${cases[0].id}/settlement`)
+   }
     // dashboard stays on same page
   }}
   collapsed={collapsed}
@@ -447,10 +453,10 @@ if (id === 'settlement') navigate(`/party/cases/${cases[0]?.id}/settlement`)
               <div className="pd-layout">
                 <div className="pd-left-col">
                   <div className="pd-stats-grid">
-                    <StatCard label="Active Cases" value="2" sub="+1 this month" subColor="#16a34a" iconBg="#eef1fb" icon={<FileText size={22} color="#2a3f8f" />} />
-                    <StatCard label="Pending Proposals" value="3" sub="2 require action" iconBg="#fff7ed" icon={<Clock size={22} color="#ea8c0d" />} />
-                    <StatCard label="Completed" value="5" sub="100% success rate" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
-                    <StatCard label="Avg. Resolution Time" value="45 days" sub="-12 days vs avg" subColor="#dc2626" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
+                    <StatCard label="Active Cases" value={cases.filter(c => !['SETTLED','MEDIATION_FAILED','CLOSED'].includes(c.status)).length} sub={cases.length > 0 ? 'Your ongoing cases' : 'No cases yet'} subColor="#16a34a" iconBg="#eef1fb" icon={<FileText size={22} color="#2a3f8f" />} />
+                    <StatCard label="Pending Proposals" value={cases.filter(c => c.status === 'PROPOSAL_SENT').length} sub="Awaiting your response" iconBg="#fff7ed" icon={<Clock size={22} color="#ea8c0d" />} />
+                    <StatCard label="Completed" value={cases.filter(c => ['SETTLED','CLOSED'].includes(c.status)).length} sub="Successfully resolved" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
+                    <StatCard label="Total Cases" value={cases.length} sub="All time" subColor="var(--text-muted)" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
                   </div>
 
                   <div className="pd-section">
@@ -467,20 +473,82 @@ if (id === 'settlement') navigate(`/party/cases/${cases[0]?.id}/settlement`)
   New Case
 </button>
                     </div>
+                    {cases.length === 0 && (
+  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', border: '1.5px dashed var(--border)', borderRadius: '12px' }}>
+    <FileText size={32} style={{ margin: '0 auto 0.75rem', opacity: 0.4 }} />
+    <p style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>No active cases yet</p>
+    <p>Once you accept an invitation or apply for mediation, your cases will appear here.</p>
+  </div>
+)}
                     {cases.map(c => (
   <CaseCard
     key={c.id}
-    title={c.title || c.case_number}
+    title={c.dispute_type || c.brief_description || c.title || 'Mediation Case'}
     status={c.status}
     statusColor="#1a56b0"
     statusBg="#dbeafe"
-    caseId={c.id}              // UUID → for API calls & navigation
-    displayId={c.case_number}  // human-readable → for UI text
-    vs={c.respondent_name || '—'}
-    progress={c.progress || 0}
-    aiScore={c.ai_score || 0}
-    nextDate={c.next_date || '—'}
-    onView={() => navigate(`/party/cases/${c.id}/intake`)}
+    caseId={c.id}
+    displayId={c.id.slice(0, 8).toUpperCase()}
+    vs={c.against_party_email || c.requesting_party_email || '—'}
+    progress={(() => {
+      const statusMap = {
+        'DRAFT': 'BOTH_INVITED',
+        'PARTY_A_SUBMITTED': 'FIRST_PARTY_SUBMITTED',
+        'AI_RUNNING': 'BURST_1_PROCESSING',
+        'ANALYSIS_READY': 'BURST_1_COMPLETE',
+        'QUESTIONNAIRE_SENT': 'QUESTIONNAIRE_ACTIVE',
+        'PROPOSAL_SENT': 'PROPOSAL_PUBLISHED',
+        'PROPOSAL_ACCEPTED': 'MEDIATION_COMPLETE',
+        'SETTLED': 'MEDIATION_COMPLETE',
+        'CLOSED': 'MEDIATION_COMPLETE'
+      }
+      const mappedStatus = statusMap[c.status] || c.status
+      const steps = [
+        'BOTH_INVITED',
+        'FIRST_PARTY_SUBMITTED',
+        'BOTH_SUBMITTED',
+        'BURST_1_PROCESSING',
+        'BURST_1_COMPLETE',
+        'QUESTIONNAIRE_ACTIVE',
+        'QUESTIONNAIRE_COMPLETE',
+        'BURST_2_PROCESSING',
+        'BURST_2_COMPLETE',
+        'PROPOSAL_DRAFT',
+        'PROPOSAL_PUBLISHED',
+        'MEDIATION_IN_PROGRESS',
+        'MEDIATION_COMPLETE'
+      ]
+      const idx = steps.indexOf(mappedStatus)
+      return idx >= 0 ? Math.round((idx / (steps.length - 1)) * 100) : 0
+    })()}
+    aiScore={(() => {
+      const statusMap = {
+        'DRAFT': 'BOTH_INVITED',
+        'PARTY_A_SUBMITTED': 'FIRST_PARTY_SUBMITTED',
+        'AI_RUNNING': 'BURST_1_PROCESSING',
+        'ANALYSIS_READY': 'BURST_1_COMPLETE',
+        'QUESTIONNAIRE_SENT': 'QUESTIONNAIRE_ACTIVE',
+        'PROPOSAL_SENT': 'PROPOSAL_PUBLISHED',
+        'PROPOSAL_ACCEPTED': 'MEDIATION_COMPLETE',
+        'SETTLED': 'MEDIATION_COMPLETE',
+        'CLOSED': 'MEDIATION_COMPLETE'
+      }
+      const mappedStatus = statusMap[c.status] || c.status
+      const activeStatesForAiScore = new Set([
+        'BURST_1_COMPLETE',
+        'QUESTIONNAIRE_ACTIVE',
+        'QUESTIONNAIRE_COMPLETE',
+        'BURST_2_PROCESSING',
+        'BURST_2_COMPLETE',
+        'PROPOSAL_DRAFT',
+        'PROPOSAL_PUBLISHED',
+        'MEDIATION_IN_PROGRESS',
+        'MEDIATION_COMPLETE'
+      ])
+      return activeStatesForAiScore.has(mappedStatus) ? 87 : 0
+    })()}
+    nextDate={'—'}
+    onView={() => navigate(`/party/cases/${c.id}`)}
   />
 ))}
                   </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCaseById, getAnalysisStatus } from "../../api/cases";
+import { useTheme } from "../../context/ThemeContext";
 import {
   Copy,
   CheckCircle2,
@@ -642,13 +643,15 @@ function CloseCaseModal({ partyLabel, onClose, onConfirm, loading, tk }) {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function CaseOverview() {
+  const { isDark } = useTheme();
   const { id } = useParams();
   console.log("CaseOverview id from URL:", id);
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
   const [caseData, setCaseData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [proposals, setProposals] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
 
   // Party submission status — from /submissions endpoint
   const [partyStatus, setPartyStatus] = useState({
@@ -678,7 +681,7 @@ export default function CaseOverview() {
   const [closeModal, setCloseModal] = useState(null);
   const [closeLoading, setCloseLoading] = useState(false);
 
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
   const width = useWindowWidth();
   const isSmall = width < 640;
 
@@ -749,6 +752,14 @@ export default function CaseOverview() {
         setCaseData(data);
         await fetchPartyStatus(id);
         await fetchInvitationStatus(id);
+
+        // Fetch proposals and audit logs
+        const [props, logs] = await Promise.all([
+          client.get(`/cases/${id}/proposals`).then((res) => res.data).catch(() => []),
+          client.get(`/cases/${id}/audit-log`).then((res) => res.data).catch(() => []),
+        ]);
+        setProposals(props);
+        setAuditLogs(logs);
       } catch {
         setError("Failed to load case");
       } finally {
@@ -846,7 +857,7 @@ export default function CaseOverview() {
   // ── Loading / error guards ───────────────────────────────
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -863,7 +874,7 @@ export default function CaseOverview() {
 
   if (error)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -880,7 +891,7 @@ export default function CaseOverview() {
 
   if (!caseData)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -904,7 +915,7 @@ export default function CaseOverview() {
     : caseData.brief_description?.slice(0, 60) || "Untitled Case";
 
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
+    <MediatorLayout>
       {/* ── Modals ── */}
       {inviteModal && (
         <InviteLinkModal
@@ -973,8 +984,8 @@ export default function CaseOverview() {
           style={{
             padding: "12px 16px",
             borderRadius: 10,
-            background: dark ? "#1e3a5f" : "#eff6ff",
-            border: `1px solid ${dark ? "#1e40af" : "#bfdbfe"}`,
+            background: isDark ? "#1e3a5f" : "#eff6ff",
+            border: `1px solid ${isDark ? "#1e40af" : "#bfdbfe"}`,
             marginBottom: 16,
             display: "flex",
             alignItems: "flex-start",
@@ -990,7 +1001,7 @@ export default function CaseOverview() {
           <span
             style={{
               fontSize: 14,
-              color: dark ? "#93c5fd" : "#1e40af",
+              color: isDark ? "#93c5fd" : "#1e40af",
               fontWeight: 500,
             }}
           >
@@ -1000,7 +1011,7 @@ export default function CaseOverview() {
 
         {/* ── Analysis polling during BURST_1_PROCESSING ── */}
         {caseData.status === "BURST_1_PROCESSING" && (
-          <AnalysisStatusBlock caseId={id} dark={dark} navigate={navigate} />
+          <AnalysisStatusBlock caseId={id} dark={isDark} navigate={navigate} />
         )}
 
         {/* ── BURST_1_COMPLETE actions ── */}
@@ -1009,8 +1020,8 @@ export default function CaseOverview() {
             style={{
               padding: "12px 16px",
               borderRadius: 10,
-              background: dark ? "#052e16" : "#f0fdf4",
-              border: `1px solid ${dark ? "#16a34a" : "#bbf7d0"}`,
+              background: isDark ? "#052e16" : "#f0fdf4",
+              border: `1px solid ${isDark ? "#16a34a" : "#bbf7d0"}`,
               marginBottom: 16,
               display: "flex",
               alignItems: "center",
@@ -1065,8 +1076,8 @@ export default function CaseOverview() {
             style={{
               padding: "12px 16px",
               borderRadius: 10,
-              background: dark ? "#052e16" : "#f0fdf4",
-              border: `1px solid ${dark ? "#16a34a" : "#bbf7d0"}`,
+              background: isDark ? "#052e16" : "#f0fdf4",
+              border: `1px solid ${isDark ? "#16a34a" : "#bbf7d0"}`,
               marginBottom: 16,
               display: "flex",
               alignItems: "center",
@@ -1104,8 +1115,8 @@ export default function CaseOverview() {
             style={{
               padding: "12px 16px",
               borderRadius: 10,
-              background: dark ? "#052e16" : "#f0fdf4",
-              border: `1px solid ${dark ? "#16a34a" : "#bbf7d0"}`,
+              background: isDark ? "#052e16" : "#f0fdf4",
+              border: `1px solid ${isDark ? "#16a34a" : "#bbf7d0"}`,
               marginBottom: 16,
               display: "flex",
               alignItems: "center",
@@ -1477,6 +1488,308 @@ export default function CaseOverview() {
             )}
           </div>
         )}
+
+        {/* ── Proposals Section ── */}
+        {proposals.length > 0 ? (
+          <div
+            style={{
+              background: tk.surface,
+              borderRadius: 12,
+              border: `1px solid ${tk.border}`,
+              padding: "16px 20px",
+              marginBottom: 16,
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 15,
+                fontWeight: 600,
+                color: tk.text,
+                margin: "0 0 12px",
+              }}
+            >
+              Negotiation Proposals
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {proposals.map((p) => {
+                const reqAcceptLog = auditLogs.find(
+                  (log) =>
+                    log.action === "PARTY_ACCEPTED_PROPOSAL" &&
+                    log.metadata?.proposal_id === p.id &&
+                    log.metadata?.party_role === "requesting_party"
+                );
+                const reqRejectLog = auditLogs.find(
+                  (log) =>
+                    log.action === "PARTY_REJECTED_PROPOSAL" &&
+                    log.metadata?.proposal_id === p.id &&
+                    log.metadata?.party_role === "requesting_party"
+                );
+                const requestingStatus = reqAcceptLog
+                  ? "Accepted"
+                  : reqRejectLog
+                  ? "Rejected"
+                  : "Pending";
+                const requestingReason = reqRejectLog
+                  ? reqRejectLog.metadata?.rejection_reason
+                  : "";
+
+                const againstAcceptLog = auditLogs.find(
+                  (log) =>
+                    log.action === "PARTY_ACCEPTED_PROPOSAL" &&
+                    log.metadata?.proposal_id === p.id &&
+                    log.metadata?.party_role === "against_party"
+                );
+                const againstRejectLog = auditLogs.find(
+                  (log) =>
+                    log.action === "PARTY_REJECTED_PROPOSAL" &&
+                    log.metadata?.proposal_id === p.id &&
+                    log.metadata?.party_role === "against_party"
+                );
+                const againstStatus = againstAcceptLog
+                  ? "Accepted"
+                  : againstRejectLog
+                  ? "Rejected"
+                  : "Pending";
+                const againstReason = againstRejectLog
+                  ? againstRejectLog.metadata?.rejection_reason
+                  : "";
+
+                const statusColor = (status) =>
+                  status === "Accepted"
+                    ? "#16a34a"
+                    : status === "Rejected"
+                    ? "#ef4444"
+                    : "#ca8a04";
+
+                const isRejected =
+                  requestingStatus === "Rejected" || againstStatus === "Rejected";
+
+                return (
+                  <div
+                    key={p.id}
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: 8,
+                      border: `1px solid ${tk.border}`,
+                      background: tk.bg,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: tk.text,
+                        }}
+                      >
+                        Round {p.round} Proposal
+                      </span>
+                      <span
+                        style={{
+                          padding: "3px 8px",
+                          borderRadius: 5,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background:
+                            p.status === "published" ? "#eff6ff" : "#f1f5f9",
+                          color: p.status === "published" ? "#1e40af" : tk.sub,
+                        }}
+                      >
+                        {p.status?.toUpperCase()}
+                      </span>
+                    </div>
+
+                    {p.status === "published" && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 20,
+                          fontSize: 12,
+                          color: tk.sub,
+                          marginBottom: 10,
+                        }}
+                      >
+                        <div>
+                          Requesting Party:{" "}
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: statusColor(requestingStatus),
+                            }}
+                          >
+                            {requestingStatus}
+                          </span>
+                        </div>
+                        <div>
+                          Against Party:{" "}
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: statusColor(againstStatus),
+                            }}
+                          >
+                            {againstStatus}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {requestingReason && (
+                      <div
+                        style={{
+                          background: "#fef2f2",
+                          border: "1px solid #fecaca",
+                          borderRadius: 6,
+                          padding: "8px 10px",
+                          fontSize: 12,
+                          color: "#dc2626",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <strong>Requesting Party Rejection:</strong>{" "}
+                        {requestingReason}
+                      </div>
+                    )}
+                    {againstReason && (
+                      <div
+                        style={{
+                          background: "#fef2f2",
+                          border: "1px solid #fecaca",
+                          borderRadius: 6,
+                          padding: "8px 10px",
+                          fontSize: 12,
+                          color: "#dc2626",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <strong>Against Party Rejection:</strong> {againstReason}
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: 8,
+                        marginTop: 8,
+                      }}
+                    >
+                      {p.status === "draft" && (
+                        <button
+                          onClick={() =>
+                            navigate(`/mediator/cases/${id}/proposals/new`)
+                          }
+                          style={{
+                            padding: "5px 12px",
+                            borderRadius: 6,
+                            border: "none",
+                            background: "#1e40af",
+                            color: "#fff",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Edit & Publish Draft
+                        </button>
+                      )}
+                      {p.status === "published" && isRejected && (
+                        <button
+                          onClick={() =>
+                            navigate(
+                              `/mediator/cases/${id}/proposals/${p.id}/revise`,
+                              {
+                                state: {
+                                  revised_draft:
+                                    p.revision_suggestions?.revised_draft ||
+                                    p.content ||
+                                    "",
+                                  round_number: p.round,
+                                  max_rounds: caseData.max_rounds || 3,
+                                  previous_proposal: p.content,
+                                  requesting_reason: requestingReason,
+                                  against_reason: againstReason,
+                                  changes_summary:
+                                    p.revision_suggestions?.changes_summary || [],
+                                },
+                              }
+                            )
+                          }
+                          style={{
+                            padding: "5px 12px",
+                            borderRadius: 6,
+                            border: "none",
+                            background: "#1e40af",
+                            color: "#fff",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Revise Proposal
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          caseData?.status === "BURST_2_COMPLETE" && (
+            <div
+              style={{
+                background: tk.surface,
+                borderRadius: 12,
+                border: `1px solid ${tk.border}`,
+                padding: "16px 20px",
+                marginBottom: 16,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <h2
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: tk.text,
+                    margin: 0,
+                  }}
+                >
+                  Proposals
+                </h2>
+                <p style={{ fontSize: 12, color: tk.sub, margin: "2px 0 0" }}>
+                  BATNA/WATNA is complete. You can now draft the first settlement proposal.
+                </p>
+              </div>
+              <button
+                onClick={() => navigate(`/mediator/cases/${id}/proposals/new`)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  background: "#1e40af",
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Draft Proposal
+              </button>
+            </div>
+          )
+        )}
+
         {/* ── Audit Log button ── */}
         <div
           style={{

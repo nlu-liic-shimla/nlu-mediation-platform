@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getAuditLog } from "../../api/cases";
 import { AlertTriangle } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
+import { useTheme } from "../../context/ThemeContext";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -34,15 +35,15 @@ const actionColor = (action) => {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function AuditLog() {
+  const { isDark } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [width, setWidth] = useState(window.innerWidth);
 
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
   const isSmall = width < 700;
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function AuditLog() {
 
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -84,7 +85,7 @@ export default function AuditLog() {
 
   if (error)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -116,7 +117,7 @@ export default function AuditLog() {
     );
 
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
+    <MediatorLayout>
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>
         {/* ── Header ── */}
         <div style={{ marginBottom: 24 }}>

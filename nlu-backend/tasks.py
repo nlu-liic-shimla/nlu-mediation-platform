@@ -570,18 +570,19 @@ def process_burst_2(self, case_id: str):
             metadata={"celery_task_id": self.request.id},
         )
 
-        # Step 2: Fetch conflict_extraction from Burst 1 results
         analysis_resp = supabase.table("ai_analysis") \
             .select("conflict_extraction") \
             .eq("case_id", case_id) \
             .eq("burst_number", 1) \
-            .single() \
+            .order("created_at", desc=True) \
+            .limit(1) \
             .execute()
 
-        if not analysis_resp.data or not analysis_resp.data.get("conflict_extraction"):
+        analysis_data = analysis_resp.data[0] if analysis_resp.data else None
+        if not analysis_data or not analysis_data.get("conflict_extraction"):
             raise ValueError(f"No Burst 1 conflict_extraction found for case {case_id}")
 
-        conflict_extraction = analysis_resp.data["conflict_extraction"]
+        conflict_extraction = analysis_data["conflict_extraction"]
 
         # Step 3: Fetch the questionnaire and both parties' responses
         q_resp = supabase.table("questionnaires") \
@@ -624,6 +625,18 @@ def process_burst_2(self, case_id: str):
         # Placeholder so the skeleton is importable without Sub-system D:
         from ai.subsystems.subsystem_d import generate_batna_watna
         from ai.schemas import ConflictExtraction
+        # Normalize dispute_type to valid DisputeType enum value
+        valid_dispute_types = {
+            "landlord_tenant", "employment", "commercial_contract",
+            "property_boundary", "family_business", "construction",
+            "consumer", "debt_recovery", "other"
+        }
+        dt = conflict_extraction.get("dispute_type")
+        if dt not in valid_dispute_types:
+            if dt == "commercial":
+                conflict_extraction["dispute_type"] = "commercial_contract"
+            else:
+                conflict_extraction["dispute_type"] = "other"
         conflict_obj = ConflictExtraction(**conflict_extraction)
         result = generate_batna_watna(conflict_obj, questionnaire_responses)
         # ── END NIHARIKA SECTION ─────────────────────────────────────────────
@@ -643,7 +656,10 @@ def process_burst_2(self, case_id: str):
         supabase.table("ai_analysis").insert({
             "case_id":      case_id,
             "burst_number": 2,
-            "batna_watna":  result_dict,
+            "result":       result_dict,
+            "status":       "complete",
+            "completed_at": "now()",
+            "failed":       False,
         }).execute()
 
         # Step 6: Transition to BURST_2_COMPLETE
@@ -814,10 +830,12 @@ def generate_proposal_revision(case_id: str, proposal_id: str):
             .select("batna_watna") \
             .eq("case_id", case_id) \
             .eq("burst_number", 2) \
-            .single() \
+            .order("created_at", desc=True) \
+            .limit(1) \
             .execute()
 
-        batna_watna = batna_resp.data.get("batna_watna") if batna_resp.data else {}
+        batna_data = batna_resp.data[0] if batna_resp.data else {}
+        batna_watna = batna_data.get("batna_watna") if batna_data else {}
 
         # Fetch mediator's private notes (fed as professional context to Sub-system H)
         case_resp = supabase.table("cases") \

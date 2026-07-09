@@ -175,16 +175,31 @@ async def create_proposal(
                 },
             )
 
-    # Fetch data for AI draft generation
-    analysis_resp = supabase.table("ai_analysis") \
-        .select("conflict_extraction, result") \
-        .eq("case_id", case_id).eq("burst_number", 2).single().execute()
+    # Fetch Burst 1 Conflict Extraction
+    b1_resp = supabase.table("ai_analysis") \
+        .select("conflict_extraction") \
+        .eq("case_id", case_id) \
+        .eq("burst_number", 1) \
+        .order("created_at", desc=True) \
+        .limit(1) \
+        .execute()
+    b1_data = b1_resp.data[0] if b1_resp.data else {}
+    conflict = b1_data.get("conflict_extraction", {}) if b1_data else {}
+
+    # Fetch Burst 2 BATNA/WATNA results
+    b2_resp = supabase.table("ai_analysis") \
+        .select("result") \
+        .eq("case_id", case_id) \
+        .eq("burst_number", 2) \
+        .order("created_at", desc=True) \
+        .limit(1) \
+        .execute()
+    b2_data = b2_resp.data[0] if b2_resp.data else {}
+    batna_watna = b2_data.get("result", {}) if b2_data else {}
 
     submissions_resp = supabase.table("submissions") \
         .select("desired_outcome, party_id").eq("case_id", case_id).execute()
 
-    conflict   = analysis_resp.data.get("conflict_extraction", {}) if analysis_resp.data else {}
-    batna_watna = analysis_resp.data.get("result", {}) if analysis_resp.data else {}
     desired_outcomes = {s["party_id"]: s["desired_outcome"] for s in (submissions_resp.data or [])}
 
     # Call AI draft generation (Vaidant's proposal_draft.py)
@@ -193,7 +208,15 @@ async def create_proposal(
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../"))
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
-        from ai.subsystems.proposal_draft import generate_proposal_draft
+        from ai.schemas import ConflictExtraction, BatnaWatnaOutput
+        from ai.proposal_draft import generate_proposal_draft
+
+        # Ensure they are Pydantic model objects, not raw dictionaries
+        if isinstance(conflict, dict):
+            conflict = ConflictExtraction(**conflict)
+        if isinstance(batna_watna, dict):
+            batna_watna = BatnaWatnaOutput(**batna_watna)
+
         draft_text = generate_proposal_draft(conflict, batna_watna, desired_outcomes)
         if hasattr(draft_text, "dict"):
             draft_text = str(draft_text)
@@ -344,11 +367,19 @@ async def respond_to_proposal(
     party_role = _get_party_role_in_case(case_id, current_user["user_id"])
 
     # Validate decision value
-    if body.decision not in ["accepted", "rejected"]:
-        raise HTTPException(status_code=422, detail={"error": True, "code": "INVALID_DECISION", "message": "decision must be 'accepted' or 'rejected'"})
+    decision_val = body.decision.strip().lower()
+    if decision_val in ["accept", "accepted"]:
+        decision_val = "accept"
+    elif decision_val in ["reject", "rejected"]:
+        decision_val = "reject"
+    else:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": True, "code": "INVALID_DECISION", "message": "decision must be 'accept/accepted' or 'reject/rejected'"}
+        )
 
     # Rejection requires a reason of at least 20 characters
-    if body.decision == "rejected":
+    if decision_val == "reject":
         if not body.rejection_reason or len(body.rejection_reason.strip()) < 20:
             raise HTTPException(
                 status_code=422,
@@ -366,15 +397,15 @@ async def respond_to_proposal(
     response_data = {
         "proposal_id": proposal_id,
         "party_id":    current_user["user_id"],
-        "decision":    body.decision,
+        "decision":    decision_val,
     }
-    if body.decision == "rejected" and body.rejection_reason:
+    if decision_val == "reject" and body.rejection_reason:
         response_data["reason"] = body.rejection_reason
 
     supabase.table("proposal_responses").insert(response_data).execute()
 
     # Audit log this party's response
-    action = "PARTY_ACCEPTED_PROPOSAL" if body.decision == "accepted" else "PARTY_REJECTED_PROPOSAL"
+    action = "PARTY_ACCEPTED_PROPOSAL" if decision_val == "accept" else "PARTY_REJECTED_PROPOSAL"
     _write_audit(
         case_id=case_id, actor_id=current_user["user_id"],
         action=action,
@@ -393,7 +424,7 @@ async def respond_to_proposal(
     if len(all_responses.data) >= 2:
         decisions = [r["decision"] for r in all_responses.data]
 
-        if all(d == "accepted" for d in decisions):
+        if all(d == "accept" for d in decisions):
             # Both accepted — case complete
             transition(case_id=case_id, new_state=CaseState.MEDIATION_COMPLETE, actor_id="system")
             _write_audit(
@@ -557,32 +588,26 @@ async def settlement_status(
         .select("pdf_url").eq("case_id", case_id).execute()
 
     pdf_ready = bool(pdf_resp.data)
+    pdf_url = None
+    if pdf_ready:
+        try:
+            signed_resp = supabase.storage.from_("case-documents").create_signed_url(
+                pdf_resp.data[0]["pdf_url"], 86400
+            )
+            pdf_url = (
+                signed_resp.get("signedURL")
+                or signed_resp.get("signed_url")
+                or pdf_resp.data[0]["pdf_url"]
+            )
+        except Exception as e:
+            logger.error(f"Failed to generate signed URL for settlement status: {e}")
+            pdf_url = pdf_resp.data[0]["pdf_url"]
 
     return {
         **result,
         "pdf_ready":  pdf_ready,
-        "pdf_url":    pdf_resp.data[0]["pdf_url"] if pdf_ready else None,
+        "pdf_url":    pdf_url,
     }
-
-
-@router.get(
-    "/cases/{case_id}/settlement/pdf",
-    summary="Download settlement PDF. Returns signed URL valid 24 hours.",
-)
-async def get_settlement_pdf(
-    case_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    pdf_resp = supabase.table("mediation_reports") \
-        .select("pdf_url").eq("case_id", case_id).single().execute()
-
-    if not pdf_resp.data:
-        raise HTTPException(
-            status_code=404,
-            detail={"error": True, "code": "PDF_NOT_READY", "message": "Settlement PDF not yet generated"},
-        )
-
-    return {"pdf_url": pdf_resp.data["pdf_url"]}
 
 
 @router.get(

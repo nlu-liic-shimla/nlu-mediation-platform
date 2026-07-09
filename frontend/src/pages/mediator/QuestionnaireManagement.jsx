@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Send, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
 import client from "../../services/api";
+import { useTheme } from "../../context/ThemeContext";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -170,19 +171,26 @@ function QuestionCard({ question, index, tk }) {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function QuestionnaireManagement() {
+  const { isDark } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
-  const tk = tokens(dark);
 
   const [caseData, setCaseData] = useState(null);
   const [questionnaire, setQuestionnaire] = useState(null);
   const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [sendSuccess, setSendSuccess] = useState(false);
-  const [error, setError] = useState(null);
-  const [sendError, setSendError] = useState(null);
+  const [sent, setSent] = useState(false);
+
+  const [width, setWidth] = useState(window.innerWidth);
+  const tk = tokens(isDark);
+  const isSmall = width < 700;
+
+  useEffect(() => {
+    const h = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
 
   // ── Fetch case + questionnaire data ──────────────────────
   useEffect(() => {
@@ -281,7 +289,7 @@ export default function QuestionnaireManagement() {
 
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -291,14 +299,47 @@ export default function QuestionnaireManagement() {
             color: tk.sub,
           }}
         >
-          Loading questionnaire data...
+          Loading questionnaire...
+        </div>
+      </MediatorLayout>
+    );
+
+  if (error)
+    return (
+      <MediatorLayout>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "60vh",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          <AlertTriangle size={24} color="#ef4444" />
+          <p style={{ color: "#ef4444", fontSize: 15 }}>{error}</p>
+          <button
+            onClick={() => navigate(`/mediator/cases/${id}`)}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 8,
+              background: "#1e40af",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            Back to Case
+          </button>
         </div>
       </MediatorLayout>
     );
 
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+    <MediatorLayout>
+      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
         {/* ── Header ── */}
         <div style={{ marginBottom: 24 }}>
           <button

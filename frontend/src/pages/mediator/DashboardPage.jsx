@@ -1,7 +1,8 @@
 import MediatorLayout from "../../layouts/MediatorLayout";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCases, createCase } from "../../api/cases";
+import { getCases, createCase, acceptApplication, rejectApplication } from "../../api/cases";
+import { useTheme } from "../../context/ThemeContext";
 import {
   Brain,
   FileText,
@@ -93,8 +94,8 @@ const APPLICATION_STATES = ["APPLICATION_PENDING", "APPLICATION_REJECTED", "WITH
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function Dashboard() {
+  const { isDark } = useTheme();
   const navigate = useNavigate();
-  const [dark, setDark]         = useState(false);
   const [cases, setCases]       = useState([]);
   const [loading, setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState("Active Cases");
@@ -112,7 +113,7 @@ export default function Dashboard() {
   const [newCaseError, setNewCaseError] = useState('');
 
   const width    = useWindowWidth();
-  const tk       = tokens(dark);
+  const tk       = tokens(isDark);
   const isNarrow = width < 1024;
   const isSmall  = width < 640;
 
@@ -137,6 +138,10 @@ export default function Dashboard() {
       setNewCaseError('Case title is required');
       return;
     }
+    if (!newCaseForm.brief_description.trim() || newCaseForm.brief_description.trim().length < 20) {
+      setNewCaseError('Description is required and must be at least 20 characters.');
+      return;
+    }
     if (!newCaseForm.requesting_party_email.trim()) {
       setNewCaseError('Requesting party email is required');
       return;
@@ -144,29 +149,32 @@ export default function Dashboard() {
     setNewCaseLoading(true);
     setNewCaseError('');
     try {
-      await createCase(newCaseForm);
+      const payload = {
+        dispute_type: newCaseForm.title,
+        brief_description: newCaseForm.brief_description,
+        requesting_party_email: newCaseForm.requesting_party_email || null,
+        against_party_email: newCaseForm.against_party_email || null,
+      };
+      await createCase(payload);
       setShowNewCase(false);
       setNewCaseForm({ title: '', brief_description: '', requesting_party_email: '', against_party_email: '' });
       // Refresh cases list
       const data = await getCases();
       setCases(data);
     } catch (err) {
-  const detail = err?.response?.data?.detail;
-  let msg = 'Failed to create case. Try again.';
-
-  if (typeof detail === 'string') {
-    msg = detail;
-  } else if (Array.isArray(detail) && detail.length > 0) {
-    msg = detail
-      .map(e => {
-        const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : 'field';
-        return `${field}: ${e.msg}`;
-      })
-      .join(' · ');
-  }
-
-  setNewCaseError(msg);
-}
+      const detail = err?.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        setNewCaseError(detail.map(e => `${e.loc[e.loc.length - 1]}: ${e.msg}`).join(', '));
+      } else if (typeof detail === 'string') {
+        setNewCaseError(detail);
+      } else if (detail?.message) {
+        setNewCaseError(detail.message);
+      } else {
+        setNewCaseError('Failed to create case. Try again.');
+      }
+    } finally {
+      setNewCaseLoading(false);
+    }
   };
 
   /* ── filter cases by tab ── */
@@ -285,13 +293,31 @@ export default function Dashboard() {
                   {c.status === "APPLICATION_PENDING" ? (
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
-                        onClick={() => navigate(`/mediator/cases/${c.id}`)}
+                        onClick={async () => {
+                          try {
+                            await acceptApplication(c.id);
+                            const data = await getCases();
+                            setCases(data);
+                          } catch (err) {
+                            console.error("Accept failed", err);
+                            alert(err?.response?.data?.detail?.message || "Failed to accept application");
+                          }
+                        }}
                         style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: "#1e40af", fontSize: 12, cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", gap: 4 }}
                       >
                         <CheckCircle size={12} /> Accept
                       </button>
                       <button
-                        onClick={() => navigate(`/mediator/cases/${c.id}`)}
+                        onClick={async () => {
+                          try {
+                            await rejectApplication(c.id, "Mediator declined");
+                            const data = await getCases();
+                            setCases(data);
+                          } catch (err) {
+                            console.error("Reject failed", err);
+                            alert(err?.response?.data?.detail?.message || "Failed to reject application");
+                          }
+                        }}
                         style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${tk.border}`, background: "transparent", fontSize: 12, cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center", gap: 4 }}
                       >
                         <XCircle size={12} /> Reject
@@ -371,7 +397,7 @@ export default function Dashboard() {
 
   /* ════════════════════════════════════════════════════════ */
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
+    <MediatorLayout>
       {/* page title + New Case button */}
       <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
         <div>
@@ -446,7 +472,7 @@ export default function Dashboard() {
               <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, color: tk.text }}>{value}</div>
               <div style={{ fontSize: 11, color: subC, marginTop: 4 }}>{sub}</div>
             </div>
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: dark ? "#0f172a" : iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: isDark ? "#0f172a" : iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Icon size={18} color={tk.accent} />
             </div>
           </div>

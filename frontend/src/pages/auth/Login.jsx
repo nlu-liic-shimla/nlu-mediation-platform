@@ -19,14 +19,15 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const actualRole = await login(email, password);
-      if (role === "party" && actualRole === "mediator") {
+      const isPartyRole = ["party_user", "requesting_party", "against_party"].includes(actualRole);
+      if (role === "party" && !isPartyRole) {
         localStorage.removeItem("nlu_token");
         localStorage.removeItem("nlu_role");
         localStorage.removeItem("nlu_user");
         setError("These credentials belong to a Mediator account. Please use the Mediator login.");
         setLoading(false); return;
       }
-      if (role === "mediator" && actualRole !== "mediator") {
+      if (role === "mediator" && isPartyRole) {
         localStorage.removeItem("nlu_token");
         localStorage.removeItem("nlu_role");
         localStorage.removeItem("nlu_user");

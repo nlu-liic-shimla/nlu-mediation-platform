@@ -4,7 +4,7 @@ import {
   ChevronLeft, CheckCircle, Download, Loader,
   AlertCircle, Upload, FileText, User
 } from 'lucide-react'
-import client from '../../api/client'
+import client from '../../services/api'
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024   // 2 MB
 const POLL_INTERVAL  = 3000              // 3 s
@@ -35,29 +35,12 @@ export default function Settlement() {
   const [polling, setPolling]     = useState(false)
   const pollRef = useRef(null)
 
-  // ── Load latest accepted proposal ────────────────────────────────────────
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await client.get(`/api/v1/cases/${caseId}/proposals`)
-        const proposals = Array.isArray(res.data) ? res.data : res.data?.proposals ?? []
-        const latest = proposals[proposals.length - 1] ?? null
-        setProposal(latest)
-      } catch (err) {
-        setError(err?.response?.data?.detail ?? 'Failed to load settlement details.')
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [caseId])
-
   // ── Poll for PDF once confirmed ──────────────────────────────────────────
   const startPolling = () => {
     setPolling(true)
     pollRef.current = setInterval(async () => {
       try {
-        const res = await client.get(`/api/v1/cases/${caseId}/settlement/status`)
+        const res = await client.get(`/cases/${caseId}/settlement/status`)
         if (res.data?.pdf_ready) {
           setPdfReady(true)
           setPdfUrl(res.data.pdf_url ?? '')
@@ -67,6 +50,44 @@ export default function Settlement() {
       } catch (_) {}
     }, POLL_INTERVAL)
   }
+
+  // ── Load latest accepted proposal and confirmation status ──────────────────
+  useEffect(() => {
+    const load = async () => {
+      try {
+        // Fetch proposals
+        const pRes = await client.get(`/cases/${caseId}/proposals`)
+        const proposals = Array.isArray(pRes.data) ? pRes.data : pRes.data?.proposals ?? []
+        const latest = proposals[proposals.length - 1] ?? null
+        setProposal(latest)
+
+        // Fetch case to get role
+        const caseRes = await client.get(`/cases/${caseId}`)
+        const role = caseRes.data?.your_role_in_this_case
+
+        // Fetch settlement status
+        const statusRes = await client.get(`/cases/${caseId}/settlement/status`)
+        const statusData = statusRes.data
+
+        if (role && statusData && statusData[role]) {
+          if (statusData[role].confirmed) {
+            setConfirmed(true)
+            if (statusData.pdf_ready) {
+              setPdfReady(true)
+              setPdfUrl(statusData.pdf_url ?? '')
+            } else {
+              startPolling()
+            }
+          }
+        }
+      } catch (err) {
+        setError(err?.response?.data?.detail ?? 'Failed to load settlement details.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [caseId])
 
   useEffect(() => () => clearInterval(pollRef.current), [])
 
@@ -96,7 +117,7 @@ export default function Settlement() {
       const form = new FormData()
       form.append('full_name', typedName.trim())
       form.append('signature', sigFile)
-      await client.post(`/api/v1/cases/${caseId}/settlement/confirm`, form, {
+      await client.post(`/cases/${caseId}/settlement/confirm`, form, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       setConfirmed(true)

@@ -159,7 +159,7 @@ async def send_questionnaire(
         This is a deliberate human checkpoint per the V5.0 flow.
     """
     # Step 1: Verify mediator owns this case
-    case = _verify_mediator_owns_case(case_id, current_user["id"])
+    case = _verify_mediator_owns_case(case_id, current_user["user_id"])
 
     # Step 2: Case must be in BURST_1_COMPLETE to send questionnaire
     if case["status"] != CaseState.BURST_1_COMPLETE.value:
@@ -179,10 +179,12 @@ async def send_questionnaire(
         .select("conflict_extraction") \
         .eq("case_id", case_id) \
         .eq("burst_number", 1) \
-        .single() \
+        .order("created_at", desc=True) \
+        .limit(1) \
         .execute()
 
-    if not analysis_resp.data or not analysis_resp.data.get("conflict_extraction"):
+    analysis_data = analysis_resp.data[0] if analysis_resp.data else None
+    if not analysis_data or not analysis_data.get("conflict_extraction"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -192,7 +194,7 @@ async def send_questionnaire(
             },
         )
 
-    conflict_extraction = analysis_resp.data["conflict_extraction"]
+    conflict_extraction = analysis_data["conflict_extraction"]
 
     # Step 4: Call Sub-system C to generate questions
     # Sub-system C lives in the ai/ folder (Rishika's code)
@@ -204,7 +206,13 @@ async def send_questionnaire(
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
 
+        from ai.schemas import ConflictExtraction
         from ai.subsystems.subsystem_c import generate_questionnaire
+
+        # Ensure it is a Pydantic model object, not a raw dictionary
+        if isinstance(conflict_extraction, dict):
+            conflict_extraction = ConflictExtraction(**conflict_extraction)
+
         questionnaire_output = generate_questionnaire(conflict_extraction)
 
         # Convert Pydantic model to dict if needed
@@ -239,7 +247,7 @@ async def send_questionnaire(
     # Step 5: Save questionnaire to database
     q_insert = supabase.table("questionnaires").insert({
         "case_id":    case_id,
-        "created_by": current_user["id"],
+        "created_by": current_user["user_id"],
         "questions":  questions_data,
     }).execute()
 
@@ -255,11 +263,11 @@ async def send_questionnaire(
     transition(
         case_id=case_id,
         new_state=CaseState.QUESTIONNAIRE_ACTIVE,
-        actor_id=current_user["id"],
+        actor_id=current_user["user_id"],
         metadata={"questionnaire_id": questionnaire_id},
     )
 
-    logger.info(f"Questionnaire {questionnaire_id} sent for case {case_id} by mediator {current_user['id']}")
+    logger.info(f"Questionnaire {questionnaire_id} sent for case {case_id} by mediator {current_user["user_id"]}")
 
     return {
         "questionnaire_id": questionnaire_id,
@@ -267,6 +275,28 @@ async def send_questionnaire(
         "status": "questionnaire_active",
         "message": "Questionnaire sent. Both parties have been notified.",
     }
+
+
+@router.get(
+    "/cases/{case_id}/questionnaires",
+    summary="List all questionnaires for a case",
+)
+async def list_questionnaires(
+    case_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Returns a list of all questionnaires created for this case.
+    Both mediators and parties can see this list, so they can fetch
+    the questions directed at them.
+    """
+    resp = supabase.table("questionnaires") \
+        .select("id, created_at, created_by") \
+        .eq("case_id", case_id) \
+        .order("created_at", desc=False) \
+        .execute()
+    
+    return resp.data or []
 
 
 # ── ENDPOINT 2: Party fetches their questions ─────────────────────────────────
@@ -315,28 +345,54 @@ async def get_questionnaire(
         )
 
     questions_data = q_resp.data.get("questions", {})
-    all_questions  = questions_data.get("questions", [])
+    if isinstance(questions_data, list):
+        all_questions = questions_data
+    elif isinstance(questions_data, dict):
+        all_questions = questions_data.get("questions", [])
+    else:
+        all_questions = []
+
+    def map_question(q):
+        mapped = {**q}
+        # Map ID
+        mapped["id"] = q.get("question_id") or q.get("id")
+        # Map Text
+        mapped["text"] = q.get("question_text") or q.get("text")
+        # Map Type
+        q_type = q.get("question_type") or q.get("type")
+        if q_type == "open":
+            q_type = "open_ended"
+        mapped["type"] = q_type
+        return mapped
 
     # Mediator sees everything — no filtering, no stripping
     if current_user["role"] == "mediator":
+        mapped_questions = [map_question(q) for q in all_questions]
         return {
             "questionnaire_id": q_id,
             "case_id": case_id,
-            "questions": all_questions,
-            "total": len(all_questions),
+            "questions": mapped_questions,
+            "total": len(mapped_questions),
         }
 
     # Party: determine their role in this case
-    party_role = _get_party_role_in_case(case_id, current_user["id"])
+    party_role = _get_party_role_in_case(case_id, current_user["user_id"])
 
     # Filter: only questions directed at this party's role or at "both"
     filtered_questions = []
     for q in all_questions:
         directed_at = q.get("directed_at", "both")
+        # Normalize role values to be robust
+        if directed_at == "party_a":
+            directed_at = "requesting_party"
+        elif directed_at == "party_b":
+            directed_at = "against_party"
+
         if directed_at in [party_role, "both"]:
             # Strip 'purpose' field — parties never see why they're being asked
             safe_question = {k: v for k, v in q.items() if k != "purpose"}
-            filtered_questions.append(safe_question)
+            mapped_q = map_question(safe_question)
+            filtered_questions.append(mapped_q)
 
     return {
         "questionnaire_id": q_id,
@@ -391,13 +447,13 @@ async def submit_questionnaire_response(
     because if a constraint is ever relaxed in future, we still do the right thing.
     """
     # Step 1: Verify party belongs to this case and get their role
-    party_role = _get_party_role_in_case(case_id, current_user["id"])
+    party_role = _get_party_role_in_case(case_id, current_user["user_id"])
 
     # Step 2: Check for duplicate submission BEFORE touching the DB
     existing_resp = supabase.table("questionnaire_responses") \
         .select("id") \
         .eq("questionnaire_id", q_id) \
-        .eq("respondent_id", current_user["id"]) \
+        .eq("respondent_id", current_user["user_id"]) \
         .execute()
 
     if existing_resp.data:
@@ -413,7 +469,7 @@ async def submit_questionnaire_response(
     # Step 3: Save response
     insert_resp = supabase.table("questionnaire_responses").insert({
         "questionnaire_id": q_id,
-        "respondent_id":    current_user["id"],
+        "respondent_id":    current_user["user_id"],
         "answers":          body.answers,
     }).execute()
 
@@ -433,7 +489,7 @@ async def submit_questionnaire_response(
     )
     supabase.table("audit_logs").insert({
         "case_id":   case_id,
-        "actor_id":  current_user["id"],
+        "actor_id":  current_user["user_id"],
         "action":    action,
         "old_state": CaseState.QUESTIONNAIRE_ACTIVE.value,
         "new_state": CaseState.QUESTIONNAIRE_ACTIVE.value,
@@ -520,7 +576,7 @@ async def get_questionnaire_responses(
         database level, and this endpoint enforces it at application level.
         Two layers of protection, as per the three-layer security model.
     """
-    _verify_mediator_owns_case(case_id, current_user["id"])
+    _verify_mediator_owns_case(case_id, current_user["user_id"])
 
     # Fetch all responses for this questionnaire
     responses_resp = supabase.table("questionnaire_responses") \

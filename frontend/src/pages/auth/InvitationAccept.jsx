@@ -79,7 +79,10 @@ const handleAccept = async () => {
   setLoading(true)
   setApiError('')
   try {
-    const data = await acceptInvitation(token, email, password)
+    const isLogin = accountChoice === 'has_account'
+    const data = isLogin
+      ? await acceptInvitation(token, password)
+      : await acceptInvitation(token, password, email.split('@')[0])
     localStorage.setItem('nlu_token', data.access_token)
     localStorage.setItem('nlu_role', 'party_user')
     localStorage.setItem('nlu_user', JSON.stringify({

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { finaliseCase, getSettlementStatus } from "../../api/cases";
 import { CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
+import { useTheme } from "../../context/ThemeContext";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -18,16 +19,16 @@ const tokens = (dark) => ({
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function FinaliseCase() {
+  const { isDark } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
   const [status, setStatus] = useState(null);
   const [finalising, setFinalising] = useState(false);
   const [finalised, setFinalised] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
 
   /* ── Poll settlement status every 3 seconds ── */
   useEffect(() => {
@@ -107,7 +108,7 @@ export default function FinaliseCase() {
 
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -123,7 +124,7 @@ export default function FinaliseCase() {
     );
 
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
+    <MediatorLayout>
       <div style={{ maxWidth: 700, margin: "0 auto" }}>
         {/* ── Header ── */}
         <div style={{ marginBottom: 24 }}>

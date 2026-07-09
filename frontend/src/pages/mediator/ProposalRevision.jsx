@@ -1,9 +1,15 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { updateProposal, publishProposal } from "../../api/cases";
+import {
+  updateProposal,
+  publishProposal,
+  getProposals,
+  getAuditLog,
+  getCaseById,
+} from "../../api/cases";
 import { AlertTriangle } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
-import client from "../../services/api";
+import { useTheme } from "../../context/ThemeContext";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -107,9 +113,9 @@ function PublishModal({ onCancel, onConfirm, loading, tk }) {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function ProposalRevision() {
+  const { isDark } = useTheme();
   const { id, p_id } = useParams();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
 
   const [revisedText, setRevisedText] = useState("");
   const [roundNumber, setRoundNumber] = useState(null);
@@ -127,7 +133,7 @@ export default function ProposalRevision() {
   const [error, setError] = useState(null);
 
   const [width, setWidth] = useState(window.innerWidth);
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
   const isSmall = width < 900;
 
   useEffect(() => {
@@ -136,42 +142,58 @@ export default function ProposalRevision() {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  // ── Load revision data from API ──────────────────────────
-  // Fetches the proposal by p_id, then reads revision_suggestions
-  // which is populated by Sub-system H (Celery task) after a rejection.
+  // Load revision data from location state or API fallback
   useEffect(() => {
     const loadRevision = async () => {
       try {
-        // Fetch all proposals for this case, find the one matching p_id
-        const res = await client.get(`/cases/${id}/proposals`);
-        const proposals = Array.isArray(res.data)
-          ? res.data
-          : res.data?.proposals ?? [];
+        const state = window.history.state?.usr;
+        if (state) {
+          setRevisedText(state.revised_draft || "");
+          setRoundNumber(state.round_number || 1);
+          setMaxRounds(state.max_rounds || 3);
+          setPreviousProposal(state.previous_proposal || "");
+          setRequestingReason(state.requesting_reason || "");
+          setAgainstReason(state.against_reason || "");
+          setChangesSummary(state.changes_summary || []);
+        } else {
+          // Fallback fetch: get case details, proposals, and audit logs
+          const [caseResult, proposalsList, auditLogs] = await Promise.all([
+            getCaseById(id).catch(() => null),
+            getProposals(id).catch(() => []),
+            getAuditLog(id).catch(() => []),
+          ]);
 
-        const proposal = proposals.find((p) => p.id === p_id) ?? proposals[proposals.length - 1];
+          if (caseResult) {
+            setMaxRounds(caseResult.max_rounds || 3);
+          }
 
-        if (!proposal) {
-          setError("Proposal not found.");
-          return;
+          const prop = proposalsList.find((p) => p.id === p_id);
+          if (prop) {
+            setPreviousProposal(prop.content || "");
+            setRoundNumber(prop.round || 1);
+            setRevisedText(prop.revision_suggestions?.revised_draft || prop.content || "");
+            setChangesSummary(prop.revision_suggestions?.changes_summary || []);
+          }
+
+          // Extract rejection reasons from audit log metadata
+          const reqLog = auditLogs.find(
+            (log) =>
+              log.action === "PARTY_REJECTED_PROPOSAL" &&
+              log.metadata?.proposal_id === p_id &&
+              log.metadata?.party_role === "requesting_party"
+          );
+          if (reqLog) setRequestingReason(reqLog.metadata.rejection_reason || "");
+
+          const againstLog = auditLogs.find(
+            (log) =>
+              log.action === "PARTY_REJECTED_PROPOSAL" &&
+              log.metadata?.proposal_id === p_id &&
+              log.metadata?.party_role === "against_party"
+          );
+          if (againstLog) setAgainstReason(againstLog.metadata.rejection_reason || "");
         }
-
-        // revision_suggestions is set by Sub-system H after rejection
-        // shape: { revised_draft, changes_summary, requesting_reason, against_reason }
-        const suggestions = proposal.revision_suggestions || {};
-
-        setRevisedText(suggestions.revised_draft || proposal.content || proposal.raw_text || "");
-        setRoundNumber(proposal.round_number || proposal.round || 1);
-        setPreviousProposal(proposal.content || proposal.raw_text || "");
-        setRequestingReason(suggestions.requesting_reason || "");
-        setAgainstReason(suggestions.against_reason || "");
-        setChangesSummary(suggestions.changes_summary || []);
-
-        // Get max_rounds from the case
-        const caseRes = await client.get(`/cases/${id}`);
-        setMaxRounds(caseRes.data?.max_rounds || 3);
-
-      } catch {
-        setError("Failed to load revision data. Please go back and try again.");
+      } catch (err) {
+        setError("Failed to load revision data");
       } finally {
         setLoading(false);
       }
@@ -214,7 +236,7 @@ export default function ProposalRevision() {
 
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -231,7 +253,7 @@ export default function ProposalRevision() {
 
   if (error)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -263,7 +285,7 @@ export default function ProposalRevision() {
     );
 
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
+    <MediatorLayout>
       {showPublishModal && (
         <PublishModal
           onCancel={() => setShowPublishModal(false)}

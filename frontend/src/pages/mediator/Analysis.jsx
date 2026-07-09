@@ -22,6 +22,7 @@ import {
   Save,
 } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
+import { useTheme } from "../../context/ThemeContext";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -208,9 +209,9 @@ function DocumentList({ docs, tk }) {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function Analysis() {
+  const { isDark } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
 
   const [analysis, setAnalysis] = useState(null);
   const [analysisStatus, setAnalysisStatus] = useState("pending");
@@ -227,7 +228,7 @@ export default function Analysis() {
   const [toneOpen, setToneOpen] = useState(false);
   const [factorsOpen, setFactorsOpen] = useState(false);
 
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
   const width = useWindowWidth();
   const isSmall = width < 900;
 
@@ -290,7 +291,7 @@ useEffect(() => {
   /* ── Guards ── */
   if (!id)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -322,7 +323,7 @@ useEffect(() => {
 
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -339,7 +340,7 @@ useEffect(() => {
 
   if (error)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -372,7 +373,7 @@ useEffect(() => {
 
   if (!analysis)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -445,7 +446,7 @@ useEffect(() => {
 
   /* ── Render ── */
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
+    <MediatorLayout>
       {/* ── Header ── */}
       <div style={{ marginBottom: 24 }}>
         <button
@@ -588,7 +589,7 @@ useEffect(() => {
               style={{
                 padding: "14px 18px",
                 borderBottom: `1px solid ${tk.border}`,
-                background: dark ? "#1e293b" : "#f8fafc",
+                background: isDark ? "#1e293b" : "#f8fafc",
               }}
             >
               <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>
@@ -627,7 +628,7 @@ useEffect(() => {
               style={{
                 padding: "14px 18px",
                 borderBottom: `1px solid ${tk.border}`,
-                background: dark ? "#1e293b" : "#f8fafc",
+                background: isDark ? "#1e293b" : "#f8fafc",
               }}
             >
               <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>

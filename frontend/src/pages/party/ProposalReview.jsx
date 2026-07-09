@@ -4,7 +4,7 @@ import {
   ChevronLeft, CheckCircle, XCircle, AlertCircle,
   Loader, FileText, Clock
 } from 'lucide-react'
-import client from '../../api/client'
+import client from '../../services/api'
 
 const MIN_REASON_CHARS = 20
 
@@ -21,13 +21,35 @@ export default function ProposalReview() {
   const [submitting, setSubmitting]       = useState(false)
   const [submitError, setSubmitError]     = useState('')
 
+  const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
+  const userKey = user.user_id || user.email || 'guest'
+  const decisionKey = `proposal_decision_${caseId}_${userKey}`
+
+  useEffect(() => {
+    const savedDecision = localStorage.getItem(decisionKey)
+    if (savedDecision) {
+      setDecision(savedDecision)
+    }
+  }, [caseId, decisionKey])
+
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await client.get(`/api/v1/cases/${caseId}/proposals`)
-        // Backend returns only published proposals for party (RLS enforced)
-        const proposals = Array.isArray(res.data) ? res.data : res.data?.proposals ?? []
-        const latest = proposals[proposals.length - 1] ?? null
+        // Dev mode simulation: Check localStorage first
+        const localProps = localStorage.getItem(`proposals_${caseId}`)
+        let latest = null
+        if (localProps) {
+          const proposals = JSON.parse(localProps)
+          const published = proposals.filter(p => p.status === 'published')
+          latest = published[published.length - 1] ?? null
+        }
+
+        if (!latest) {
+          const res = await client.get(`/cases/${caseId}/proposals`)
+          const proposals = Array.isArray(res.data) ? res.data : res.data?.proposals ?? []
+          latest = proposals[proposals.length - 1] ?? null
+        }
+
         setProposal(latest)
       } catch (err) {
         setError(err?.response?.data?.detail ?? 'Failed to load proposal. Please try again.')
@@ -42,12 +64,37 @@ export default function ProposalReview() {
     setSubmitting(true)
     setSubmitError('')
     try {
-      await client.post(`/api/v1/cases/${caseId}/proposals/${proposal.id}/respond`, {
-        decision: 'accept'
-      })
-      setDecision('done_accept')
+      if (proposal?.id?.startsWith('mock-')) {
+        setDecision('done_accept')
+        localStorage.setItem(decisionKey, 'done_accept')
+        
+        // Count how many parties have accepted this mock proposal in localStorage
+        let acceptCount = 1 // Count current user
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key.startsWith(`proposal_decision_${caseId}_`) && key !== decisionKey) {
+            const val = localStorage.getItem(key)
+            if (val === 'done_accept') {
+              acceptCount++
+            }
+          }
+        }
+
+        if (acceptCount >= 2) {
+          localStorage.setItem(`case_status_${caseId}`, 'MEDIATION_COMPLETE')
+        } else {
+          localStorage.setItem(`case_status_${caseId}`, 'PROPOSAL_PUBLISHED')
+        }
+      } else {
+        await client.post(`/cases/${caseId}/proposals/${proposal.id}/respond`, {
+          decision: 'accept'
+        })
+        setDecision('done_accept')
+      }
     } catch (err) {
-      setSubmitError(err?.response?.data?.detail ?? 'Something went wrong. Please try again.')
+      const detail = err?.response?.data?.detail
+      const msg = typeof detail === 'object' && detail !== null ? (detail.message || JSON.stringify(detail)) : (detail ?? 'Something went wrong. Please try again.')
+      setSubmitError(msg)
     } finally {
       setSubmitting(false)
     }
@@ -58,16 +105,26 @@ export default function ProposalReview() {
     setSubmitting(true)
     setSubmitError('')
     try {
-      await client.post(`/api/v1/cases/${caseId}/proposals/${proposal.id}/respond`, {
-        decision: 'reject',
-        rejection_reason: rejectionReason.trim()
-      })
-      setDecision('done_reject')
+      if (proposal?.id?.startsWith('mock-')) {
+        setDecision('done_reject')
+        localStorage.setItem(decisionKey, 'done_reject')
+        localStorage.setItem(`case_status_${caseId}`, 'MEDIATION_IN_PROGRESS')
+      } else {
+        await client.post(`/cases/${caseId}/proposals/${proposal.id}/respond`, {
+          decision: 'reject',
+          rejection_reason: rejectionReason.trim()
+        })
+        setDecision('done_reject')
+      }
     } catch (err) {
       if (err?.response?.status === 422) {
-        setSubmitError('Your rejection reason must be at least 20 characters.')
+        const detail = err?.response?.data?.detail
+        const msg = typeof detail === 'object' && detail !== null ? (detail.message || 'Validation error') : 'Your rejection reason must be at least 20 characters.'
+        setSubmitError(msg)
       } else {
-        setSubmitError(err?.response?.data?.detail ?? 'Something went wrong. Please try again.')
+        const detail = err?.response?.data?.detail
+        const msg = typeof detail === 'object' && detail !== null ? (detail.message || JSON.stringify(detail)) : (detail ?? 'Something went wrong. Please try again.')
+        setSubmitError(msg)
       }
     } finally {
       setSubmitting(false)

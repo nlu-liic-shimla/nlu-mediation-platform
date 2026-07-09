@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTheme } from "../context/ThemeContext";
 import {
   LayoutDashboard,
   Brain,
@@ -34,7 +35,8 @@ const NAV_ITEMS = [
   { icon: Settings2, label: "Admin Panel", path: "/mediator/admin" },
 ];
 
-export default function MediatorLayout({ children, dark, setDark }) {
+export default function MediatorLayout({ children }) {
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -44,7 +46,7 @@ export default function MediatorLayout({ children, dark, setDark }) {
   const notifRef = useRef(null);
 
   const user = JSON.parse(localStorage.getItem("nlu_user") || "{}");
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 900);
@@ -213,12 +215,12 @@ export default function MediatorLayout({ children, dark, setDark }) {
             style={{
               margin: "0 12px 16px",
               padding: "12px",
-              background: dark ? "#0f172a" : "#eff6ff",
+              background: isDark ? "#0f172a" : "#eff6ff",
               borderRadius: 10,
               display: "flex",
               alignItems: "center",
               gap: 10,
-              border: `1px solid ${dark ? "#1e3a5f" : "#bfdbfe"}`,
+              border: `1px solid ${isDark ? "#1e3a5f" : "#bfdbfe"}`,
             }}
           >
             <div
@@ -354,7 +356,7 @@ export default function MediatorLayout({ children, dark, setDark }) {
 
           {/* Theme toggle */}
           <button
-            onClick={() => setDark((d) => !d)}
+            onClick={toggleTheme}
             style={{
               width: 36,
               height: 36,
@@ -369,7 +371,7 @@ export default function MediatorLayout({ children, dark, setDark }) {
               flexShrink: 0,
             }}
           >
-            {dark ? <Sun size={16} /> : <Moon size={16} />}
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
           {/* Notifications */}
