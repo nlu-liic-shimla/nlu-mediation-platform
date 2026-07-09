@@ -491,11 +491,62 @@ useEffect(() => {
     displayId={c.id.slice(0, 8).toUpperCase()}
     vs={c.against_party_email || c.requesting_party_email || '—'}
     progress={(() => {
-      const steps = ['DRAFT','BOTH_INVITED','PARTY_A_SUBMITTED','BOTH_SUBMITTED','AI_RUNNING','ANALYSIS_READY','QUESTIONNAIRE_SENT','BURST_2_COMPLETE','PROPOSAL_SENT','PROPOSAL_ACCEPTED','SETTLED']
-      const idx = steps.indexOf(c.status)
+      const statusMap = {
+        'DRAFT': 'BOTH_INVITED',
+        'PARTY_A_SUBMITTED': 'FIRST_PARTY_SUBMITTED',
+        'AI_RUNNING': 'BURST_1_PROCESSING',
+        'ANALYSIS_READY': 'BURST_1_COMPLETE',
+        'QUESTIONNAIRE_SENT': 'QUESTIONNAIRE_ACTIVE',
+        'PROPOSAL_SENT': 'PROPOSAL_PUBLISHED',
+        'PROPOSAL_ACCEPTED': 'MEDIATION_COMPLETE',
+        'SETTLED': 'MEDIATION_COMPLETE',
+        'CLOSED': 'MEDIATION_COMPLETE'
+      }
+      const mappedStatus = statusMap[c.status] || c.status
+      const steps = [
+        'BOTH_INVITED',
+        'FIRST_PARTY_SUBMITTED',
+        'BOTH_SUBMITTED',
+        'BURST_1_PROCESSING',
+        'BURST_1_COMPLETE',
+        'QUESTIONNAIRE_ACTIVE',
+        'QUESTIONNAIRE_COMPLETE',
+        'BURST_2_PROCESSING',
+        'BURST_2_COMPLETE',
+        'PROPOSAL_DRAFT',
+        'PROPOSAL_PUBLISHED',
+        'MEDIATION_IN_PROGRESS',
+        'MEDIATION_COMPLETE'
+      ]
+      const idx = steps.indexOf(mappedStatus)
       return idx >= 0 ? Math.round((idx / (steps.length - 1)) * 100) : 0
     })()}
-    aiScore={c.status === 'BURST_2_COMPLETE' || c.status === 'PROPOSAL_SENT' || c.status === 'SETTLED' ? 87 : 0}
+    aiScore={(() => {
+      const statusMap = {
+        'DRAFT': 'BOTH_INVITED',
+        'PARTY_A_SUBMITTED': 'FIRST_PARTY_SUBMITTED',
+        'AI_RUNNING': 'BURST_1_PROCESSING',
+        'ANALYSIS_READY': 'BURST_1_COMPLETE',
+        'QUESTIONNAIRE_SENT': 'QUESTIONNAIRE_ACTIVE',
+        'PROPOSAL_SENT': 'PROPOSAL_PUBLISHED',
+        'PROPOSAL_ACCEPTED': 'MEDIATION_COMPLETE',
+        'SETTLED': 'MEDIATION_COMPLETE',
+        'CLOSED': 'MEDIATION_COMPLETE'
+      }
+      const mappedStatus = statusMap[c.status] || c.status
+      const activeStatesForAiScore = new Set([
+        'BURST_1_COMPLETE',
+        'QUESTIONNAIRE_ACTIVE',
+        'QUESTIONNAIRE_COMPLETE',
+        'BURST_2_PROCESSING',
+        'BURST_2_COMPLETE',
+        'PROPOSAL_DRAFT',
+        'PROPOSAL_PUBLISHED',
+        'MEDIATION_IN_PROGRESS',
+        'MEDIATION_COMPLETE'
+      ])
+      return activeStatesForAiScore.has(mappedStatus) ? 87 : 0
+    })()}
     nextDate={'—'}
     onView={() => navigate(`/party/cases/${c.id}`)}
   />

@@ -208,7 +208,15 @@ async def create_proposal(
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../"))
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
+        from ai.schemas import ConflictExtraction, BatnaWatnaOutput
         from ai.proposal_draft import generate_proposal_draft
+
+        # Ensure they are Pydantic model objects, not raw dictionaries
+        if isinstance(conflict, dict):
+            conflict = ConflictExtraction(**conflict)
+        if isinstance(batna_watna, dict):
+            batna_watna = BatnaWatnaOutput(**batna_watna)
+
         draft_text = generate_proposal_draft(conflict, batna_watna, desired_outcomes)
         if hasattr(draft_text, "dict"):
             draft_text = str(draft_text)

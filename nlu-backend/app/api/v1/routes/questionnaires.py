@@ -206,7 +206,13 @@ async def send_questionnaire(
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
 
+        from ai.schemas import ConflictExtraction
         from ai.subsystems.subsystem_c import generate_questionnaire
+
+        # Ensure it is a Pydantic model object, not a raw dictionary
+        if isinstance(conflict_extraction, dict):
+            conflict_extraction = ConflictExtraction(**conflict_extraction)
+
         questionnaire_output = generate_questionnaire(conflict_extraction)
 
         # Convert Pydantic model to dict if needed
