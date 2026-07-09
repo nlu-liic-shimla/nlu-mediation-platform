@@ -5,9 +5,11 @@ import {
   updateProposal,
   publishProposal,
   getBatnaWatna,
+  getProposals,
 } from "../../api/cases";
 import { AlertTriangle, CheckCircle2, Eye } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
+import { useTheme } from "../../context/ThemeContext";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -204,10 +206,9 @@ function PublishModal({ onCancel, onConfirm, loading, tk }) {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function ProposalEditor() {
+  const { isDark } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
-
   const [proposalId, setProposalId] = useState(null);
   const [draftText, setDraftText] = useState("");
   const [roundNumber, setRoundNumber] = useState(1);
@@ -223,7 +224,7 @@ export default function ProposalEditor() {
   const [showPublishModal, setShowPublishModal] = useState(false);
 
   const [width, setWidth] = useState(window.innerWidth);
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
   const isSmall = width < 900;
 
   useEffect(() => {
@@ -232,21 +233,30 @@ export default function ProposalEditor() {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  // On mount — create proposal and get AI draft
+  // On mount — create proposal and get AI draft (or resume existing draft)
   useEffect(() => {
     const init = async () => {
       try {
-        const [proposalRes, batnaRes] = await Promise.all([
-          createProposal(id),
+        const [proposalsList, batnaRes] = await Promise.all([
+          getProposals(id).catch(() => []),
           getBatnaWatna(id).catch(() => null),
         ]);
-        setProposalId(proposalRes.proposal_id);
-        setDraftText(proposalRes.draft_text || "");
-        setRoundNumber(proposalRes.round_number || 1);
+
+        const draft = proposalsList.find((p) => p.status === "draft");
+        if (draft) {
+          setProposalId(draft.id);
+          setDraftText(draft.content || "");
+          setRoundNumber(draft.round || 1);
+        } else {
+          const proposalRes = await createProposal(id);
+          setProposalId(proposalRes.proposal_id);
+          setDraftText(proposalRes.draft_text || "");
+          setRoundNumber(proposalRes.round_number || 1);
+        }
         setBatnaData(batnaRes);
       } catch (err) {
         setError(
-          "Failed to create proposal. Make sure BATNA/WATNA is complete.",
+          "Failed to load or create proposal. Make sure BATNA/WATNA is complete.",
         );
       } finally {
         setLoading(false);
@@ -290,7 +300,7 @@ export default function ProposalEditor() {
 
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -307,7 +317,7 @@ export default function ProposalEditor() {
 
   if (error)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -341,7 +351,7 @@ export default function ProposalEditor() {
     );
 
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
+    <MediatorLayout>
       {showPreview && (
         <PreviewModal
           text={draftText}

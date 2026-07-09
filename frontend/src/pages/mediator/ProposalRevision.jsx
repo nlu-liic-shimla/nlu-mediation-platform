@@ -1,8 +1,15 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { updateProposal, publishProposal } from "../../api/cases";
+import {
+  updateProposal,
+  publishProposal,
+  getProposals,
+  getAuditLog,
+  getCaseById,
+} from "../../api/cases";
 import { AlertTriangle } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
+import { useTheme } from "../../context/ThemeContext";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -106,9 +113,9 @@ function PublishModal({ onCancel, onConfirm, loading, tk }) {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function ProposalRevision() {
+  const { isDark } = useTheme();
   const { id, p_id } = useParams();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
 
   const [revisedText, setRevisedText] = useState("");
   const [roundNumber, setRoundNumber] = useState(null);
@@ -126,7 +133,7 @@ export default function ProposalRevision() {
   const [error, setError] = useState(null);
 
   const [width, setWidth] = useState(window.innerWidth);
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
   const isSmall = width < 900;
 
   useEffect(() => {
@@ -135,11 +142,10 @@ export default function ProposalRevision() {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  // Load revision data from location state or API
+  // Load revision data from location state or API fallback
   useEffect(() => {
     const loadRevision = async () => {
       try {
-        // Data passed via navigation state from previous screen
         const state = window.history.state?.usr;
         if (state) {
           setRevisedText(state.revised_draft || "");
@@ -149,8 +155,44 @@ export default function ProposalRevision() {
           setRequestingReason(state.requesting_reason || "");
           setAgainstReason(state.against_reason || "");
           setChangesSummary(state.changes_summary || []);
+        } else {
+          // Fallback fetch: get case details, proposals, and audit logs
+          const [caseResult, proposalsList, auditLogs] = await Promise.all([
+            getCaseById(id).catch(() => null),
+            getProposals(id).catch(() => []),
+            getAuditLog(id).catch(() => []),
+          ]);
+
+          if (caseResult) {
+            setMaxRounds(caseResult.max_rounds || 3);
+          }
+
+          const prop = proposalsList.find((p) => p.id === p_id);
+          if (prop) {
+            setPreviousProposal(prop.content || "");
+            setRoundNumber(prop.round || 1);
+            setRevisedText(prop.revision_suggestions?.revised_draft || prop.content || "");
+            setChangesSummary(prop.revision_suggestions?.changes_summary || []);
+          }
+
+          // Extract rejection reasons from audit log metadata
+          const reqLog = auditLogs.find(
+            (log) =>
+              log.action === "PARTY_REJECTED_PROPOSAL" &&
+              log.metadata?.proposal_id === p_id &&
+              log.metadata?.party_role === "requesting_party"
+          );
+          if (reqLog) setRequestingReason(reqLog.metadata.rejection_reason || "");
+
+          const againstLog = auditLogs.find(
+            (log) =>
+              log.action === "PARTY_REJECTED_PROPOSAL" &&
+              log.metadata?.proposal_id === p_id &&
+              log.metadata?.party_role === "against_party"
+          );
+          if (againstLog) setAgainstReason(againstLog.metadata.rejection_reason || "");
         }
-      } catch {
+      } catch (err) {
         setError("Failed to load revision data");
       } finally {
         setLoading(false);
@@ -194,7 +236,7 @@ export default function ProposalRevision() {
 
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -211,7 +253,7 @@ export default function ProposalRevision() {
 
   if (error)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -243,7 +285,7 @@ export default function ProposalRevision() {
     );
 
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
+    <MediatorLayout>
       {showPublishModal && (
         <PublishModal
           onCancel={() => setShowPublishModal(false)}

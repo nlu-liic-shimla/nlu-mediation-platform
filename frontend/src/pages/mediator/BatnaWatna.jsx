@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getBatnaWatna } from "../../api/cases";
 import { AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
+import { useTheme } from "../../context/ThemeContext";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -246,15 +247,15 @@ function PartyColumn({ label, data, tk }) {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function BatnaWatna() {
+  const { isDark } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [width, setWidth] = useState(window.innerWidth);
 
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
   const isSmall = width < 900;
 
   useEffect(() => {
@@ -279,7 +280,7 @@ export default function BatnaWatna() {
 
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -296,7 +297,7 @@ export default function BatnaWatna() {
 
   if (error)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -331,7 +332,7 @@ export default function BatnaWatna() {
   const ap = data?.against_party;
 
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
+    <MediatorLayout>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         {/* ── Header ── */}
         <div style={{ marginBottom: 24 }}>

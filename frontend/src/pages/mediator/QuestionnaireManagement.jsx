@@ -4,6 +4,7 @@ import { getQuestionnaires, getQuestionnaireResponses } from "../../api/cases";
 import { AlertTriangle, Send } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
 import client from "../../services/api";
+import { useTheme } from "../../context/ThemeContext";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -27,9 +28,9 @@ function isDivergent(a, b) {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function QuestionnaireManagement() {
+  const { isDark } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
 
   const [questionnaire, setQuestionnaire] = useState(null);
   const [responses, setResponses] = useState([]);
@@ -39,7 +40,7 @@ export default function QuestionnaireManagement() {
   const [sent, setSent] = useState(false);
 
   const [width, setWidth] = useState(window.innerWidth);
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
   const isSmall = width < 700;
 
   useEffect(() => {
@@ -106,7 +107,7 @@ export default function QuestionnaireManagement() {
 
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -123,7 +124,7 @@ export default function QuestionnaireManagement() {
 
   if (error)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -155,7 +156,7 @@ export default function QuestionnaireManagement() {
     );
 
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
+    <MediatorLayout>
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>
         {/* ── Header ── */}
         <div style={{ marginBottom: 24 }}>

@@ -5,7 +5,7 @@ import {
   CheckCircle, AlertCircle, Loader, ChevronRight,
   User, Calendar, Hash
 } from 'lucide-react'
-import client from '../../api/client'
+import client from '../../services/api'
 import AnalysisStatusBanner from '../../components/party/AnalysisStatusBanner'
 import BatnaWatnaPartyDisplay from '../../components/party/BatnaWatnaPartyDisplay'
 
@@ -100,8 +100,8 @@ export default function CaseDetails() {
       setLoading(true)
       try {
         const [caseRes, subRes] = await Promise.all([
-          client.get(`/api/v1/cases/${caseId}`),
-          client.get(`/api/v1/cases/${caseId}/submissions`),
+          client.get(`/cases/${caseId}`),
+          client.get(`/cases/${caseId}/submissions`),
         ])
         setCaseData(caseRes.data)
         setSubmission(subRes.data.submissions?.[0] || null)
@@ -116,7 +116,10 @@ export default function CaseDetails() {
   }, [caseId])
 
   const currentStep = STATUS_STEP_MAP[caseData?.status] ?? 0
-  const actionInfo  = ACTION_NEEDED[caseData?.status]
+  let actionInfo  = ACTION_NEEDED[caseData?.status]
+  if (caseData?.status === 'QUESTIONNAIRE_ACTIVE' && caseData?.user_has_submitted_questionnaire) {
+    actionInfo = { msg: 'Questionnaire submitted. Awaiting response from the other party.', action: null }
+  }
   const showBatna   = BURST_2_STATUSES.has(caseData?.status)
 
   return (

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Scale, ChevronRight, ChevronLeft, AlertCircle, CheckCircle } from 'lucide-react'
-import client from '../../api/client'
+import client from '../../services/api'
 
 const DISPUTE_TYPES = [
   { value: 'landlord_tenant', label: 'Landlord / Tenant', icon: '🏠' },
@@ -64,7 +64,7 @@ export default function ApplyForMediation() {
         against_party_phone: form.against_party_phone || null,
         monetary_value: form.monetary_value ? Number(form.monetary_value) : null,
       }
-      const res = await client.post('/api/v1/cases/apply/submit', payload)
+      const res = await client.post('/cases/apply/submit', payload)
       setApplicationId(res.data.id)
       setSubmitted(true)
     } catch (err) {
