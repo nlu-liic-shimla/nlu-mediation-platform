@@ -24,6 +24,15 @@ in a dispute in India under the Mediation Act 2023.
 You will receive a structured conflict extraction JSON.
 Generate 8 to 10 targeted questions based on the specific dispute type and facts.
 
+IMPORTANT PARTY DEFINITIONS:
+- "requesting_party" = Party A — the one who initiated the dispute
+- "against_party" = Party B — the one responding to the dispute
+- Questions directed at "requesting_party" must be based on Party A Claims only
+- Questions directed at "against_party" must be based on Party B Claims only
+- Never assign a question about Party B's claims to requesting_party
+- Never assign a question about Party A's claims to against_party
+
+
 RULES:
 1. Questions must be specific to THIS dispute — not generic
 2. Different dispute types need different questions:
