@@ -35,20 +35,10 @@ export default function ProposalReview() {
   useEffect(() => {
     const load = async () => {
       try {
-        // Dev mode simulation: Check localStorage first
-        const localProps = localStorage.getItem(`proposals_${caseId}`)
-        let latest = null
-        if (localProps) {
-          const proposals = JSON.parse(localProps)
-          const published = proposals.filter(p => p.status === 'published')
-          latest = published[published.length - 1] ?? null
-        }
-
-        if (!latest) {
-          const res = await client.get(`/cases/${caseId}/proposals`)
-          const proposals = Array.isArray(res.data) ? res.data : res.data?.proposals ?? []
-          latest = proposals[proposals.length - 1] ?? null
-        }
+        const res = await client.get(`/cases/${caseId}/proposals`)
+        const proposals = Array.isArray(res.data) ? res.data : res.data?.proposals ?? []
+        const published = proposals.filter(p => p.status === 'published')
+        const latest = published[published.length - 1] ?? proposals[proposals.length - 1] ?? null
 
         setProposal(latest)
       } catch (err) {
@@ -64,33 +54,11 @@ export default function ProposalReview() {
     setSubmitting(true)
     setSubmitError('')
     try {
-      if (proposal?.id?.startsWith('mock-')) {
-        setDecision('done_accept')
-        localStorage.setItem(decisionKey, 'done_accept')
-        
-        // Count how many parties have accepted this mock proposal in localStorage
-        let acceptCount = 1 // Count current user
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i)
-          if (key.startsWith(`proposal_decision_${caseId}_`) && key !== decisionKey) {
-            const val = localStorage.getItem(key)
-            if (val === 'done_accept') {
-              acceptCount++
-            }
-          }
-        }
-
-        if (acceptCount >= 2) {
-          localStorage.setItem(`case_status_${caseId}`, 'MEDIATION_COMPLETE')
-        } else {
-          localStorage.setItem(`case_status_${caseId}`, 'PROPOSAL_PUBLISHED')
-        }
-      } else {
-        await client.post(`/cases/${caseId}/proposals/${proposal.id}/respond`, {
-          decision: 'accept'
-        })
-        setDecision('done_accept')
-      }
+      await client.post(`/cases/${caseId}/proposals/${proposal.id}/respond`, {
+        decision: 'accept'
+      })
+      setDecision('done_accept')
+      localStorage.setItem(decisionKey, 'done_accept')
     } catch (err) {
       const detail = err?.response?.data?.detail
       const msg = typeof detail === 'object' && detail !== null ? (detail.message || JSON.stringify(detail)) : (detail ?? 'Something went wrong. Please try again.')
@@ -100,22 +68,19 @@ export default function ProposalReview() {
     }
   }
 
+  
+
   const handleReject = async () => {
     if (rejectionReason.trim().length < MIN_REASON_CHARS) return
     setSubmitting(true)
     setSubmitError('')
     try {
-      if (proposal?.id?.startsWith('mock-')) {
-        setDecision('done_reject')
-        localStorage.setItem(decisionKey, 'done_reject')
-        localStorage.setItem(`case_status_${caseId}`, 'MEDIATION_IN_PROGRESS')
-      } else {
-        await client.post(`/cases/${caseId}/proposals/${proposal.id}/respond`, {
-          decision: 'reject',
-          rejection_reason: rejectionReason.trim()
-        })
-        setDecision('done_reject')
-      }
+      await client.post(`/cases/${caseId}/proposals/${proposal.id}/respond`, {
+        decision: 'reject',
+        rejection_reason: rejectionReason.trim()
+      })
+      setDecision('done_reject')
+      localStorage.setItem(decisionKey, 'done_reject')
     } catch (err) {
       if (err?.response?.status === 422) {
         const detail = err?.response?.data?.detail
@@ -273,7 +238,7 @@ export default function ProposalReview() {
             {/* Proposal terms */}
             <div className="pr-card">
               <p className="pr-card-title"><FileText size={16} color="var(--brand)" /> Proposed Settlement Terms</p>
-              <p className="pr-terms">{proposal.raw_text}</p>
+              <p className="pr-terms">{proposal.content || proposal.raw_text || "No content available"}</p>
             </div>
 
             {/* Disclaimer */}

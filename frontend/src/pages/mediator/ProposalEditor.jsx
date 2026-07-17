@@ -6,6 +6,8 @@ import {
   publishProposal,
   getBatnaWatna,
   getProposals,
+  getQuestionnaires,
+  getQuestionnaireResponses,
 } from "../../api/cases";
 import { AlertTriangle, CheckCircle2, Eye } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
@@ -219,6 +221,7 @@ export default function ProposalEditor() {
   const [savedAt, setSavedAt] = useState(null);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState(null);
+  const [qSummary, setQSummary] = useState(null);
 
   const [showPreview, setShowPreview] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -264,6 +267,49 @@ export default function ProposalEditor() {
     };
     init();
   }, [id]);
+
+  useEffect(() => {
+  const fetchQuestionnaireSummary = async () => {
+    try {
+      const qData = await getQuestionnaires(id);
+      const q = Array.isArray(qData) ? qData[0] : qData.questionnaires?.[0] || qData;
+      if (!q?.id) return;
+
+      const rData = await getQuestionnaireResponses(id, q.id);
+      const questions = rData.questions || [];
+      const responses = rData.responses || [];
+
+      const rpResponse = responses.find((r) => r.party_role === "requesting_party");
+      const apResponse = responses.find((r) => r.party_role === "against_party");
+
+      let answeredCount = 0;
+      let divergentCount = 0;
+
+      questions.forEach((question) => {
+        const rpAnswer = rpResponse?.answers?.[question.question_id];
+        const apAnswer = apResponse?.answers?.[question.question_id];
+        const rpApplicable = question.directed_at !== "against_party";
+        const apApplicable = question.directed_at !== "requesting_party";
+
+        if ((rpApplicable && rpAnswer) || (apApplicable && apAnswer)) answeredCount++;
+        if (rpApplicable && apApplicable && rpAnswer && apAnswer) {
+          if (rpAnswer.toString().trim().toLowerCase() !== apAnswer.toString().trim().toLowerCase()) {
+            divergentCount++;
+          }
+        }
+      });
+
+      setQSummary({
+        total: questions.length,
+        answered: answeredCount,
+        divergent: divergentCount,
+      });
+    } catch {
+      setQSummary(null);
+    }
+  };
+  fetchQuestionnaireSummary();
+}, [id]);
 
   const handleSaveDraft = async () => {
     if (!proposalId) return;
@@ -539,24 +585,24 @@ export default function ProposalEditor() {
                     gap: 8,
                   }}
                 >
-                  {[
-                    {
-                      label: "Req Party BATNA",
-                      value: batnaData.requesting_party?.batna_label,
-                    },
-                    {
-                      label: "Req Party WATNA",
-                      value: batnaData.requesting_party?.watna_label,
-                    },
-                    {
-                      label: "Against Party BATNA",
-                      value: batnaData.against_party?.batna_label,
-                    },
-                    {
-                      label: "Against Party WATNA",
-                      value: batnaData.against_party?.watna_label,
-                    },
-                  ].map(({ label, value }) => (
+                 {[
+  {
+    label: "Req Party BATNA",
+    value: batnaData.party_a?.batna_label,
+  },
+  {
+    label: "Req Party WATNA",
+    value: batnaData.party_a?.watna_label,
+  },
+  {
+    label: "Against Party BATNA",
+    value: batnaData.party_b?.batna_label,
+  },
+  {
+    label: "Against Party WATNA",
+    value: batnaData.party_b?.watna_label,
+  },
+].map(({ label, value }) => (
                     <div
                       key={label}
                       style={{
@@ -630,17 +676,32 @@ export default function ProposalEditor() {
                 Questionnaire Summary
               </div>
               <div
-                style={{
-                  padding: "12px",
-                  borderRadius: 8,
-                  background: tk.bg,
-                  border: `1px solid ${tk.border}`,
-                  fontSize: 13,
-                  color: tk.sub,
-                }}
-              >
-                Questionnaire responses visible after both parties answer.
-              </div>
+  style={{
+    padding: "12px",
+    borderRadius: 8,
+    background: tk.bg,
+    border: `1px solid ${tk.border}`,
+    fontSize: 13,
+    color: tk.text,
+  }}
+>
+  {qSummary ? (
+    <>
+      <p style={{ margin: "0 0 4px" }}>
+        <strong>{qSummary.answered}</strong> of <strong>{qSummary.total}</strong> questions answered.
+      </p>
+      {qSummary.divergent > 0 ? (
+        <p style={{ margin: 0, color: "#d97706" }}>
+          {qSummary.divergent} divergent answer{qSummary.divergent > 1 ? "s" : ""} — review before drafting terms.
+        </p>
+      ) : (
+        <p style={{ margin: 0, color: tk.sub }}>No divergent answers.</p>
+      )}
+    </>
+  ) : (
+    <span style={{ color: tk.sub }}>Questionnaire responses visible after both parties answer.</span>
+  )}
+</div>
             </div>
           </div>
         </div>

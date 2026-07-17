@@ -118,7 +118,7 @@ async def get_batna_watna(
 
     # PARTY — sees only their own section, labels only, NO numeric scores
     party_role = _get_party_role_in_case(case_id, current_user["user_id"])
-    party_key  = "requesting_party" if party_role == "requesting_party" else "against_party"
+    party_key  = "party_a" if party_role == "requesting_party" else "party_b"
     party_data = batna_data.get(party_key, {})
 
     # If jurisdiction is unclear, show solicitor message instead of labels
