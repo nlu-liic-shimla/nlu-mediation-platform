@@ -181,6 +181,9 @@ export default function QuestionnaireManagement() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState(null);
+const [sendError, setSendError] = useState(null);
+const [sendSuccess, setSendSuccess] = useState(false);
 
   const [width, setWidth] = useState(window.innerWidth);
   const tk = tokens(isDark);

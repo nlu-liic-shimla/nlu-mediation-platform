@@ -363,12 +363,18 @@ function QuestionnaireComparison({ responses, loading, tk }) {
 ══════════════════════════════════════════════════════════ */
 export default function BatnaWatna() {
   const { isDark } = useTheme();
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [width, setWidth] = useState(window.innerWidth);
+const { id } = useParams();
+const navigate = useNavigate();
+const [data, setData] = useState(null);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState(null);
+const [width, setWidth] = useState(window.innerWidth);
+const [qLoading, setQLoading] = useState(true);
+const [qResponses, setQResponses] = useState([]);
+const [notesLoaded, setNotesLoaded] = useState(false);
+const [notes, setNotes] = useState("");
+const [notesSaving, setNotesSaving] = useState(false);
+const [notesSaved, setNotesSaved] = useState(false);
 
   const tk = tokens(isDark);
   const isSmall = width < 900;
