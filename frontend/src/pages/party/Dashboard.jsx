@@ -145,7 +145,7 @@ export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
   const userEmail = user.email || 'User'
   const userInitials = userEmail.substring(0, 2).toUpperCase()
-  const userName = userEmail.split('@')[0]
+  const userName = user.full_name || userEmail.split('@')[0]
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)
@@ -163,14 +163,18 @@ export default function Dashboard() {
   const sidebarWidth = isMobile ? 0 : (collapsed ? 60 : 240)
 
   const [cases, setCases] = useState([])
+const [applications, setApplications] = useState([])
 
 useEffect(() => {
   client.get('/cases').then(res => {
     const data = res.data
     const arr = Array.isArray(data) ? data : data.cases || data.data || []
-    console.log('RAW:', JSON.stringify(arr[0]))  // ← change to this
     setCases(arr)
   }).catch(() => setCases([]))
+
+  client.get('/cases/applications/my').then(res => {
+    setApplications(res.data?.applications || [])
+  }).catch(() => setApplications([]))
 }, [])
 
   const notifications = [
@@ -377,19 +381,19 @@ useEffect(() => {
         <Sidebar
   active={activeNav}
   onNavigate={(id) => {
-    setActiveNav(id)
-    if (id === 'new-case') navigate('/party/apply')
-   if (id === 'questionnaire') {
-     if (cases[0]?.id) navigate(`/party/cases/${cases[0].id}/questionnaire`)
-   }
-   if (id === 'proposals') {
-     if (cases[0]?.id) navigate(`/party/cases/${cases[0].id}/proposal`)
-   }
-   if (id === 'settlement') {
-     if (cases[0]?.id) navigate(`/party/cases/${cases[0].id}/settlement`)
-   }
-    // dashboard stays on same page
-  }}
+  setActiveNav(id)
+  if (id === 'new-case') { navigate('/party/apply'); return }
+
+  const needsCase = ['questionnaire', 'proposals', 'settlement']
+  if (needsCase.includes(id) && !cases[0]?.id) {
+    alert('You don\'t have an active case yet. Apply for mediation or accept an invitation first.')
+    return
+  }
+
+  if (id === 'questionnaire') navigate(`/party/cases/${cases[0].id}/questionnaire`)
+  if (id === 'proposals') navigate(`/party/cases/${cases[0].id}/proposal`)
+  if (id === 'settlement') navigate(`/party/cases/${cases[0].id}/settlement`)
+}}
   collapsed={collapsed}
   onToggle={() => setCollapsed(p => !p)}
   onSignOut={handleSignOut}
@@ -473,6 +477,31 @@ useEffect(() => {
   New Case
 </button>
                     </div>
+                    {applications
+    .filter(a => a.status === 'APPLICATION_PENDING')
+    .map(a => (
+      <div key={a.id} className="pd-case-card">
+        <div className="pd-case-top">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="pd-case-title-row">
+              <h3 className="pd-case-title">
+                {a.dispute_type ? a.dispute_type.replace(/_/g, ' ') : 'Mediation Application'}
+              </h3>
+              <span
+                className="pd-case-badge"
+                style={{ color: '#ca8a04', background: '#fef9c3' }}
+              >
+                Waiting for mediator review
+              </span>
+            </div>
+            <p className="pd-case-meta">
+              Submitted {new Date(a.created_at).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+      </div>
+  ))}
+
                     {cases.length === 0 && (
   <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', border: '1.5px dashed var(--border)', borderRadius: '12px' }}>
     <FileText size={32} style={{ margin: '0 auto 0.75rem', opacity: 0.4 }} />

@@ -33,15 +33,15 @@ class RegisterRequest(BaseModel):
 
     @validator("phone_number", always=True)
     def phone_required_for_mediator(cls, v, values):
-        if values.get("role") == UserRole.mediator and not v:
-            raise ValueError("phone_number is required for mediator registration")
-        return v
+     if values.get("role") == UserRole.mediator and not v:
+        raise ValueError("phone_number is required for mediator registration")
+     return v
 
-    @validator("organization", always=True)
-    def organization_required_for_mediator(cls, v, values):
-        if values.get("role") == UserRole.mediator and not v:
-            raise ValueError("organization is required for mediator registration")
-        return v
+@validator("organization", always=True)
+def organization_required_for_mediator(cls, v, values):
+    if values.get("role") == UserRole.mediator and not v:
+        raise ValueError("organization is required for mediator registration")
+    return v
 
 
 class LoginRequest(BaseModel):
