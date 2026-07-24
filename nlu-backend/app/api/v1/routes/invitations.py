@@ -67,6 +67,7 @@ class InviteRequest(BaseModel):
 
 
 class AcceptRequest(BaseModel):
+    email: str
     password: str
     full_name: Optional[str] = None
 
@@ -202,11 +203,38 @@ async def accept_invitation(token: str, body: AcceptRequest):
     """
     Public endpoint — no JWT required.
     Creates or links user account. Returns JWT + case_id + role_in_case.
+
+    FIX #20A/B/C: requires email in the request now, and verifies it
+    matches invited_email before creating/linking an account. Also blocks
+    requesting_party invitations from going through this endpoint at all,
+    since those have no real invited_email (the applicant already has an
+    account) — sending them through here previously created a broken
+    duplicate account with a blank email.
     """
     from app.core.security import hash_password, verify_password, create_access_token
 
     token_hash = hash_token(token)
     invitation = get_valid_invitation(token_hash)
+
+    if invitation.get("invitation_role") == "requesting_party" and not invitation.get("invited_email"):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": True,
+                "code": "INVALID_INVITATION_TYPE",
+                "message": "This invitation does not require account creation. Log in with your existing account to view the case."
+            }
+        )
+
+    if body.email.strip().lower() != invitation["invited_email"].strip().lower():
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": True,
+                "code": "EMAIL_MISMATCH",
+                "message": "This invitation was sent to a different email address."
+            }
+        )
 
     existing_user = supabase.table("users").select(
         "id, email, password_hash, role"
