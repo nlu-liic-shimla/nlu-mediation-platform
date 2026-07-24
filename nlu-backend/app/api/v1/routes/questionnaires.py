@@ -276,6 +276,60 @@ async def send_questionnaire(
         "message": "Questionnaire sent. Both parties have been notified.",
     }
 
+    # ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT 1B: Party/Mediator discovers active questionnaire for a case
+# This was a gap in the original design — the party dashboard needs to
+# discover the q_id before it can call GET /questionnaires/{q_id}
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/cases/{case_id}/questionnaires",
+    summary="Get the active questionnaire for a case. Returns active_questionnaire_id.",
+)
+async def list_questionnaires(
+    case_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    WHY THIS ENDPOINT EXISTS:
+    ─────────────────────────
+    The party dashboard needs to know the q_id before it can fetch questions.
+    Without this, the party has no way to discover which questionnaire to open.
+    The mediator's POST /questionnaires returns the q_id, but the party never
+    sees that response — they only see their dashboard status update.
+
+    This endpoint bridges that gap.
+    """
+
+    # Verify the user belongs to this case
+    if current_user["role"] == "party_user":
+        _get_party_role_in_case(case_id, current_user["id"])  # raises 403 if not a party
+    elif current_user["role"] == "mediator":
+        _verify_mediator_owns_case(case_id, current_user["id"])  # raises 403 if not their case
+
+    # Fetch the most recent questionnaire for this case
+    # For MVP there is only ever one per case
+    resp = supabase.table("questionnaires") \
+        .select("id, case_id, created_at") \
+        .eq("case_id", case_id) \
+        .order("created_at", desc=True) \
+        .execute()
+
+    if not resp.data:
+        return {
+            "questionnaires": [],
+            "active_questionnaire_id": None,
+            "message": "No questionnaire has been sent yet for this case.",
+        }
+
+    latest = resp.data[0]
+
+    return {
+        "questionnaires": resp.data,
+        "active_questionnaire_id": latest["id"],
+        "created_at": latest["created_at"],
+    }
+
 
 @router.get(
     "/cases/{case_id}/questionnaires",

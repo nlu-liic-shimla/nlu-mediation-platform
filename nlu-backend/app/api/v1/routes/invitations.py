@@ -417,7 +417,7 @@ async def decline_invitation(token: str, body: DeclineRequest):
 
 # ── ENDPOINT 5: Mediator closes case after 3 declines ─────────────────────────
 
-@router.post("/cases/{case_id}/close-declined")
+@router.post("/cases/{case_id}/close-declined", operation_id="close_declined_case_invitations")
 async def close_declined_case(
     case_id: str,
     current_user: dict = Depends(require_role(["mediator"]))

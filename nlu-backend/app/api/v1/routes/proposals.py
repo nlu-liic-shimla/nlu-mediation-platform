@@ -651,8 +651,33 @@ async def settlement_status(
 
 
 @router.get(
+
+
+    "/cases/{case_id}/settlement/pdf",
+    summary="Download settlement PDF. Returns signed URL valid 24 hours.",
+    operation_id="get_settlement_pdf_proposals",
+)
+async def get_settlement_pdf(
+    case_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    pdf_resp = supabase.table("mediation_reports") \
+        .select("pdf_url").eq("case_id", case_id).single().execute()
+
+    if not pdf_resp.data:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": True, "code": "PDF_NOT_READY", "message": "Settlement PDF not yet generated"},
+        )
+
+    return {"pdf_url": pdf_resp.data["pdf_url"]}
+
+
+@router.get(
+
     "/cases/{case_id}/audit-log",
     summary="Full audit log for a case. Mediator only. Read only.",
+    operation_id="get_audit_log_proposals",
 )
 async def get_audit_log(
     case_id: str,
@@ -691,6 +716,7 @@ async def save_notes(
 @router.get(
     "/cases/{case_id}/notes",
     summary="Mediator retrieves private notes.",
+    operation_id="get_notes_proposals",
 )
 async def get_notes(
     case_id: str,
