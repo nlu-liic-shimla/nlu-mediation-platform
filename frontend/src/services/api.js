@@ -289,7 +289,11 @@ api.interceptors.response.use(
     return res;
   },
   (err) => {
-    if (err.response?.status === 401) {
+    const isAuthEndpoint =
+      err.config?.url?.includes('/auth/login') ||
+      err.config?.url?.includes('/auth/register')
+
+    if (err.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('nlu_token')
       localStorage.removeItem('nlu_role')
       window.location.href = '/auth/login'

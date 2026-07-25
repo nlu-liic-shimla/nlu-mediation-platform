@@ -276,27 +276,56 @@ async def send_questionnaire(
         "message": "Questionnaire sent. Both parties have been notified.",
     }
 
+    # ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT 1B: Party/Mediator discovers active questionnaire for a case
+# This was a gap in the original design — the party dashboard needs to
+# discover the q_id before it can call GET /questionnaires/{q_id}
+# ─────────────────────────────────────────────────────────────────────────────
 
 @router.get(
     "/cases/{case_id}/questionnaires",
-    summary="List all questionnaires for a case",
+    summary="Get questionnaires for a case, including active_questionnaire_id",
 )
 async def list_questionnaires(
     case_id: str,
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Returns a list of all questionnaires created for this case.
-    Both mediators and parties can see this list, so they can fetch
-    the questions directed at them.
+    Returns all questionnaires for this case, plus active_questionnaire_id
+    so the party/mediator dashboard knows which one to fetch questions for.
+
+    FIX #33 (partial): this endpoint previously existed as two duplicate
+    definitions in this file. Python silently used only the second one,
+    which had NO access verification (any authenticated user could query
+    any case_id) and was missing active_questionnaire_id, which the
+    frontend depends on to decide whether to show the questionnaire.
+    Merged into one correct version below.
     """
+    if current_user["role"] == "party_user":
+        _get_party_role_in_case(case_id, current_user["user_id"])
+    elif current_user["role"] == "mediator":
+        _verify_mediator_owns_case(case_id, current_user["user_id"])
+
     resp = supabase.table("questionnaires") \
-        .select("id, created_at, created_by") \
+        .select("id, case_id, created_at, created_by") \
         .eq("case_id", case_id) \
-        .order("created_at", desc=False) \
+        .order("created_at", desc=True) \
         .execute()
-    
-    return resp.data or []
+
+    if not resp.data:
+        return {
+            "questionnaires": [],
+            "active_questionnaire_id": None,
+            "message": "No questionnaire has been sent yet for this case.",
+        }
+
+    latest = resp.data[0]
+
+    return {
+        "questionnaires": resp.data,
+        "active_questionnaire_id": latest["id"],
+        "created_at": latest["created_at"],
+    }
 
 
 # ── ENDPOINT 2: Party fetches their questions ─────────────────────────────────

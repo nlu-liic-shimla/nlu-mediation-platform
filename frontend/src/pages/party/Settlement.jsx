@@ -30,6 +30,7 @@ export default function Settlement() {
   const [confirming, setConfirming]   = useState(false)
   const [confirmed, setConfirmed]     = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [signatureConfirmed, setSignatureConfirmed] = useState(false)
 
   // PDF polling state
   const [pdfReady, setPdfReady]   = useState(false)
@@ -131,7 +132,7 @@ export default function Settlement() {
     }
   }
 
-  const canConfirm = typedName.trim().length > 0 && sigFile !== null && !fileError
+  const canConfirm = typedName.trim().length > 0 && sigFile !== null && !fileError && signatureConfirmed
 
   const styles = `
     @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=DM+Sans:wght@400;500&display=swap');
@@ -303,6 +304,14 @@ export default function Settlement() {
                 <p className="st-file-error"><AlertCircle size={13} /> {fileError}</p>
               )}
             </div>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, marginTop: 10 }}>
+  <input
+    type="checkbox"
+    checked={signatureConfirmed}
+    onChange={e => setSignatureConfirmed(e.target.checked)}
+  />
+  <span>I confirm the uploaded image is my genuine signature, and I am legally authorized to sign this settlement on my own behalf.</span>
+</label>
 
             {submitError && (
               <div className="st-submit-error">

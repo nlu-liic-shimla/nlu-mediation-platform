@@ -6,6 +6,7 @@ import {
   User, Calendar, Hash
 } from 'lucide-react'
 import client from '../../services/api'
+import { getDocuments } from '../../api/cases'
 import AnalysisStatusBanner from '../../components/party/AnalysisStatusBanner'
 import BatnaWatnaPartyDisplay from '../../components/party/BatnaWatnaPartyDisplay'
 import { getDocuments, getSettlementStatus } from '../../api/cases'
@@ -95,7 +96,6 @@ export default function CaseDetails() {
   const [submission, setSubmission] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-const [error, setError] = useState('')
   const [documents, setDocuments] = useState([])
   const [docsLoading, setDocsLoading] = useState(true)
   const [settlementConfirmed, setSettlementConfirmed] = useState(false)
@@ -119,6 +119,20 @@ const [error, setError] = useState('')
     }
     fetchAll()
   }, [caseId])
+  useEffect(() => {
+  const fetchDocuments = async () => {
+    try {
+      const res = await getDocuments(caseId)
+      const docs = Array.isArray(res) ? res : res.documents ?? []
+      setDocuments(docs)
+    } catch {
+      setDocuments([])
+    } finally {
+      setDocsLoading(false)
+    }
+  }
+  fetchDocuments()
+}, [caseId])
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -381,18 +395,43 @@ const currentStep = STATUS_STEP_MAP[caseData?.status] ?? 0
             </div>
 
             {/* Documents */}
-            <div className="cd-card">
-              <p className="cd-card-title"><Upload size={16} color="var(--brand)" /> Documents</p>
-              <div className="cd-empty">
-                <div className="cd-empty-icon">
-                  <Upload size={22} color="var(--text-muted)" />
-                </div>
-                <p className="cd-empty-text">Upload supporting documents to strengthen your case.</p>
-                <button className="cd-submit-btn" onClick={() => navigate(`/party/cases/${caseId}/documents`)}>
-                  <Upload size={14} /> Upload Documents
-                </button>
-              </div>
-            </div>
+<div className="cd-card">
+  <p className="cd-card-title"><Upload size={16} color="var(--brand)" /> Documents</p>
+  {docsLoading ? (
+    <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading documents…</p>
+  ) : documents.length > 0 ? (
+    <>
+      {documents.map((doc, i) => (
+        <div key={doc.id || i} className="cd-submission-row">
+          <span className="cd-submission-label">
+            <FileText size={13} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+            {doc.filename || doc.name || 'Document'}
+          </span>
+          <span className="cd-submission-value">
+            {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : ''}
+          </span>
+        </div>
+      ))}
+      <button
+        className="cd-submit-btn"
+        style={{ marginTop: 12 }}
+        onClick={() => navigate(`/party/cases/${caseId}/documents`)}
+      >
+        <Upload size={14} /> Upload More
+      </button>
+    </>
+  ) : (
+    <div className="cd-empty">
+      <div className="cd-empty-icon">
+        <Upload size={22} color="var(--text-muted)" />
+      </div>
+      <p className="cd-empty-text">Upload supporting documents to strengthen your case.</p>
+      <button className="cd-submit-btn" onClick={() => navigate(`/party/cases/${caseId}/documents`)}>
+        <Upload size={14} /> Upload Documents
+      </button>
+    </div>
+  )}
+</div>
           </>
         )}
       </div>

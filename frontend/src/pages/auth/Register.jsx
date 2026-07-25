@@ -93,7 +93,7 @@ const Step3 = () => (
     </div>
     <div className="rg-next-box">
       <p className="rg-next-title">What happens next?</p>
-      {["You'll receive a verification email", "Complete your profile to unlock all features", "Start your first mediation case or review"].map(item => (
+      {["Complete your profile to unlock all features", "Start your first mediation case or review"].map(item => (
         <div key={item} className="rg-next-item">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 6L9 17l-5-5" />
@@ -141,7 +141,14 @@ export default function Register() {
       if (!data.role) { setErrors({ role: 'Please select an account type.' }); return }
       setLoading(true)
       try {
-        await register(data.email, data.password, data.role)
+        await register({
+  email: data.email,
+  password: data.password,
+  role: data.role,
+  fullName: data.fullName,
+  phoneNumber: data.phone,
+  organization: data.organization,
+})
         setStep(3)
       } catch (err) {
         setApiError(err.response?.data?.detail || 'Registration failed. Please try again.')

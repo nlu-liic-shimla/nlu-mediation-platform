@@ -312,7 +312,9 @@ function QuestionnaireComparison({ responses, loading, tk }) {
               {responses.map((q, i) => {
                 const rpAnswer = q.requesting_party_answer || q.party_a_answer || "—";
                 const apAnswer = q.against_party_answer || q.party_b_answer || "—";
-                const divergent = isDivergent(rpAnswer, apAnswer);
+                const rpApplicable = q.directed_at !== "against_party";
+const apApplicable = q.directed_at !== "requesting_party";
+const divergent = rpApplicable && apApplicable && isDivergent(rpAnswer, apAnswer);
 
                 return (
                   <tr
@@ -334,14 +336,18 @@ function QuestionnaireComparison({ responses, loading, tk }) {
                       {q.question_text || q.question || "—"}
                     </td>
                     <td style={{ padding: "14px 16px", color: tk.text, verticalAlign: "top" }}>
-                      {rpAnswer === "—" ? (
+                      {q.directed_at === "against_party" ? (
+                        <span style={{ color: tk.sub }}>— Not applicable</span>
+                      ) : rpAnswer === "—" ? (
                         <span style={{ color: tk.sub, fontStyle: "italic" }}>No answer yet</span>
                       ) : (
                         rpAnswer
                       )}
                     </td>
                     <td style={{ padding: "14px 16px", color: tk.text, verticalAlign: "top" }}>
-                      {apAnswer === "—" ? (
+                      {q.directed_at === "requesting_party" ? (
+                        <span style={{ color: tk.sub }}>— Not applicable</span>
+                      ) : apAnswer === "—" ? (
                         <span style={{ color: tk.sub, fontStyle: "italic" }}>No answer yet</span>
                       ) : (
                         apAnswer
@@ -401,29 +407,42 @@ const [notesSaved, setNotesSaved] = useState(false);
 
   // ── Fetch questionnaire responses for the comparison table ──
   useEffect(() => {
-    const fetchQuestionnaire = async () => {
-      setQLoading(true);
-      try {
-        const qData = await getQuestionnaires(id);
-        const q = Array.isArray(qData) ? qData[0] : qData.questionnaires?.[0] || qData;
+  const fetchQuestionnaire = async () => {
+    setQLoading(true);
+    try {
+      const qData = await getQuestionnaires(id);
+      const q = Array.isArray(qData) ? qData[0] : qData.questionnaires?.[0] || qData;
 
-        if (q?.id) {
-          const rData = await getQuestionnaireResponses(id, q.id);
-          const questions = Array.isArray(rData)
-            ? rData
-            : rData.questions || rData.responses || [];
-          setQResponses(questions);
-        } else {
-          setQResponses([]);
-        }
-      } catch {
+      if (q?.id || q?.questionnaire_id) {
+        const qId = q.id || q.questionnaire_id;
+        const rData = await getQuestionnaireResponses(id, qId);
+
+        const questions = rData.questions || [];
+        const responses = rData.responses || [];
+
+        const rpResponse = responses.find((r) => r.party_role === "requesting_party");
+        const apResponse = responses.find((r) => r.party_role === "against_party");
+
+        const merged = questions.map((question) => ({
+  id: question.question_id,
+  question_text: question.question_text,
+  directed_at: question.directed_at,
+  requesting_party_answer: rpResponse?.answers?.[question.question_id] || null,
+  against_party_answer: apResponse?.answers?.[question.question_id] || null,
+}));
+
+        setQResponses(merged);
+      } else {
         setQResponses([]);
-      } finally {
-        setQLoading(false);
       }
-    };
-    fetchQuestionnaire();
-  }, [id]);
+    } catch {
+      setQResponses([]);
+    } finally {
+      setQLoading(false);
+    }
+  };
+  fetchQuestionnaire();
+}, [id]);
 
   // ── Load existing mediator notes ──
   useEffect(() => {
@@ -505,8 +524,8 @@ const [notesSaved, setNotesSaved] = useState(false);
       </MediatorLayout>
     );
 
-  const rp = data?.requesting_party;
-  const ap = data?.against_party;
+  const rp = data?.party_a;
+const ap = data?.party_b;
 
   return (
     <MediatorLayout>

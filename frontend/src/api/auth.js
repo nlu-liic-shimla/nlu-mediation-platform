@@ -13,12 +13,20 @@ export const login = async (email, password) => {
     user_id: payload.sub,
     email: payload.email,
     role: payload.role,
+    full_name: payload.full_name,
   }));
 
   return payload.role;
 };
 
-export const register = async (email, password, role) => {
-  const response = await client.post("/api/v1/auth/register", { email, password, role });
+export const register = async ({ email, password, role, fullName, phoneNumber, organization }) => {
+  const response = await client.post("/api/v1/auth/register", {
+    email,
+    password,
+    role,
+    full_name: fullName || null,
+    phone_number: phoneNumber || null,
+    organization: organization || null,
+  });
   return response.data;
 };
