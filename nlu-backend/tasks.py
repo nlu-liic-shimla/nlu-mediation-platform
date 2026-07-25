@@ -238,13 +238,16 @@ def process_burst_1(self, case_id: str):
 
         # ── Create ai_analysis tracking record ────────────────────────────────
         # This record is what GET /cases/{id}/analysis/status reads
-        supabase.table("ai_analysis").insert({
+        # Capture row_id so all subsequent updates hit this exact row,
+        # not whichever row matches case_id (which can have duplicates on retry)
+        insert_result = supabase.table("ai_analysis").insert({
             "case_id": case_id,
             "burst_number": 1,
             "status": "processing",
             "started_at": now,
             "failed": False,
         }).execute()
+        row_id = insert_result.data[0]["id"]
 
         # ── Fetch both party submissions ───────────────────────────────────────
         submissions = supabase.table("submissions").select(
@@ -316,7 +319,7 @@ def process_burst_1(self, case_id: str):
         # Save F result immediately — partial saves mean retry can see progress
         supabase.table("ai_analysis").update({
             "tone_analysis": tone_data,
-        }).eq("case_id", case_id).execute()
+        }).eq("id", row_id).execute()
 
         # ══════════════════════════════════════════════════════════════════════
         # STEP 2 — Sub-system A: Conflict Extraction
@@ -343,7 +346,7 @@ def process_burst_1(self, case_id: str):
         # Save A result
         supabase.table("ai_analysis").update({
             "conflict_extraction": conflict_result.model_dump(),
-        }).eq("case_id", case_id).execute()
+        }).eq("id", row_id).execute()
 
         # Warn mediator if confidence is low — case still proceeds
         if conflict_result.extraction_confidence < 0.5:
@@ -395,11 +398,22 @@ def process_burst_1(self, case_id: str):
                     f"bias_check_passed={bias_result.bias_check_passed}"
                 )
 
+                # If bias was detected and a revised summary exists,
+                # overwrite neutral_summary with the de-biased version.
+                # This ensures the mediator sees the correct version
+                # without any changes needed in cases.py (#21 fix).
+                if bias_result.bias_detected and bias_result.revised_summary:
+                    summary_data["summary"] = bias_result.revised_summary
+                    logger.info(
+                        f"[Burst 1] Bias detected — neutral_summary overwritten "
+                        f"with de-biased version for case {case_id}"
+                    )
+
         # Save B + E results together
         supabase.table("ai_analysis").update({
             "neutral_summary": summary_data,
             "bias_removal": bias_data,
-        }).eq("case_id", case_id).execute()
+        }).eq("id", row_id).execute()
 
         # ══════════════════════════════════════════════════════════════════════
         # STEP 5 — Sub-system G: Mediatability Score
@@ -433,7 +447,7 @@ def process_burst_1(self, case_id: str):
             "status": "complete",
             "completed_at": completed_at,
             "failed": False,
-        }).eq("case_id", case_id).execute()
+        }).eq("id", row_id).execute()
 
         # Transition case to BURST_1_COMPLETE
         transition(case_id, CaseState.BURST_1_COMPLETE, actor_id="system")
@@ -460,7 +474,7 @@ def process_burst_1(self, case_id: str):
                 "status": "failed",
                 "failed": True,
                 "error_message": f"{type(e).__name__}: {str(e)}",
-            }).eq("case_id", case_id).execute()
+            }).eq("id", row_id).execute()
         except Exception as db_err:
             logger.error(
                 f"[Burst 1] Could not update ai_analysis failed status: {db_err}"
