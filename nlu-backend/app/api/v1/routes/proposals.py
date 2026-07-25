@@ -42,14 +42,54 @@ class SettlementConfirmBody(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _verify_mediator_owns_case(case_id: str, mediator_id: str) -> dict:
+    """
+    Verifies the mediator owns this case OR this application request.
+    Falls back to application_requests when case_id doesn't exist in
+    the cases table yet — this happens whenever a mediator interacts
+    with an application before accepting it (audit log, notes, etc.).
+
+    FIX #13: previously used .single().execute() on cases only, which
+    throws an unhandled exception whenever the ID belongs to an
+    application_request instead of a real case — causing 500s on
+    GET /audit-log, PATCH /notes, etc. for any pre-acceptance case_id.
+    """
     case_resp = supabase.table("cases") \
         .select("id, status, assigned_mediator, negotiation_round, max_rounds, mediator_notes") \
-        .eq("id", case_id).single().execute()
-    if not case_resp.data:
-        raise HTTPException(status_code=404, detail={"error": True, "code": "CASE_NOT_FOUND", "message": "Case not found"})
-    if case_resp.data["assigned_mediator"] != mediator_id:
-        raise HTTPException(status_code=403, detail={"error": True, "code": "FORBIDDEN", "message": "You are not the mediator for this case"})
-    return case_resp.data
+        .eq("id", case_id).execute()
+
+    if case_resp.data:
+        case = case_resp.data[0]
+        if case["assigned_mediator"] != mediator_id:
+            raise HTTPException(status_code=403, detail={
+                "error": True, "code": "FORBIDDEN",
+                "message": "You are not the mediator for this case"
+            })
+        return case
+
+    app_resp = supabase.table("application_requests") \
+        .select("id, status, assigned_mediator, mediator_notes") \
+        .eq("id", case_id).execute()
+
+    if app_resp.data:
+        app = app_resp.data[0]
+        if app["assigned_mediator"] != mediator_id:
+            raise HTTPException(status_code=403, detail={
+                "error": True, "code": "FORBIDDEN",
+                "message": "You are not the mediator for this application"
+            })
+        return {
+            "id": app["id"],
+            "status": app.get("status", "APPLICATION_PENDING"),
+            "assigned_mediator": app["assigned_mediator"],
+            "negotiation_round": 0,
+            "max_rounds": 3,
+            "mediator_notes": app.get("mediator_notes"),
+            "_is_application": True,
+        }
+
+    raise HTTPException(status_code=404, detail={
+        "error": True, "code": "CASE_NOT_FOUND", "message": "Case or application not found"
+    })
 
 
 def _get_party_role_in_case(case_id: str, user_id: str) -> str:
@@ -611,8 +651,33 @@ async def settlement_status(
 
 
 @router.get(
+
+
+    "/cases/{case_id}/settlement/pdf",
+    summary="Download settlement PDF. Returns signed URL valid 24 hours.",
+    operation_id="get_settlement_pdf_proposals",
+)
+async def get_settlement_pdf(
+    case_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    pdf_resp = supabase.table("mediation_reports") \
+        .select("pdf_url").eq("case_id", case_id).single().execute()
+
+    if not pdf_resp.data:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": True, "code": "PDF_NOT_READY", "message": "Settlement PDF not yet generated"},
+        )
+
+    return {"pdf_url": pdf_resp.data["pdf_url"]}
+
+
+@router.get(
+
     "/cases/{case_id}/audit-log",
     summary="Full audit log for a case. Mediator only. Read only.",
+    operation_id="get_audit_log_proposals",
 )
 async def get_audit_log(
     case_id: str,
@@ -651,6 +716,7 @@ async def save_notes(
 @router.get(
     "/cases/{case_id}/notes",
     summary="Mediator retrieves private notes.",
+    operation_id="get_notes_proposals",
 )
 async def get_notes(
     case_id: str,
