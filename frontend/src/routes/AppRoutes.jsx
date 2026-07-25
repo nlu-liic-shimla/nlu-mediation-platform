@@ -219,7 +219,7 @@ import IntakeWizard from "../pages/party/IntakeWizard";
 import ProposalReview from "../pages/party/ProposalReview";
 import Questionnaire from "../pages/party/Questionnaire";
 import Settlement from "../pages/party/Settlement";
-import ApplyForMediation from '../pages/party/ApplyForMediation';
+import ApplyForMediation from "../pages/party/ApplyForMediation";
 import UploadDocuments from "../pages/party/UploadDocuments";
 
 import MediatorDashboard from "../pages/mediator/DashboardPage";
@@ -418,25 +418,25 @@ export default function AppRoutes() {
           }
         />
         <Route
-  path="/mediator/cases/:id/proposals"
-  element={
-    <ProtectedRoute>
-      <RoleBasedRoute allowedRoles={["mediator"]}>
-        <ProposalManagement />
-      </RoleBasedRoute>
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/mediator/cases/:id/questionnaires"
-  element={
-    <ProtectedRoute>
-      <RoleBasedRoute allowedRoles={["mediator"]}>
-        <QuestionnaireManagement />
-      </RoleBasedRoute>
-    </ProtectedRoute>
-  }
-/>
+          path="/mediator/cases/:id/proposals"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <ProposalManagement />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mediator/cases/:id/questionnaires"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <QuestionnaireManagement />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/mediator/cases/:id/batna-watna"
           element={
@@ -498,6 +498,16 @@ export default function AppRoutes() {
             <ProtectedRoute>
               <RoleBasedRoute allowedRoles={["mediator"]}>
                 <AdminPanel />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mediator/cases/:id/proposal"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={["mediator"]}>
+                <ProposalManagement />
               </RoleBasedRoute>
             </ProtectedRoute>
           }

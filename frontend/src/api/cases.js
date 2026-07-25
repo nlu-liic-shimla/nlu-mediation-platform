@@ -174,3 +174,12 @@ export const rejectApplication = async (applicationId, reason = "") => {
   });
   return response.data;
 };
+
+
+export const respondToProposal = async (caseId, proposalId, decision, rejectionReason) => {
+  const response = await client.post(`/cases/${caseId}/proposals/${proposalId}/respond`, {
+    decision,
+    rejection_reason: rejectionReason || undefined,
+  });
+  return response.data;
+};

@@ -27,6 +27,7 @@ export default function FinaliseCase() {
   const [finalised, setFinalised] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pollError, setPollError] = useState(null);
 
   const tk = tokens(isDark);
 
@@ -37,7 +38,7 @@ export default function FinaliseCase() {
         const data = await getSettlementStatus(id);
         setStatus(data);
       } catch {
-        // fail silently
+        setPollError("Failed to load settlement status. Retrying...");
       } finally {
         setLoading(false);
       }
@@ -119,6 +120,39 @@ export default function FinaliseCase() {
           }}
         >
           Loading case status...
+        </div>
+      </MediatorLayout>
+    );
+
+  if (pollError && !status)
+    return (
+      <MediatorLayout dark={dark} setDark={setDark}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "60vh",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          <AlertTriangle size={24} color="#ef4444" />
+          <p style={{ color: "#ef4444", fontSize: 15 }}>{pollError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 8,
+              background: "#1e40af",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            Refresh
+          </button>
         </div>
       </MediatorLayout>
     );

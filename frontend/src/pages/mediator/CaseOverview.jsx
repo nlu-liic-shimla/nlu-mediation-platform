@@ -755,8 +755,14 @@ export default function CaseOverview() {
 
         // Fetch proposals and audit logs
         const [props, logs] = await Promise.all([
-          client.get(`/cases/${id}/proposals`).then((res) => res.data).catch(() => []),
-          client.get(`/cases/${id}/audit-log`).then((res) => res.data).catch(() => []),
+          client
+            .get(`/cases/${id}/proposals`)
+            .then((res) => res.data)
+            .catch(() => []),
+          client
+            .get(`/cases/${id}/audit-log`)
+            .then((res) => res.data)
+            .catch(() => []),
         ]);
         setProposals(props);
         setAuditLogs(logs);
@@ -1516,19 +1522,19 @@ export default function CaseOverview() {
                   (log) =>
                     log.action === "PARTY_ACCEPTED_PROPOSAL" &&
                     log.metadata?.proposal_id === p.id &&
-                    log.metadata?.party_role === "requesting_party"
+                    log.metadata?.party_role === "requesting_party",
                 );
                 const reqRejectLog = auditLogs.find(
                   (log) =>
                     log.action === "PARTY_REJECTED_PROPOSAL" &&
                     log.metadata?.proposal_id === p.id &&
-                    log.metadata?.party_role === "requesting_party"
+                    log.metadata?.party_role === "requesting_party",
                 );
                 const requestingStatus = reqAcceptLog
                   ? "Accepted"
                   : reqRejectLog
-                  ? "Rejected"
-                  : "Pending";
+                    ? "Rejected"
+                    : "Pending";
                 const requestingReason = reqRejectLog
                   ? reqRejectLog.metadata?.rejection_reason
                   : "";
@@ -1537,19 +1543,19 @@ export default function CaseOverview() {
                   (log) =>
                     log.action === "PARTY_ACCEPTED_PROPOSAL" &&
                     log.metadata?.proposal_id === p.id &&
-                    log.metadata?.party_role === "against_party"
+                    log.metadata?.party_role === "against_party",
                 );
                 const againstRejectLog = auditLogs.find(
                   (log) =>
                     log.action === "PARTY_REJECTED_PROPOSAL" &&
                     log.metadata?.proposal_id === p.id &&
-                    log.metadata?.party_role === "against_party"
+                    log.metadata?.party_role === "against_party",
                 );
                 const againstStatus = againstAcceptLog
                   ? "Accepted"
                   : againstRejectLog
-                  ? "Rejected"
-                  : "Pending";
+                    ? "Rejected"
+                    : "Pending";
                 const againstReason = againstRejectLog
                   ? againstRejectLog.metadata?.rejection_reason
                   : "";
@@ -1558,11 +1564,12 @@ export default function CaseOverview() {
                   status === "Accepted"
                     ? "#16a34a"
                     : status === "Rejected"
-                    ? "#ef4444"
-                    : "#ca8a04";
+                      ? "#ef4444"
+                      : "#ca8a04";
 
                 const isRejected =
-                  requestingStatus === "Rejected" || againstStatus === "Rejected";
+                  requestingStatus === "Rejected" ||
+                  againstStatus === "Rejected";
 
                 return (
                   <div
@@ -1669,7 +1676,8 @@ export default function CaseOverview() {
                           marginBottom: 8,
                         }}
                       >
-                        <strong>Against Party Rejection:</strong> {againstReason}
+                        <strong>Against Party Rejection:</strong>{" "}
+                        {againstReason}
                       </div>
                     )}
 
@@ -1717,9 +1725,10 @@ export default function CaseOverview() {
                                   requesting_reason: requestingReason,
                                   against_reason: againstReason,
                                   changes_summary:
-                                    p.revision_suggestions?.changes_summary || [],
+                                    p.revision_suggestions?.changes_summary ||
+                                    [],
                                 },
-                              }
+                              },
                             )
                           }
                           style={{
@@ -1768,7 +1777,8 @@ export default function CaseOverview() {
                   Proposals
                 </h2>
                 <p style={{ fontSize: 12, color: tk.sub, margin: "2px 0 0" }}>
-                  BATNA/WATNA is complete. You can now draft the first settlement proposal.
+                  BATNA/WATNA is complete. You can now draft the first
+                  settlement proposal.
                 </p>
               </div>
               <button
@@ -1814,6 +1824,32 @@ export default function CaseOverview() {
             }}
           >
             📋 View Audit Log
+          </button>
+        </div>
+        {/* ── Proposals button ── */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: 16,
+          }}
+        >
+          <button
+            onClick={() => navigate(`/mediator/cases/${id}/proposal`)}
+            style={{
+              padding: "7px 16px",
+              borderRadius: 8,
+              border: `1px solid ${tk.border}`,
+              background: "transparent",
+              color: tk.sub,
+              fontSize: 13,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            📄 View Proposals
           </button>
         </div>
         {/* ── Case Details ── */}
