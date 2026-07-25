@@ -585,17 +585,14 @@ useEffect(() => {
               overflow: "hidden",
             }}
           >
-            <div
-              style={{
-                padding: "14px 18px",
-                borderBottom: `1px solid ${tk.border}`,
-                background: isDark ? "#1e293b" : "#f8fafc",
-              }}
-            >
-              <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>
-                Requesting Party — Raw Submission
-              </span>
-            </div>
+            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${tk.border}`, background: isDark ? "#1e293b" : "#f8fafc" }}>
+  <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>
+    Requesting Party — Raw Submission
+  </span>
+  <p style={{ fontSize: 11, color: "#d97706", margin: "4px 0 0" }}>
+    ⚠ Unedited — may contain emotional or biased language. See AI Neutral Summary for a processed version.
+  </p>
+</div>
             <div style={{ padding: "16px 18px" }}>
               <p
                 style={{
@@ -624,17 +621,14 @@ useEffect(() => {
               overflow: "hidden",
             }}
           >
-            <div
-              style={{
-                padding: "14px 18px",
-                borderBottom: `1px solid ${tk.border}`,
-                background: isDark ? "#1e293b" : "#f8fafc",
-              }}
-            >
-              <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>
-                Against Party — Raw Submission
-              </span>
-            </div>
+            <div style={{ padding: "14px 18px", borderBottom: `1px solid ${tk.border}`, background: isDark ? "#1e293b" : "#f8fafc" }}>
+  <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>
+    Against Party — Raw Submission
+  </span>
+  <p style={{ fontSize: 11, color: "#d97706", margin: "4px 0 0" }}>
+    ⚠ Unedited — may contain emotional or biased language. See AI Neutral Summary for a processed version.
+  </p>
+</div>
             <div style={{ padding: "16px 18px" }}>
               <p
                 style={{

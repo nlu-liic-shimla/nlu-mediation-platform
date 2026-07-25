@@ -51,11 +51,10 @@ function SolicitorMessage() {
         </svg>
       </div>
       <div>
-        <p className="text-sm font-semibold text-blue-800 mb-1">Legal Advice Recommended</p>
+        <p className="text-sm font-semibold text-blue-800 mb-1">Consider Getting Legal Advice</p>
         <p className="text-sm text-blue-700 leading-relaxed">
-          Based on the analysis of your case, we strongly recommend consulting a solicitor
-          before proceeding. A legal professional can help you understand your rights and
-          the best course of action given your specific circumstances.
+          Some aspects of your case involve legal complexity that a qualified solicitor can help clarify.
+          This is a routine recommendation for cases like yours and doesn't reflect on the mediation process itself.
         </p>
       </div>
     </div>

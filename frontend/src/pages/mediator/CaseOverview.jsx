@@ -59,7 +59,7 @@ const NEXT_ACTION = {
   WITHDRAWN: "Application was withdrawn",
   BOTH_INVITED: "Generate invitation links below and share with both parties",
   FIRST_PARTY_SUBMITTED:
-    "One party submitted — generate link for the other party below",
+      "One party has submitted their statement. Share the invitation link with the other party below so they can submit theirs.",
   BOTH_SUBMITTED: "Both parties submitted — AI processing will begin shortly",
   BURST_1_PROCESSING: "AI is analysing submissions — please wait",
   BURST_1_COMPLETE: "AI analysis complete — view results or send questionnaire",
@@ -127,7 +127,7 @@ function PartyRow({
       text: `⚠ Declined (${attemptCount}/3)`,
     };
   } else if (invited) {
-    badge = { bg: "#fef9c3", color: "#ca8a04", text: "✉ Invited" };
+    badge = { bg: "#fef9c3", color: "#ca8a04", text: "🔗 Link Ready" };
   } else {
     badge = { bg: "#f1f5f9", color: "#94a3b8", text: "○ Not Invited" };
   }
@@ -652,6 +652,7 @@ export default function CaseOverview() {
   const [error, setError] = useState(null);
   const [proposals, setProposals] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [settlementDone, setSettlementDone] = useState(false);
 
   // Party submission status — from /submissions endpoint
   const [partyStatus, setPartyStatus] = useState({
@@ -760,6 +761,12 @@ export default function CaseOverview() {
         ]);
         setProposals(props);
         setAuditLogs(logs);
+      try {
+          const settlementRes = await client.get(`/cases/${id}/settlement/status`);
+          setSettlementDone(!!settlementRes.data?.pdf_ready);
+        } catch {
+          // fail silently — not all cases have reached settlement yet
+        }
       } catch {
         setError("Failed to load case");
       } finally {
@@ -1110,7 +1117,7 @@ export default function CaseOverview() {
           </div>
         )}
         {/* Finalise Case button */}
-        {caseData.status === "MEDIATION_COMPLETE" && (
+       {caseData.status === "MEDIATION_COMPLETE" && !settlementDone && (
           <div
             style={{
               padding: "12px 16px",

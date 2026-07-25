@@ -181,7 +181,7 @@ export default function FinaliseCase() {
         )}
 
         {/* ── Finalise button ── */}
-        {!finalised && (
+        {!finalised && !pdfReady && (
           <div
             style={{
               background: tk.surface,
@@ -245,18 +245,18 @@ export default function FinaliseCase() {
           }}
         >
           <h2
-            style={{
-              fontSize: 15,
-              fontWeight: 600,
-              color: tk.text,
-              margin: "0 0 4px",
-            }}
-          >
-            Party Confirmation Status
-          </h2>
-          <p style={{ fontSize: 12, color: tk.sub, margin: "0 0 12px" }}>
-            Updates automatically every 3 seconds
-          </p>
+  style={{
+    fontSize: 15,
+    fontWeight: 600,
+    color: tk.text,
+    margin: "0 0 4px",
+  }}
+>
+  Party Confirmation Status
+</h2>
+<p style={{ fontSize: 12, color: tk.sub, margin: "0 0 12px" }}>
+  This updates automatically as parties confirm
+</p>
           <PartyConfirmRow
             label="Requesting Party"
             confirmed={status?.requesting_party?.confirmed}

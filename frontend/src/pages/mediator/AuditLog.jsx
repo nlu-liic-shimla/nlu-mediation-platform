@@ -30,6 +30,50 @@ const actionColor = (action) => {
   if (a.includes("PUBLISHED") || a.includes("CREATED")) return "#1e40af";
   return "#64748b";
 };
+const ACTION_LABELS = {
+  STATE_TRANSITION: "Status changed",
+  INVITATION_GENERATED: "Invitation link generated",
+  INVITATION_ACCEPTED: "Party joined the case",
+  INVITATION_DECLINED: "Party declined invitation",
+  INVITATION_REGENERATED: "Invitation link regenerated",
+  APPLICATION_ACCEPTED: "Application accepted",
+  APPLICATION_REJECTED: "Application rejected",
+  APPLICATION_WITHDRAWN: "Application withdrawn",
+  CASE_CLOSED_PARTY_DECLINED: "Case closed — party declined too many times",
+  REQUESTING_PARTY_ANSWERED: "Requesting party answered questionnaire",
+  AGAINST_PARTY_ANSWERED: "Against party answered questionnaire",
+  PROPOSAL_DRAFT_CREATED: "Proposal draft created",
+  PROPOSAL_DRAFT_SAVED: "Proposal draft saved",
+  PROPOSAL_PUBLISHED: "Proposal published",
+  PARTY_ACCEPTED_PROPOSAL: "Party accepted proposal",
+  PARTY_REJECTED_PROPOSAL: "Party rejected proposal",
+  MEDIATION_COMPLETE: "Mediation completed",
+  MEDIATION_IN_PROGRESS: "Negotiation continuing",
+  PROPOSAL_REVISION_GENERATED: "AI generated a revised proposal",
+  ROUNDS_EXTENDED: "Negotiation rounds extended",
+  CASE_FINALISED: "Case finalised by mediator",
+};
+
+const STATE_LABELS = {
+  BOTH_INVITED: "Both Invited",
+  FIRST_PARTY_SUBMITTED: "First Party Submitted",
+  BOTH_SUBMITTED: "Both Submitted",
+  BURST_1_PROCESSING: "AI Analysis Running",
+  BURST_1_COMPLETE: "AI Analysis Complete",
+  PROCESSING_FAILED: "Processing Failed",
+  QUESTIONNAIRE_ACTIVE: "Questionnaire Active",
+  QUESTIONNAIRE_COMPLETE: "Questionnaire Complete",
+  BURST_2_PROCESSING: "BATNA/WATNA Running",
+  BURST_2_COMPLETE: "BATNA/WATNA Complete",
+  PROPOSAL_DRAFT: "Proposal Drafted",
+  PROPOSAL_PUBLISHED: "Proposal Published",
+  MEDIATION_IN_PROGRESS: "Negotiation In Progress",
+  MEDIATION_COMPLETE: "Mediation Complete",
+  MEDIATION_FAILED: "Mediation Failed",
+};
+
+const humanizeAction = (action) => ACTION_LABELS[action] || (action ? action.replace(/_/g, " ").toLowerCase() : "—");
+const humanizeState = (state) => STATE_LABELS[state] || (state ? state.replace(/_/g, " ") : "—");
 
 /* ══════════════════════════════════════════════════════════
    MAIN COMPONENT
@@ -272,7 +316,7 @@ export default function AuditLog() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {log.action || "—"}
+                          {humanizeAction(log.action)}
                         </span>
                       </td>
 

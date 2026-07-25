@@ -108,6 +108,7 @@ export default function Dashboard() {
     brief_description: '',
     requesting_party_email: '',
     against_party_email: '',
+    monetary_value: '',
   });
   const [newCaseLoading, setNewCaseLoading] = useState(false);
   const [newCaseError, setNewCaseError] = useState('');
@@ -154,6 +155,7 @@ export default function Dashboard() {
         brief_description: newCaseForm.brief_description,
         requesting_party_email: newCaseForm.requesting_party_email || null,
         against_party_email: newCaseForm.against_party_email || null,
+        monetary_value: newCaseForm.monetary_value ? Number(newCaseForm.monetary_value) : null
       };
       await createCase(payload);
       setShowNewCase(false);
@@ -290,48 +292,47 @@ export default function Dashboard() {
                   {new Date(c.created_at).toLocaleDateString()}
                 </td>
                 <td style={{ padding: "14px 16px" }}>
-                  {c.status === "APPLICATION_PENDING" ? (
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        onClick={async () => {
-                          try {
-                            await acceptApplication(c.id);
-                            const data = await getCases();
-                            setCases(data);
-                          } catch (err) {
-                            console.error("Accept failed", err);
-                            alert(err?.response?.data?.detail?.message || "Failed to accept application");
-                          }
-                        }}
-                        style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: "#1e40af", fontSize: 12, cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", gap: 4 }}
-                      >
-                        <CheckCircle size={12} /> Accept
-                      </button>
-                      <button
-                        onClick={async () => {
-                          try {
-                            await rejectApplication(c.id, "Mediator declined");
-                            const data = await getCases();
-                            setCases(data);
-                          } catch (err) {
-                            console.error("Reject failed", err);
-                            alert(err?.response?.data?.detail?.message || "Failed to reject application");
-                          }
-                        }}
-                        style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${tk.border}`, background: "transparent", fontSize: 12, cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center", gap: 4 }}
-                      >
-                        <XCircle size={12} /> Reject
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => navigate(`/mediator/cases/${c.id}`)}
-                      style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${tk.border}`, background: "transparent", fontSize: 12, cursor: "pointer", color: tk.text, display: "flex", alignItems: "center", gap: 4 }}
-                    >
-                      <Eye size={12} /> View
-                    </button>
-                  )}
-                </td>
+  {c.status === "APPLICATION_PENDING" ? (
+    <div style={{ display: "flex", gap: 8 }}>
+      <button
+        onClick={async () => {
+          try {
+            await acceptApplication(c.id);
+            const data = await getCases();
+            setCases(data);
+          } catch (err) {
+            console.error("Accept failed", err);
+            alert(err?.response?.data?.detail?.message || "Failed to accept application");
+          }
+        }}
+        style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: "#1e40af", fontSize: 12, cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", gap: 4 }}
+      >
+        <CheckCircle size={12} /> Accept
+      </button>
+      <button
+        onClick={async () => {
+          try {
+            await rejectApplication(c.id, "Mediator declined");
+            const data = await getCases();
+            setCases(data);
+          } catch (err) {
+            console.error("Reject failed", err);
+            alert(err?.response?.data?.detail?.message || "Failed to reject application");
+          }
+        }}
+        style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${tk.border}`, background: "transparent", fontSize: 12, cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center", gap: 4 }}
+      >
+        <XCircle size={12} /> Reject
+      </button>
+    </div>
+  ) : c.status === "APPLICATION_REJECTED" ? (
+    <span style={{ fontSize: 12, color: tk.sub }}>
+      Rejected{c.rejection_reason ? ` — ${c.rejection_reason}` : ""}
+    </span>
+  ) : (
+    <span style={{ fontSize: 12, color: tk.sub }}>Withdrawn by party</span>
+  )}
+</td>
               </tr>
             ))
           )}
@@ -686,6 +687,20 @@ export default function Dashboard() {
                 style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: `1px solid ${tk.border}`, background: tk.bg, color: tk.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
               />
             </div>
+            {/* Monetary value */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: tk.sub, display: 'block', marginBottom: 6 }}>
+                MONETARY VALUE (₹)
+              </label>
+              <input
+                type="number"
+                placeholder="e.g. 50000 (optional)"
+                value={newCaseForm.monetary_value}
+                onChange={e => setNewCaseForm(p => ({ ...p, monetary_value: e.target.value }))}
+                min="0"
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: `1px solid ${tk.border}`, background: tk.bg, color: tk.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              />
+            </div>
 
             {/* Error */}
             {newCaseError && (
@@ -720,7 +735,7 @@ export default function Dashboard() {
 }
 const STATUS_DISPLAY = {
   BOTH_INVITED:          "Awaiting Submissions",
-  FIRST_PARTY_SUBMITTED: "1 of 2 Submitted",
+  FIRST_PARTY_SUBMITTED: "Waiting on other party",
   BOTH_SUBMITTED:        "Processing",
   BURST_1_PROCESSING:    "AI Running",
   BURST_1_COMPLETE:      "Analysis Ready",

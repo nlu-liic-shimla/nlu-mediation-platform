@@ -8,6 +8,7 @@ import {
 import client from '../../services/api'
 import AnalysisStatusBanner from '../../components/party/AnalysisStatusBanner'
 import BatnaWatnaPartyDisplay from '../../components/party/BatnaWatnaPartyDisplay'
+import { getDocuments, getSettlementStatus } from '../../api/cases'
 
 // ── Timeline steps ────────────────────────────────────────────────────────────
 const TIMELINE_STEPS = [
@@ -94,6 +95,10 @@ export default function CaseDetails() {
   const [submission, setSubmission] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+const [error, setError] = useState('')
+  const [documents, setDocuments] = useState([])
+  const [docsLoading, setDocsLoading] = useState(true)
+  const [settlementConfirmed, setSettlementConfirmed] = useState(false)
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -115,10 +120,45 @@ export default function CaseDetails() {
     fetchAll()
   }, [caseId])
 
-  const currentStep = STATUS_STEP_MAP[caseData?.status] ?? 0
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const res = await getDocuments(caseId)
+        const docs = Array.isArray(res) ? res : res.documents ?? []
+        setDocuments(docs)
+      } catch {
+        setDocuments([])
+      } finally {
+        setDocsLoading(false)
+      }
+    }
+    fetchDocuments()
+  }, [caseId])
+
+  useEffect(() => {
+    if (caseData?.status !== 'MEDIATION_COMPLETE') return
+    const checkSettlement = async () => {
+      try {
+        const status = await getSettlementStatus(caseId)
+        const role = caseData?.your_role_in_this_case
+        if (role && status?.[role]?.confirmed) {
+          setSettlementConfirmed(true)
+        }
+      } catch {
+        // fail silently
+      }
+    }
+    checkSettlement()
+  }, [caseData, caseId])
+
+
+const currentStep = STATUS_STEP_MAP[caseData?.status] ?? 0
   let actionInfo  = ACTION_NEEDED[caseData?.status]
   if (caseData?.status === 'QUESTIONNAIRE_ACTIVE' && caseData?.user_has_submitted_questionnaire) {
     actionInfo = { msg: 'Questionnaire submitted. Awaiting response from the other party.', action: null }
+  }
+  if (caseData?.status === 'MEDIATION_COMPLETE' && settlementConfirmed) {
+    actionInfo = { msg: 'You have confirmed the settlement. You can download the PDF once it is ready.', action: null }
   }
   const showBatna   = BURST_2_STATUSES.has(caseData?.status)
 
@@ -244,8 +284,9 @@ export default function CaseDetails() {
               </div>
             )}
 
-            {/* Analysis status polling (existing) */}
-            <AnalysisStatusBanner caseId={caseId} />
+            {['BOTH_SUBMITTED', 'BURST_1_PROCESSING', 'BURST_1_COMPLETE', 'PROCESSING_FAILED'].includes(caseData?.status) && (
+  <AnalysisStatusBanner caseId={caseId} />
+)}
 
             {/* Case info */}
             <div className="cd-card">
@@ -259,10 +300,7 @@ export default function CaseDetails() {
                   <p className="cd-info-label"><Clock size={11} /> Status</p>
                   <p className="cd-info-value" style={{ color: 'var(--brand)' }}>{caseData.status?.replace(/_/g, ' ')}</p>
                 </div>
-                <div className="cd-info-item">
-                  <p className="cd-info-label"><User size={11} /> Mediator</p>
-                  <p className="cd-info-value">{caseData.assigned_mediator || '—'}</p>
-                </div>
+               
                 <div className="cd-info-item">
                   <p className="cd-info-label"><Calendar size={11} /> Created</p>
                   <p className="cd-info-value">{caseData.created_at ? new Date(caseData.created_at).toLocaleDateString() : '—'}</p>
