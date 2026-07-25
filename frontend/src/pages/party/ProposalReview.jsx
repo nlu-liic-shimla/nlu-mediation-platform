@@ -8,6 +8,7 @@ import client from '../../services/api'
 
 const MIN_REASON_CHARS = 20
 
+
 export default function ProposalReview() {
   const navigate = useNavigate()
   const { id: caseId } = useParams()
@@ -24,6 +25,8 @@ export default function ProposalReview() {
   const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
   const userKey = user.user_id || user.email || 'guest'
   const decisionKey = `proposal_decision_${caseId}_${userKey}`
+
+  const stripMarkdown = (text) => (text || '').replace(/\*\*/g, '').replace(/\*/g, '')
 
   useEffect(() => {
     const savedDecision = localStorage.getItem(decisionKey)

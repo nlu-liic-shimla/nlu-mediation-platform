@@ -24,6 +24,8 @@ export default function Settlement() {
   const [sigPreview, setSigPreview] = useState('')         // filename display
   const [fileError, setFileError]   = useState('')
 
+  const stripMarkdown = (text) => (text || '').replace(/\*\*/g, '').replace(/\*/g, '')
+
   // Submission state
   const [confirming, setConfirming]   = useState(false)
   const [confirmed, setConfirmed]     = useState(false)
@@ -234,7 +236,7 @@ export default function Settlement() {
         {proposal && (
           <div className="st-card">
             <p className="st-card-title"><FileText size={16} color="var(--brand)" /> Agreed Settlement Terms</p>
-            <p className="st-terms">{proposal.content || proposal.raw_text || "No content available"}</p>
+<p className="st-terms">{stripMarkdown(proposal.content || proposal.raw_text) || "No content available"}</p>
           </div>
         )}
 
