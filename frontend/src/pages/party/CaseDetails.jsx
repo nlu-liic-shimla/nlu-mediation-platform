@@ -6,7 +6,7 @@ import {
   User, Calendar, Hash
 } from 'lucide-react'
 import client from '../../services/api'
-import { getDocuments } from '../../api/cases'
+
 import AnalysisStatusBanner from '../../components/party/AnalysisStatusBanner'
 import BatnaWatnaPartyDisplay from '../../components/party/BatnaWatnaPartyDisplay'
 import { getDocuments, getSettlementStatus } from '../../api/cases'

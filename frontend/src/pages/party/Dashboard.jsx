@@ -165,7 +165,7 @@ export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
   const userEmail = user.email || 'User'
   const userInitials = userEmail.substring(0, 2).toUpperCase()
-  const userName = user.full_name || userEmail.split('@')[0]
+  const userName = userEmail.split('@')[0]
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)
@@ -183,18 +183,15 @@ export default function Dashboard() {
   const sidebarWidth = isMobile ? 0 : (collapsed ? 60 : 240)
 
   const [cases, setCases] = useState([])
-const [applications, setApplications] = useState([])
+  const [applications, setApplications] = useState([])
 
 useEffect(() => {
   client.get('/cases').then(res => {
     const data = res.data
     const arr = Array.isArray(data) ? data : data.cases || data.data || []
+    console.log('RAW:', JSON.stringify(arr[0]))  // ← change to this
     setCases(arr)
   }).catch(() => setCases([]))
-
-  client.get('/cases/applications/my').then(res => {
-    setApplications(res.data?.applications || [])
-  }).catch(() => setApplications([]))
 }, [])
 
   const notifications = [
@@ -228,6 +225,9 @@ const activeCase = cases[0]
     if (pStages.includes(activeCase.status)) visibleNavIds.add('proposals')
     if (activeCase.status === 'MEDIATION_COMPLETE') visibleNavIds.add('settlement')
   }
+const activeCasesList = cases.filter(
+  c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status)
+)
   return (
     <>
       <style>{`
@@ -409,7 +409,6 @@ const activeCase = cases[0]
         <Sidebar
   active={activeNav}
   onNavigate={(id) => {
-<<<<<<< HEAD
     setActiveNav(id)
     if (id === 'new-case') { navigate('/party/apply'); return }
 
@@ -444,21 +443,6 @@ const activeCase = cases[0]
       navigate(`/party/cases/${activeCase.id}/settlement`)
     }
   }}
-=======
-  setActiveNav(id)
-  if (id === 'new-case') { navigate('/party/apply'); return }
-
-  const needsCase = ['questionnaire', 'proposals', 'settlement']
-  if (needsCase.includes(id) && !cases[0]?.id) {
-    alert('You don\'t have an active case yet. Apply for mediation or accept an invitation first.')
-    return
-  }
-
-  if (id === 'questionnaire') navigate(`/party/cases/${cases[0].id}/questionnaire`)
-  if (id === 'proposals') navigate(`/party/cases/${cases[0].id}/proposal`)
-  if (id === 'settlement') navigate(`/party/cases/${cases[0].id}/settlement`)
-}}
->>>>>>> main
   collapsed={collapsed}
   onToggle={() => setCollapsed(p => !p)}
   onSignOut={handleSignOut}
@@ -542,12 +526,7 @@ const activeCase = cases[0]
 >
   New Case
 </button>
-<<<<<<< HEAD
                     </div>{applications
-=======
-                    </div>
-                    {applications
->>>>>>> main
     .filter(a => a.status === 'APPLICATION_PENDING')
     .map(a => (
       <div key={a.id} className="pd-case-card">
@@ -572,11 +551,7 @@ const activeCase = cases[0]
       </div>
   ))}
 
-<<<<<<< HEAD
                     {activeCasesList.length === 0 && (
-=======
-                    {cases.length === 0 && (
->>>>>>> main
   <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', border: '1.5px dashed var(--border)', borderRadius: '12px' }}>
     <FileText size={32} style={{ margin: '0 auto 0.75rem', opacity: 0.4 }} />
     <p style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>No active cases yet</p>
