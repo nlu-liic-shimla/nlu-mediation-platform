@@ -321,9 +321,9 @@ class BatnaWatnaOutput(BaseModel):
     )
     disclaimer: str = Field(
         default=(
-            "This analysis provides negotiation guidance only and does not constitute "
-            "legal advice. Parties should consult a qualified legal professional for "
-            "advice specific to their situation."
+            "This analysis is meant to support your negotiation, not replace legal counsel. "
+            "For complex situations, speaking with a qualified solicitor can help you "
+            "understand your options more fully."
         ),
         description="Mandatory disclaimer shown alongside all BATNA/WATNA output."
     )

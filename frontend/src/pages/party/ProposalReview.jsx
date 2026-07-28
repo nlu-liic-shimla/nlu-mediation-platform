@@ -8,6 +8,7 @@ import client from '../../services/api'
 
 const MIN_REASON_CHARS = 20
 
+
 export default function ProposalReview() {
   const navigate = useNavigate()
   const { id: caseId } = useParams()
@@ -24,6 +25,8 @@ export default function ProposalReview() {
   const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
   const userKey = user.user_id || user.email || 'guest'
   const decisionKey = `proposal_decision_${caseId}_${userKey}`
+
+  const stripMarkdown = (text) => (text || '').replace(/\*\*/g, '').replace(/\*/g, '')
 
   useEffect(() => {
     const savedDecision = localStorage.getItem(decisionKey)
@@ -238,7 +241,7 @@ export default function ProposalReview() {
             {/* Proposal terms */}
             <div className="pr-card">
               <p className="pr-card-title"><FileText size={16} color="var(--brand)" /> Proposed Settlement Terms</p>
-              <p className="pr-terms">{proposal.content || proposal.raw_text || "No content available"}</p>
+              <p className="pr-terms">{stripMarkdown(proposal.content || proposal.raw_text) || "No content available"}</p>
             </div>
 
             {/* Disclaimer */}

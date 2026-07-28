@@ -237,7 +237,7 @@ export default function ProposalEditor() {
   }, []);
 
   // On mount — create proposal and get AI draft (or resume existing draft)
-  useEffect(() => {
+ useEffect(() => {
     const init = async () => {
       try {
         const [proposalsList, batnaRes] = await Promise.all([
@@ -258,7 +258,9 @@ export default function ProposalEditor() {
         }
         setBatnaData(batnaRes);
       } catch (err) {
+        const backendMsg = err?.response?.data?.detail?.message || err?.response?.data?.detail;
         setError(
+          backendMsg ||
           "Failed to load or create proposal. Make sure BATNA/WATNA is complete.",
         );
       } finally {

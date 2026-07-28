@@ -10,6 +10,25 @@ import {
   Bot, LogOut, Menu, X
 } from 'lucide-react'
 
+const PARTY_STATUS_LABELS = {
+  BOTH_INVITED: 'Waiting for both parties',
+  FIRST_PARTY_SUBMITTED: 'Waiting for other party',
+  BOTH_SUBMITTED: 'Processing',
+  BURST_1_PROCESSING: 'Analyzing your case',
+  BURST_1_COMPLETE: 'Analysis complete',
+  PROCESSING_FAILED: 'Analysis delayed',
+  QUESTIONNAIRE_ACTIVE: 'Questionnaire pending',
+  QUESTIONNAIRE_COMPLETE: 'Reviewing responses',
+  BURST_2_PROCESSING: 'Preparing your case summary',
+  BURST_2_COMPLETE: 'Case summary ready',
+  PROPOSAL_DRAFT: 'Mediator preparing proposal',
+  PROPOSAL_PUBLISHED: 'Proposal ready for review',
+  MEDIATION_IN_PROGRESS: 'Negotiation ongoing',
+  MEDIATION_COMPLETE: 'Settlement reached',
+  MEDIATION_FAILED: 'Mediation unsuccessful',
+}
+const friendlyStatus = (status) => PARTY_STATUS_LABELS[status] || 'In progress'
+
 const NAV_ITEMS = [
   { id: 'dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'new-case',      icon: FilePlus,        label: 'New Case' },
@@ -18,7 +37,7 @@ const NAV_ITEMS = [
   { id: 'settlement',    icon: CheckSquare,     label: 'Settlement' },
 ]
 
-const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile, mobileOpen, onMobileClose }) => (
+const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile, mobileOpen, onMobileClose, visibleIds }) => (
   <>
     {/* Mobile overlay */}
     {isMobile && mobileOpen && (
@@ -38,9 +57,10 @@ const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile,
         )}
       </div>
 
-      <nav className="pd-sidebar-nav">
-        {NAV_ITEMS.map(({ id, icon: Icon, label }) => {
+       <nav className="pd-sidebar-nav">
+        {NAV_ITEMS.filter(item => !visibleIds || visibleIds.has(item.id)).map(({ id, icon: Icon, label }) => {
           const isActive = active === id
+          
           return (
             <button
               key={id}
@@ -95,7 +115,7 @@ const StatCard = ({ label, value, sub, subColor, icon, iconBg }) => (
   </div>
 )
 
-const CaseCard = ({ title, status, caseId, displayId, vs, progress, aiScore, nextDate, statusColor, statusBg, onView }) => (
+const CaseCard = ({ title, status, rawStatus, caseId, displayId, vs, progress, nextDate, statusColor, statusBg, onView }) => (
   <div className="pd-case-card">
     <div className="pd-case-top">
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -105,14 +125,14 @@ const CaseCard = ({ title, status, caseId, displayId, vs, progress, aiScore, nex
         </div>
         <p className="pd-case-meta">Case ID: {displayId || caseId} • vs. {vs}</p>
       </div>
-      <div className="pd-ai-score">
-        <p className="pd-ai-score-label">AI Score</p>
-        <p className="pd-ai-score-value">{aiScore}%</p>
-      </div>
+      
     </div>
+    
 
     {/* ← ADD HERE */}
+     {['BOTH_SUBMITTED', 'BURST_1_PROCESSING', 'BURST_1_COMPLETE', 'PROCESSING_FAILED'].includes(rawStatus) && (
     <AnalysisStatusBanner caseId={caseId} />
+     )}
 
     <div className="pd-progress-section">
       <div className="pd-progress-row">
@@ -145,7 +165,7 @@ export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
   const userEmail = user.email || 'User'
   const userInitials = userEmail.substring(0, 2).toUpperCase()
-  const userName = user.full_name || userEmail.split('@')[0]
+  const userName = userEmail.split('@')[0]
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)
@@ -163,18 +183,15 @@ export default function Dashboard() {
   const sidebarWidth = isMobile ? 0 : (collapsed ? 60 : 240)
 
   const [cases, setCases] = useState([])
-const [applications, setApplications] = useState([])
+  const [applications, setApplications] = useState([])
 
 useEffect(() => {
   client.get('/cases').then(res => {
     const data = res.data
     const arr = Array.isArray(data) ? data : data.cases || data.data || []
+    console.log('RAW:', JSON.stringify(arr[0]))  // ← change to this
     setCases(arr)
   }).catch(() => setCases([]))
-
-  client.get('/cases/applications/my').then(res => {
-    setApplications(res.data?.applications || [])
-  }).catch(() => setApplications([]))
 }, [])
 
   const notifications = [
@@ -199,7 +216,18 @@ useEffect(() => {
   },
   { icon: <Calendar size={17} />, label: 'Schedule Session', path: null },
 ]
-
+const activeCase = cases[0]
+  const visibleNavIds = new Set(['dashboard', 'new-case'])
+  if (activeCase) {
+    const qStages = ['QUESTIONNAIRE_ACTIVE', 'QUESTIONNAIRE_COMPLETE', 'BURST_2_PROCESSING', 'BURST_2_COMPLETE', 'PROPOSAL_DRAFT', 'PROPOSAL_PUBLISHED', 'MEDIATION_IN_PROGRESS', 'MEDIATION_COMPLETE']
+    const pStages = ['PROPOSAL_DRAFT', 'PROPOSAL_PUBLISHED', 'MEDIATION_IN_PROGRESS', 'MEDIATION_COMPLETE']
+    if (qStages.includes(activeCase.status)) visibleNavIds.add('questionnaire')
+    if (pStages.includes(activeCase.status)) visibleNavIds.add('proposals')
+    if (activeCase.status === 'MEDIATION_COMPLETE') visibleNavIds.add('settlement')
+  }
+const activeCasesList = cases.filter(
+  c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status)
+)
   return (
     <>
       <style>{`
@@ -381,25 +409,47 @@ useEffect(() => {
         <Sidebar
   active={activeNav}
   onNavigate={(id) => {
-  setActiveNav(id)
-  if (id === 'new-case') { navigate('/party/apply'); return }
+    setActiveNav(id)
+    if (id === 'new-case') { navigate('/party/apply'); return }
 
-  const needsCase = ['questionnaire', 'proposals', 'settlement']
-  if (needsCase.includes(id) && !cases[0]?.id) {
-    alert('You don\'t have an active case yet. Apply for mediation or accept an invitation first.')
-    return
-  }
+    const activeCase = cases[0]
 
-  if (id === 'questionnaire') navigate(`/party/cases/${cases[0].id}/questionnaire`)
-  if (id === 'proposals') navigate(`/party/cases/${cases[0].id}/proposal`)
-  if (id === 'settlement') navigate(`/party/cases/${cases[0].id}/settlement`)
-}}
+    if (id === 'questionnaire') {
+      if (!activeCase) { alert("You don't have an active case yet."); return }
+      const allowed = ['QUESTIONNAIRE_ACTIVE', 'QUESTIONNAIRE_COMPLETE', 'BURST_2_PROCESSING', 'BURST_2_COMPLETE', 'PROPOSAL_DRAFT', 'PROPOSAL_PUBLISHED', 'MEDIATION_IN_PROGRESS', 'MEDIATION_COMPLETE']
+      if (!allowed.includes(activeCase.status)) {
+        alert("The questionnaire isn't available yet for your case.")
+        return
+      }
+      navigate(`/party/cases/${activeCase.id}/questionnaire`)
+    }
+
+    if (id === 'proposals') {
+      if (!activeCase) { alert("You don't have an active case yet."); return }
+      const allowed = ['PROPOSAL_DRAFT', 'PROPOSAL_PUBLISHED', 'MEDIATION_IN_PROGRESS', 'MEDIATION_COMPLETE']
+      if (!allowed.includes(activeCase.status)) {
+        alert("No proposal has been published yet.")
+        return
+      }
+      navigate(`/party/cases/${activeCase.id}/proposal`)
+    }
+
+    if (id === 'settlement') {
+      if (!activeCase) { alert("You don't have an active case yet."); return }
+      if (activeCase.status !== 'MEDIATION_COMPLETE') {
+        alert("Settlement confirmation isn't available yet — both parties need to accept a proposal first.")
+        return
+      }
+      navigate(`/party/cases/${activeCase.id}/settlement`)
+    }
+  }}
   collapsed={collapsed}
   onToggle={() => setCollapsed(p => !p)}
   onSignOut={handleSignOut}
   isMobile={isMobile}
   mobileOpen={mobileOpen}
   onMobileClose={() => setMobileOpen(false)}
+    visibleIds={visibleNavIds}
 />
 
         <div className="pd-main" style={{ marginLeft: isMobile ? 0 : (collapsed ? 60 : 240), transition: 'margin-left 0.25s ease' }}>
@@ -476,8 +526,7 @@ useEffect(() => {
 >
   New Case
 </button>
-                    </div>
-                    {applications
+                    </div>{applications
     .filter(a => a.status === 'APPLICATION_PENDING')
     .map(a => (
       <div key={a.id} className="pd-case-card">
@@ -502,18 +551,19 @@ useEffect(() => {
       </div>
   ))}
 
-                    {cases.length === 0 && (
+                    {activeCasesList.length === 0 && (
   <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', border: '1.5px dashed var(--border)', borderRadius: '12px' }}>
     <FileText size={32} style={{ margin: '0 auto 0.75rem', opacity: 0.4 }} />
     <p style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>No active cases yet</p>
     <p>Once you accept an invitation or apply for mediation, your cases will appear here.</p>
   </div>
 )}
-                    {cases.map(c => (
+                    {activeCasesList.map(c => (
   <CaseCard
     key={c.id}
     title={c.dispute_type || c.brief_description || c.title || 'Mediation Case'}
-    status={c.status}
+    status={friendlyStatus(c.status)}
+    rawStatus={c.status}
     statusColor="#1a56b0"
     statusBg="#dbeafe"
     caseId={c.id}
@@ -549,32 +599,6 @@ useEffect(() => {
       ]
       const idx = steps.indexOf(mappedStatus)
       return idx >= 0 ? Math.round((idx / (steps.length - 1)) * 100) : 0
-    })()}
-    aiScore={(() => {
-      const statusMap = {
-        'DRAFT': 'BOTH_INVITED',
-        'PARTY_A_SUBMITTED': 'FIRST_PARTY_SUBMITTED',
-        'AI_RUNNING': 'BURST_1_PROCESSING',
-        'ANALYSIS_READY': 'BURST_1_COMPLETE',
-        'QUESTIONNAIRE_SENT': 'QUESTIONNAIRE_ACTIVE',
-        'PROPOSAL_SENT': 'PROPOSAL_PUBLISHED',
-        'PROPOSAL_ACCEPTED': 'MEDIATION_COMPLETE',
-        'SETTLED': 'MEDIATION_COMPLETE',
-        'CLOSED': 'MEDIATION_COMPLETE'
-      }
-      const mappedStatus = statusMap[c.status] || c.status
-      const activeStatesForAiScore = new Set([
-        'BURST_1_COMPLETE',
-        'QUESTIONNAIRE_ACTIVE',
-        'QUESTIONNAIRE_COMPLETE',
-        'BURST_2_PROCESSING',
-        'BURST_2_COMPLETE',
-        'PROPOSAL_DRAFT',
-        'PROPOSAL_PUBLISHED',
-        'MEDIATION_IN_PROGRESS',
-        'MEDIATION_COMPLETE'
-      ])
-      return activeStatesForAiScore.has(mappedStatus) ? 87 : 0
     })()}
     nextDate={'—'}
     onView={() => navigate(`/party/cases/${c.id}`)}
