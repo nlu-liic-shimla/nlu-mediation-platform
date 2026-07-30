@@ -241,7 +241,7 @@ export default function ProposalReview() {
             {/* Proposal terms */}
             <div className="pr-card">
               <p className="pr-card-title"><FileText size={16} color="var(--brand)" /> Proposed Settlement Terms</p>
-              <p className="pr-terms">{proposal.content || proposal.raw_text || "No content available"}</p>
+              <p className="pr-terms">{stripMarkdown(proposal.content || proposal.raw_text) || "No content available"}</p>
             </div>
 
             {/* Disclaimer */}

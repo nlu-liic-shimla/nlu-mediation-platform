@@ -328,7 +328,7 @@ export default function AuditLog() {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {log.old_state || "—"}
+                        {humanizeState(log.old_state)}
                       </td>
 
                       {/* New State */}
@@ -345,7 +345,7 @@ export default function AuditLog() {
                             color: actionColor(log.new_state),
                           }}
                         >
-                          {log.new_state || "—"}
+                          {humanizeState(log.new_state)}
                         </span>
                       </td>
                     </tr>
