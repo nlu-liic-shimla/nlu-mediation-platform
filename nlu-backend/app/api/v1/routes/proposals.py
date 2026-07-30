@@ -440,7 +440,7 @@ async def respond_to_proposal(
         "decision":    decision_val,
     }
     if decision_val == "reject" and body.rejection_reason:
-        response_data["reason"] = body.rejection_reason
+        response_data["rejection_reason"] = body.rejection_reason
 
     supabase.table("proposal_responses").insert(response_data).execute()
 
