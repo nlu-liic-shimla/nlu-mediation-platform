@@ -47,7 +47,7 @@ async def confirm_settlement(
 
     # Verify case exists and is in correct state
     case_result = supabase.table("cases") \
-        .select("id, status") \
+        .select("id, status, finalised_at") \
         .eq("id", case_id) \
         .single() \
         .execute()
@@ -64,6 +64,15 @@ async def confirm_settlement(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Settlement confirmation not available. Case is in state '{case_status}'. "
                    f"Confirmation is only available when state is MEDIATION_COMPLETE."
+        )
+
+    # BUG #31 FIX: status alone isn't enough — it's MEDIATION_COMPLETE both before AND
+    # after the mediator finalises. Without this check, parties could confirm settlement
+    # before the mediator ever clicked "Finalise Case", causing indefinite polling.
+    if not case_result.data.get("finalised_at"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your mediator has not yet finalised this case. Please wait to be notified before confirming."
         )
 
     # Validate full name

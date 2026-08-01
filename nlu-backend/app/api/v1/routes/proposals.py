@@ -578,6 +578,13 @@ async def finalise_case(
             detail={"error": True, "code": "INVALID_CASE_STATE", "message": f"Case must be MEDIATION_COMPLETE to finalise. Currently: {case['status']}"},
         )
 
+    now = datetime.datetime.utcnow().isoformat()
+
+    # BUG #31 FIX: status alone can't distinguish "both accepted, waiting for mediator"
+    # from "mediator finalised, parties should confirm" — both are MEDIATION_COMPLETE.
+    # finalised_at is the real signal parties and settlement/confirm now gate on.
+    supabase.table("cases").update({"finalised_at": now}).eq("id", case_id).execute()
+
     # Self-transition — status stays MEDIATION_COMPLETE, but audit log records mediator's action
     transition(case_id=case_id, new_state=CaseState.MEDIATION_COMPLETE, actor_id=current_user["user_id"])
 
@@ -585,10 +592,10 @@ async def finalise_case(
         case_id=case_id, actor_id=current_user["user_id"],
         action="CASE_FINALISED",
         old_state=CaseState.MEDIATION_COMPLETE.value, new_state=CaseState.MEDIATION_COMPLETE.value,
-        metadata={},
+        metadata={"finalised_at": now},
     )
 
-    return {"status": "finalised", "message": "Both parties have been notified to confirm the settlement."}
+    return {"status": "finalised", "finalised_at": now, "message": "Both parties have been notified to confirm the settlement."}
 
 
 @router.get(
@@ -643,10 +650,15 @@ async def settlement_status(
             logger.error(f"Failed to generate signed URL for settlement status: {e}")
             pdf_url = pdf_resp.data[0]["pdf_url"]
 
+    # BUG #31 FIX: expose finalised_at so frontend can confirm mediator actually finalised
+    case_check = supabase.table("cases").select("finalised_at").eq("id", case_id).single().execute()
+    finalised_at = case_check.data.get("finalised_at") if case_check.data else None
+
     return {
         **result,
-        "pdf_ready":  pdf_ready,
-        "pdf_url":    pdf_url,
+        "pdf_ready":     pdf_ready,
+        "pdf_url":       pdf_url,
+        "finalised_at":  finalised_at,
     }
 
 
