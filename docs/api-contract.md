@@ -1,5 +1,5 @@
 # NLU Mediation Platform — API Contract
-# Version: 4.0 | Owner: Backend Role 1 | Updated: Week 4
+# Version: 4.1 | Owner: Backend Role 1 | Updated: Week 4 (post-MVP bug fixes)
 # Source of truth for all API endpoints across all weeks.
 # Changes after Day 1 noon each week require team chat announcement.
 
@@ -612,6 +612,35 @@ Success: 200
   ]
 
 ---
+
+## GET /api/v1/cases/{case_id}/audit-log/party-view
+Auth: party_user only (must be a party on this case)
+Description: Filtered, party-safe version of the audit log. Excludes mediator-only
+content (private notes, AI claim flags, invitation regeneration internals) per
+Flow 8/Flow 12 privacy rules. Only shows the calling party's own rejection_reason — never the other party's raw text.
+
+Success: 200
+  [
+    {
+      "action": "PARTY_REJECTED_PROPOSAL",
+      "old_state": null,
+      "new_state": null,
+      "metadata": { "party_role": "requesting_party", "rejection_reason": "..." },
+      "created_at": "iso8601"
+    }
+  ]
+
+Errors:
+  403 NOT_A_PARTY — user is not linked to this case via case_invitations
+
+Allow-listed actions returned:
+  STATE_TRANSITION, INVITATION_ACCEPTED, INVITATION_DECLINED,
+  REQUESTING_PARTY_ANSWERED, AGAINST_PARTY_ANSWERED, PROPOSAL_PUBLISHED,
+  PARTY_ACCEPTED_PROPOSAL, PARTY_REJECTED_PROPOSAL, MEDIATION_COMPLETE,
+  MEDIATION_IN_PROGRESS, CASE_FINALISED, PARTY_CONFIRMED_SETTLEMENT,
+  SETTLEMENT_PDF_GENERATED
+
+  ---
 
 ## INTERNAL — state_machine.py only
 ## PATCH /api/v1/cases/{case_id}/status

@@ -256,6 +256,7 @@ async def get_case(
         "negotiation_round": case.get("negotiation_round", 0),
         "max_rounds": case.get("max_rounds", 3),
         "mediator_notes": case.get("mediator_notes"),
+        "finalised_at": case.get("finalised_at"),  # BUG #31 FIX
         "created_at": case.get("created_at"),
         "updated_at": case.get("updated_at"),
         "title": case.get("brief_description") or case.get("dispute_type") or "Untitled Case",
