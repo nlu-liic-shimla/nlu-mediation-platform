@@ -13,6 +13,7 @@ import {
   Eye,
   CheckCircle,
   XCircle,
+   TrendingUp,
 } from "lucide-react";
 import {
   BarChart,
@@ -27,25 +28,10 @@ import {
 } from "recharts";
 
 /* ─── static chart data ───────────────────────────────────── */
-const caseVolumeData = [
-  { month: "Jan", cases: 10 },
-  { month: "Feb", cases: 15 },
-  { month: "Mar", cases: 13 },
-  { month: "Apr", cases: 20 },
-  { month: "May", cases: 28 },
-];
-const resolutionData = [
-  { name: "Resolved", value: 68 },
-  { name: "Pending",  value: 6  },
-  { name: "Active",   value: 22 },
-];
+
+
 const RES_COLORS = ["#1e3a5f", "#3b82f6", "#bfdbfe"];
-const aiPerfData = [
-  { week: "W1", acc: 82 },
-  { week: "W2", acc: 85 },
-  { week: "W3", acc: 84 },
-  { week: "W4", acc: 88 },
-];
+
 
 /* ─── tokens ──────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -99,7 +85,7 @@ export default function Dashboard() {
   const [cases, setCases]       = useState([]);
   const [loading, setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState("Active Cases");
-
+ const [riskFilter, setRiskFilter] = useState(null); 
   // ── Step 1: New Case modal state ──
   const [showNewCase, setShowNewCase] = useState(false);
   const [newCaseForm, setNewCaseForm] = useState({
@@ -132,6 +118,50 @@ export default function Dashboard() {
     };
     fetchCases();
   }, []);
+
+  const totalMonetaryValue = cases
+    .filter(c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status))
+    .reduce((sum, c) => sum + (Number(c.monetary_value) || 0), 0)
+
+  const disputeTypeData = (() => {
+    const counts = {}
+    cases.forEach(c => {
+      const type = c.dispute_type ? c.dispute_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Other'
+      counts[type] = (counts[type] || 0) + 1
+    })
+    return Object.entries(counts).map(([name, value]) => ({ name, value }))
+  })()
+
+  const roundData = (() => {
+    const counts = {}
+    cases.forEach(c => {
+      const round = c.negotiation_round || 0
+      const label = `Round ${round}`
+      counts[label] = (counts[label] || 0) + 1
+    })
+    return Object.entries(counts).map(([round, count]) => ({ round, count }))
+  })()
+
+  const DISPUTE_COLORS = ["#1e3a5f", "#3b82f6", "#93c5fd", "#c7d2fe", "#a5b4fc", "#818cf8"]
+  const caseVolumeData = (() => {
+    const monthCounts = {}
+    cases.forEach(c => {
+      if (!c.created_at) return
+      const d = new Date(c.created_at)
+      const label = d.toLocaleString('default', { month: 'short' })
+      monthCounts[label] = (monthCounts[label] || 0) + 1
+    })
+    const monthOrder = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    return monthOrder
+      .filter(m => monthCounts[m])
+      .map(m => ({ month: m, cases: monthCounts[m] }))
+  })()
+
+  const resolutionData = [
+    { name: "Resolved", value: cases.filter(c => c.status === 'MEDIATION_COMPLETE').length },
+    { name: "Failed",   value: cases.filter(c => c.status === 'MEDIATION_FAILED').length },
+    { name: "Active",   value: cases.filter(c => !['MEDIATION_COMPLETE','MEDIATION_FAILED'].includes(c.status) && !APPLICATION_STATES.includes(c.status)).length },
+  ]
 
   // ── Step 2: Create case handler ──
   const handleCreateCase = async () => {
@@ -180,7 +210,13 @@ export default function Dashboard() {
   };
 
   /* ── filter cases by tab ── */
+ /* ── filter cases by tab ── */
   const filteredCases = cases.filter((c) => {
+    if (riskFilter === 'high_risk') return c.status === 'PROCESSING_FAILED';
+    if (riskFilter === 'stalled') {
+      return c.status === 'BOTH_SUBMITTED' &&
+        new Date() - new Date(c.updated_at) > 7 * 24 * 60 * 60 * 1000;
+    }
     if (activeTab === "Applications") return APPLICATION_STATES.includes(c.status);
     if (activeTab === "Closed Cases") return CLOSED_STATES.includes(c.status);
     return !APPLICATION_STATES.includes(c.status) && !CLOSED_STATES.includes(c.status);
@@ -200,20 +236,15 @@ export default function Dashboard() {
   const showApprovals = pendingApprovals.length > 0;
 
   /* ── FIX: derive risk indicators from real cases ── */
-  const highRiskCount       = cases.filter((c) => c.status === "PROCESSING_FAILED").length;
-  const approachingDeadline = cases.filter((c) =>
-    c.next_session_date &&
-    new Date(c.next_session_date) - Date.now() < 3 * 24 * 60 * 60 * 1000
-  ).length;
+ const highRiskCount       = cases.filter((c) => c.status === "PROCESSING_FAILED").length;
   const stalledCount = cases.filter((c) =>
     c.status === "BOTH_SUBMITTED" &&
     new Date() - new Date(c.updated_at) > 7 * 24 * 60 * 60 * 1000
   ).length;
 
   const RISKS = [
-    { label: "High Risk Cases",       count: highRiskCount,       color: "#ef4444" },
-    { label: "Approaching Deadline",  count: approachingDeadline, color: "#f59e0b" },
-    { label: "Stalled Negotiations",  count: stalledCount,        color: "#6b7280" },
+    { label: "High Risk Cases",       count: highRiskCount, color: "#ef4444", key: 'high_risk' },
+    { label: "Stalled Negotiations",  count: stalledCount,  color: "#6b7280", key: 'stalled' },
   ];
 
   /* ── shared sub-components ── */
@@ -458,11 +489,12 @@ export default function Dashboard() {
             icon: CheckCircle2, iconBg: "#f0fdf4",
           },
           {
-            label: "AI Accuracy",
-            value: "88%",
-            sub: "+3% this week", subC: "#6366f1",
-            icon: Brain, iconBg: "#f5f3ff",
-          },
+  label: "Value in Mediation",
+  value: `₹${totalMonetaryValue.toLocaleString('en-IN')}`,
+  sub: "Across active cases", subC: "#8b5cf6",
+  icon: TrendingUp, iconBg: "#f5f3ff",
+},
+         
         ].map(({ label, value, sub, subC, icon: Icon, iconBg }) => (
           <div
             key={label}
@@ -485,7 +517,19 @@ export default function Dashboard() {
 
         {/* LEFT */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-
+{riskFilter && (
+            <div style={{
+              padding: "10px 16px",
+              borderRadius: 8,
+              background: riskFilter === 'high_risk' ? '#fef2f2' : '#f1f5f9',
+              border: `1px solid ${riskFilter === 'high_risk' ? '#fecaca' : tk.border}`,
+              marginBottom: 12,
+              fontSize: 13,
+              color: riskFilter === 'high_risk' ? '#dc2626' : tk.text,
+            }}>
+              Showing only: {riskFilter === 'high_risk' ? 'High Risk Cases (processing failed)' : 'Stalled Negotiations (7+ days no progress)'}
+            </div>
+          )}
           {/* Tabs + Cases */}
           <Card>
             <div style={{ display: "flex", borderBottom: `1px solid ${tk.border}`, padding: "0 20px", gap: 0, overflowX: "auto" }}>
@@ -514,6 +558,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Charts row */}
+         
           <div style={{ display: "grid", gridTemplateColumns: isSmall ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
             <Card style={{ padding: "18px 20px" }}>
               <div style={{ fontWeight: 600, fontSize: 14, color: tk.text, marginBottom: 2 }}>Case Volume</div>
@@ -551,7 +596,32 @@ export default function Dashboard() {
                 </div>
               </div>
             </Card>
+
+            <Card style={{ padding: "18px 20px" }}>
+              <div style={{ fontWeight: 600, fontSize: 14, color: tk.text, marginBottom: 2 }}>Dispute Types</div>
+              <div style={{ fontSize: 12, color: tk.sub, marginBottom: 14 }}>Breakdown by category</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
+                <ResponsiveContainer width={130} height={130}>
+                  <PieChart>
+                    <Pie data={disputeTypeData} cx="50%" cy="50%" innerRadius={38} outerRadius={58} dataKey="value" stroke="none">
+                      {disputeTypeData.map((_, i) => <Cell key={i} fill={DISPUTE_COLORS[i % DISPUTE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 8, fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 130, overflowY: "auto" }}>
+                  {disputeTypeData.map((d, i) => (
+                    <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 3, background: DISPUTE_COLORS[i % DISPUTE_COLORS.length], flexShrink: 0 }} />
+                      <span style={{ color: tk.sub }}>{d.name}</span>
+                      <span style={{ fontWeight: 600, color: tk.text }}>{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
           </div>
+          
         </div>
 
         {/* RIGHT */}
@@ -590,33 +660,48 @@ export default function Dashboard() {
           </Card>
 
           {/* Risk Indicators */}
+        {/* Risk Indicators */}
           <Card>
             <CardHead title="Risk Indicators" sub="Cases requiring attention" />
             <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
               {RISKS.map((r) => (
-                <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div
+                  key={r.label}
+                  onClick={() => {
+                    if (r.count === 0) return
+                    setRiskFilter(prev => prev === r.key ? null : r.key)
+                  }}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    cursor: r.count > 0 ? "pointer" : "default",
+                    padding: "6px 8px",
+                    margin: "-6px -8px",
+                    borderRadius: 8,
+                    background: riskFilter === r.key ? `${r.color}15` : "transparent",
+                    transition: "background 0.15s",
+                  }}
+                >
                   <span style={{ fontSize: 13, color: tk.text }}>{r.label}</span>
                   <span style={{ minWidth: 26, height: 22, borderRadius: 11, background: r.color, color: "#fff", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 7px" }}>
                     {r.count}
                   </span>
                 </div>
               ))}
+              {riskFilter && (
+                <button
+                  onClick={() => setRiskFilter(null)}
+                  style={{ fontSize: 12, color: tk.accent, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}
+                >
+                  ← Clear filter, show all cases
+                </button>
+              )}
             </div>
           </Card>
 
           {/* AI Performance chart */}
-          <Card style={{ padding: "18px 20px" }}>
-            <div style={{ fontWeight: 600, fontSize: 15, color: tk.text, marginBottom: 2 }}>AI Performance</div>
-            <div style={{ fontSize: 12, color: tk.sub, marginBottom: 14 }}>Weekly accuracy trend</div>
-            <ResponsiveContainer width="100%" height={130}>
-              <BarChart data={aiPerfData} barSize={20}>
-                <XAxis dataKey="week" tick={{ fontSize: 10, fill: tk.sub }} axisLine={false} tickLine={false} />
-                <YAxis domain={[70, 100]} tick={{ fontSize: 10, fill: tk.sub }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 8, fontSize: 12 }} />
-                <Bar dataKey="acc" fill="#6366f1" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
+         
         </div>
       </div>
 
