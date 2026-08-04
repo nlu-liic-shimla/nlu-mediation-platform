@@ -42,7 +42,7 @@ T = TypeVar("T", bound=BaseModel)
 # ── Models ────────────────────────────────────────────────────────────────────
 # Groq (free — use during development)
 LARGE_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"  # newest free large model
-SMALL_MODEL = "llama-3.1-8b-instant"                        # keep same — still available
+SMALL_MODEL = "llama-3.1-8b-instant"                      # keep same — still available
 
 # ── Switch to Claude for demo week ────────────────────────────────────────────
 # When you're ready for demo, comment out the Groq lines above and uncomment these:
