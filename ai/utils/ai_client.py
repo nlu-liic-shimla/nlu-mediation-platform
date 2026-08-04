@@ -41,9 +41,8 @@ T = TypeVar("T", bound=BaseModel)
 
 # ── Models ────────────────────────────────────────────────────────────────────
 # Groq (free — use during development)
-LARGE_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"  # newest free large model
-SMALL_MODEL = "llama-3.1-8b-instant"                      # keep same — still available
-
+LARGE_MODEL = "llama-3.3-70b-versatile"
+SMALL_MODEL = "llama-3.1-8b-instant"
 # ── Switch to Claude for demo week ────────────────────────────────────────────
 # When you're ready for demo, comment out the Groq lines above and uncomment these:
 # from anthropic import Anthropic  — also swap the client below
