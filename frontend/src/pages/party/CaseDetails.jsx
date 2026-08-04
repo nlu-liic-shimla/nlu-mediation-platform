@@ -80,7 +80,7 @@ const ACTION_NEEDED = {
   PROPOSAL_DRAFT:          { msg: 'The mediator is preparing a proposal.',             action: null },
   PROPOSAL_PUBLISHED:      { msg: 'A proposal is ready for your review.',              action: 'proposal' },
   MEDIATION_IN_PROGRESS:   { msg: 'The mediator is reviewing feedback. Stand by.',     action: null },
-  MEDIATION_COMPLETE:      { msg: 'Both parties accepted. Confirm your settlement.',   action: 'settlement' },
+  MEDIATION_COMPLETE:     { msg: 'Both parties accepted. Waiting for your mediator to finalise the case.',   action: null },
   MEDIATION_FAILED:        { msg: 'Mediation could not be completed.',                 action: null },
   // Legacy
   QUESTIONNAIRE_PENDING:   { msg: 'Please answer the AI-generated questionnaire.',     action: 'questionnaire' },
@@ -173,6 +173,9 @@ const currentStep = STATUS_STEP_MAP[caseData?.status] ?? 0
   }
   if (caseData?.status === 'MEDIATION_COMPLETE' && settlementConfirmed) {
     actionInfo = { msg: 'You have confirmed the settlement. You can download the PDF once it is ready.', action: null }
+  }
+  if (caseData?.status === 'MEDIATION_COMPLETE' && caseData?.finalised_at) {
+    actionInfo = { msg: 'Please confirm your settlement.', action: 'settlement' }
   }
   const showBatna   = BURST_2_STATUSES.has(caseData?.status)
 

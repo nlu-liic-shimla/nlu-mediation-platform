@@ -308,9 +308,21 @@ const handleAccept = async () => {
                   <button className="ia-primary-btn" onClick={() => setStep('consent')}>
                     View Consent Form <ChevronRight size={16} />
                   </button>
-                  <button className="ia-decline-btn" onClick={() => setScreen('declined')}>
-                    Decline invitation
-                  </button>
+                 <button
+  className="ia-decline-btn"
+  onClick={async () => {
+    try {
+      await declineInvitation(token)
+    } catch (err) {
+      // Even if the API call fails, still show the declined screen —
+      // don't trap the user. Log for debugging.
+      console.error('Decline API call failed:', err)
+    }
+    setScreen('declined')
+  }}
+>
+  Decline invitation
+</button>
                 </>
               )}
 
