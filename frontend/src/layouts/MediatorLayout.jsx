@@ -9,12 +9,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Bell,
+
   Moon,
   Sun,
   MessageSquare,
   Scale,
-  X,
+ 
   Menu,
 } from "lucide-react";
 
@@ -42,8 +42,7 @@ export default function MediatorLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const notifRef = useRef(null);
+ 
 
   const user = JSON.parse(localStorage.getItem("nlu_user") || "{}");
   const tk = tokens(isDark);
@@ -59,14 +58,7 @@ export default function MediatorLayout({ children }) {
     if (!isMobile) setMobileOpen(false);
   }, [isMobile]);
 
-  useEffect(() => {
-    const h = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target))
-        setNotifOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+ 
 
   const handleLogout = () => {
     localStorage.removeItem("nlu_token");
@@ -374,94 +366,11 @@ export default function MediatorLayout({ children }) {
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          {/* Notifications */}
-          <div ref={notifRef} style={{ position: "relative", flexShrink: 0 }}>
-            <button
-              onClick={() => setNotifOpen((o) => !o)}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 8,
-                border: `1px solid ${tk.border}`,
-                background: tk.inputBg,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: tk.sub,
-                position: "relative",
-              }}
-            >
-              <Bell size={16} />
-              <span
-                style={{
-                  position: "absolute",
-                  top: 4,
-                  right: 4,
-                  width: 16,
-                  height: 16,
-                  borderRadius: "50%",
-                  background: "#ef4444",
-                  fontSize: 10,
-                  color: "#fff",
-                  fontWeight: 700,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                2
-              </span>
-            </button>
-            {notifOpen && (
-              <div
-                style={{
-                  position: "fixed",
-                  top: 64,
-                  right: 12,
-                  width: "min(290px, calc(100vw - 24px))",
-                  background: tk.surface,
-                  border: `1px solid ${tk.border}`,
-                  borderRadius: 10,
-                  boxShadow: "0 8px 32px rgba(0,0,0,.14)",
-                  zIndex: 9999,
-                  overflow: "visible",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "12px 16px",
-                    borderBottom: `1px solid ${tk.border}`,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    style={{ fontWeight: 600, fontSize: 14, color: tk.text }}
-                  >
-                    Notifications
-                  </span>
-                  <button
-                    onClick={() => setNotifOpen(false)}
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      cursor: "pointer",
-                      color: tk.sub,
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-                <div
-                  style={{ padding: "12px 16px", fontSize: 13, color: tk.sub }}
-                >
-                  No new notifications
-                </div>
-              </div>
-            )}
-          </div>
+          
+             
+           
+            
+            
 
           {/* Avatar */}
           <div

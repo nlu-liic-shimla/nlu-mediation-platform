@@ -7,7 +7,7 @@ import {
   Scale, LayoutDashboard, FilePlus, MessageSquare,
   FileText, CheckSquare, Bell, Search, ChevronRight,
   ChevronLeft, Calendar, TrendingUp, Clock, AlertCircle,
-  Bot, LogOut, Menu, X
+  Bot, LogOut, Menu, X,  DollarSign
 } from 'lucide-react'
 
 const PARTY_STATUS_LABELS = {
@@ -115,7 +115,7 @@ const StatCard = ({ label, value, sub, subColor, icon, iconBg }) => (
   </div>
 )
 
-const CaseCard = ({ title, status, rawStatus, caseId, displayId, vs, progress, nextDate, statusColor, statusBg, onView }) => (
+const CaseCard = ({ title, status, rawStatus, caseId, displayId, vs, progress, nextDate, statusColor, statusBg, onView, docCount  }) => (
   <div className="pd-case-card">
     <div className="pd-case-top">
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -158,14 +158,17 @@ export default function Dashboard() {
   const [activeNav, setActiveNav] = useState('dashboard')
   const [collapsed, setCollapsed] = useState(false)
   const [search, setSearch] = useState('')
-  const [showNotifs, setShowNotifs] = useState(false)
+  
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [timeline, setTimeline] = useState([])
+  const [docCounts, setDocCounts] = useState({})
 
   const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
   const userEmail = user.email || 'User'
   const userInitials = userEmail.substring(0, 2).toUpperCase()
   const userName = userEmail.split('@')[0]
+ 
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)
@@ -182,41 +185,68 @@ export default function Dashboard() {
 
   const sidebarWidth = isMobile ? 0 : (collapsed ? 60 : 240)
 
-  const [cases, setCases] = useState([])
-  const [applications, setApplications] = useState([])
+  
+const [cases, setCases] = useState([])
+const [applications, setApplications] = useState([])
 
 useEffect(() => {
   client.get('/cases').then(res => {
     const data = res.data
     const arr = Array.isArray(data) ? data : data.cases || data.data || []
-    console.log('RAW:', JSON.stringify(arr[0]))  // ← change to this
     setCases(arr)
   }).catch(() => setCases([]))
+
+  client.get('/cases/applications/my').then(res => {
+    setApplications(res.data?.applications || [])
+  }).catch(() => setApplications([]))
 }, [])
+const activeCase = cases[0]
 
-  const notifications = [
-    { text: 'New settlement proposal received for CASE-2024-001', time: '2 hours ago' },
-    { text: 'Upcoming mediation session on May 25 at 2:00 PM', time: '5 hours ago' },
-    { text: 'Document analysis completed', time: '1 day ago' },
-  ]
+const activeCasesList = cases.filter(
+  c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status)
+)
 
-  const activities = [
-    { title: 'Settlement Proposal Submitted', desc: 'Mediator submitted revised settlement proposal', date: '5/21/2026' },
-    { title: 'Mediation Session #3', desc: 'Virtual session discussing payment terms', date: '5/18/2026' },
-    { title: 'Document Analysis Completed', desc: 'AI analysis of all submitted evidence', date: '5/15/2026' },
-  ]
+const totalMonetaryValue = cases
+  .filter(c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status))
+  .reduce((sum, c) => sum + (Number(c.monetary_value) || 0), 0)
+
+useEffect(() => {
+    if (!activeCase?.id) return
+    client.get(`/cases/${activeCase.id}/audit-log/party-view`).then(res => {
+      setTimeline((Array.isArray(res.data) ? res.data : []).slice(0, 5))
+    }).catch(() => setTimeline([]))
+  }, [activeCase?.id])
+
+  useEffect(() => {
+  activeCasesList.forEach(c => {
+    client.get(`/cases/${c.id}/documents`).then(res => {
+      const docs = Array.isArray(res.data) ? res.data : res.data?.documents ?? []
+      setDocCounts(prev => ({ ...prev, [c.id]: docs.length }))
+    }).catch(() => {})
+  })
+}, [cases])
+
 
   const quickActions = [
     { icon: <FilePlus size={17} />, label: 'Apply for Mediation', path: '/party/apply' },
-  { icon: <FilePlus size={17} />, label: 'Start New Case', path: '/party/apply' },
+  
   { 
     icon: <FileText size={17} />, 
     label: 'Upload Documents', 
-    onClick: () => cases[0] && navigate(`/party/cases/${cases[0].id}/documents`)
+    onClick: () => {
+      if (cases[0]) {
+        navigate(`/party/cases/${cases[0].id}/documents`)
+      } else {
+        alert("You don't have an active case yet. Apply for mediation first.")
+      }
+    }
   },
-  { icon: <Calendar size={17} />, label: 'Schedule Session', path: null },
 ]
-const activeCase = cases[0]
+
+
+ 
+
+ 
   const visibleNavIds = new Set(['dashboard', 'new-case'])
   if (activeCase) {
     const qStages = ['QUESTIONNAIRE_ACTIVE', 'QUESTIONNAIRE_COMPLETE', 'BURST_2_PROCESSING', 'BURST_2_COMPLETE', 'PROPOSAL_DRAFT', 'PROPOSAL_PUBLISHED', 'MEDIATION_IN_PROGRESS', 'MEDIATION_COMPLETE']
@@ -225,9 +255,7 @@ const activeCase = cases[0]
     if (pStages.includes(activeCase.status)) visibleNavIds.add('proposals')
     if (activeCase.status === 'MEDIATION_COMPLETE') visibleNavIds.add('settlement')
   }
-const activeCasesList = cases.filter(
-  c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status)
-)
+
   return (
     <>
       <style>{`
@@ -466,27 +494,7 @@ const activeCasesList = cases.filter(
             </div>
             <div className="pd-topbar-right">
               <ThemeToggle />
-              <div className="pd-notif-wrap">
-                <button className="pd-notif-btn" onClick={() => setShowNotifs(p => !p)}>
-                  <Bell size={20} color="var(--text-secondary)" />
-                  <span className="pd-notif-badge">2</span>
-                </button>
-                {showNotifs && (
-                  <div className="pd-notif-dropdown">
-                    <p className="pd-notif-title">Notifications</p>
-                    {notifications.map((n, i) => (
-                      <div key={i} className="pd-notif-item-drop">
-                        <div className="pd-notif-drop-icon"><AlertCircle size={14} color="var(--brand)" /></div>
-                        <div>
-                          <p className="pd-notif-drop-text">{n.text}</p>
-                          <p className="pd-notif-drop-time">{n.time}</p>
-                        </div>
-                      </div>
-                    ))}
-                    <button className="pd-notif-view-all">View all notifications</button>
-                  </div>
-                )}
-              </div>
+             
               <div className="pd-avatar">{userInitials}</div>
               <span className="pd-avatar-name">{userName}</span>
               <button className="pd-signout-btn" onClick={handleSignOut}>
@@ -503,15 +511,48 @@ const activeCasesList = cases.filter(
                 <h1 className="pd-page-title">Dashboard</h1>
                 <p className="pd-page-sub">Welcome back, {userName}. Here's your case overview.</p>
               </div>
+              {activeCase && (
+  ['QUESTIONNAIRE_ACTIVE', 'PROPOSAL_PUBLISHED'].includes(activeCase.status) ||
+  (activeCase.status === 'MEDIATION_COMPLETE' && activeCase.finalised_at)
+) && ( <div style={{
+    padding: '14px 18px',
+    borderRadius: 10,
+    background: 'var(--brand-light)',
+    border: '1.5px solid var(--brand)',
+    marginBottom: '1.25rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    flexWrap: 'wrap',
+  }}>
+    <span style={{ fontSize: 14, color: 'var(--brand)', fontWeight: 500 }}>
+      {activeCase.status === 'QUESTIONNAIRE_ACTIVE' && 'Action needed: Answer your questionnaire'}
+      {activeCase.status === 'PROPOSAL_PUBLISHED' && 'Action needed: Review the mediator\'s proposal'}
+      {activeCase.status === 'MEDIATION_COMPLETE' && 'Action needed: Confirm your settlement'}
+    </span>
+    <button
+      onClick={() => {
+        if (activeCase.status === 'QUESTIONNAIRE_ACTIVE') navigate(`/party/cases/${activeCase.id}/questionnaire`)
+        if (activeCase.status === 'PROPOSAL_PUBLISHED') navigate(`/party/cases/${activeCase.id}/proposal`)
+        if (activeCase.status === 'MEDIATION_COMPLETE') navigate(`/party/cases/${activeCase.id}/settlement`)
+      }}
+      style={{ background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+    >
+      Take Action →
+    </button>
+  </div>
+)}
 
               <div className="pd-layout">
                 <div className="pd-left-col">
                   <div className="pd-stats-grid">
-                    <StatCard label="Active Cases" value={cases.filter(c => !['SETTLED','MEDIATION_FAILED','CLOSED'].includes(c.status)).length} sub={cases.length > 0 ? 'Your ongoing cases' : 'No cases yet'} subColor="#16a34a" iconBg="#eef1fb" icon={<FileText size={22} color="#2a3f8f" />} />
-                    <StatCard label="Pending Proposals" value={cases.filter(c => c.status === 'PROPOSAL_SENT').length} sub="Awaiting your response" iconBg="#fff7ed" icon={<Clock size={22} color="#ea8c0d" />} />
-                    <StatCard label="Completed" value={cases.filter(c => ['SETTLED','CLOSED'].includes(c.status)).length} sub="Successfully resolved" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
-                    <StatCard label="Total Cases" value={cases.length} sub="All time" subColor="var(--text-muted)" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
-                  </div>
+                    <StatCard label="Active Cases" value={cases.filter(c => !['MEDIATION_COMPLETE','MEDIATION_FAILED'].includes(c.status)).length} sub={cases.length > 0 ? 'Your ongoing cases' : 'No cases yet'} subColor="#16a34a" iconBg="#eef1fb" icon={<FileText size={22} color="#2a3f8f" />} />
+<StatCard label="Pending Proposals" value={cases.filter(c => c.status === 'PROPOSAL_PUBLISHED').length} sub="Awaiting your response" iconBg="#fff7ed" icon={<Clock size={22} color="#ea8c0d" />} />
+<StatCard label="Completed" value={cases.filter(c => c.status === 'MEDIATION_COMPLETE').length} sub="Successfully resolved" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
+<StatCard label="Total Cases" value={cases.length} sub="All time" subColor="var(--text-muted)" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
+<StatCard label="Amount at Stake" value={`₹${totalMonetaryValue.toLocaleString('en-IN')}`} sub="Across active cases" subColor="#8b5cf6" iconBg="#f5f3ff" icon={<TrendingUp size={22} color="#8b5cf6" />} />
+ </div>
 
                   <div className="pd-section">
                     <div className="pd-section-head">
@@ -520,10 +561,12 @@ const activeCasesList = cases.filter(
                         <p className="pd-section-sub">Track your ongoing mediation cases</p>
                       </div>
                       
-                      <button
+                     <button
   className="pd-new-case-btn"
   onClick={() => navigate('/party/apply')}
+  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
 >
+  <FilePlus size={15} />
   New Case
 </button>
                     </div>{applications
@@ -601,7 +644,9 @@ const activeCasesList = cases.filter(
       return idx >= 0 ? Math.round((idx / (steps.length - 1)) * 100) : 0
     })()}
     nextDate={'—'}
+         docCount={docCounts[c.id]}
     onView={() => navigate(`/party/cases/${c.id}`)}
+   
   />
 ))}
                   </div>
@@ -609,18 +654,22 @@ const activeCasesList = cases.filter(
 
                 <div className="pd-right-col">
                   <div className="pd-side-card">
-                    <h2 className="pd-side-title">Recent Notifications</h2>
-                    {notifications.map((n, i) => (
-                      <div key={i} className="pd-notif-item" style={{ borderBottom: i < notifications.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <div className="pd-notif-icon"><AlertCircle size={14} color="var(--brand)" /></div>
-                        <div>
-                          <p className="pd-notif-text">{n.text}</p>
-                          <p className="pd-notif-time">{n.time}</p>
+                    <h2 className="pd-side-title">Case Timeline</h2>
+                    {timeline.length === 0 ? (
+                      <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No activity yet.</p>
+                    ) : (
+                      timeline.map((log, i) => (
+                        <div key={i} className="pd-activity-item" style={{ borderBottom: i < timeline.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                          <div className="pd-activity-dot" />
+                          <div>
+                            <p className="pd-activity-title">{log.action?.replace(/_/g, ' ')}</p>
+                            <p className="pd-activity-date">{new Date(log.created_at).toLocaleDateString()}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    <button className="pd-view-all">View all notifications</button>
+                      ))
+                    )}
                   </div>
+                  
                   <div className="pd-side-card">
   <h2 className="pd-side-title">Quick Actions</h2>
   {quickActions.map((a, i) => (
@@ -628,7 +677,7 @@ const activeCasesList = cases.filter(
       key={i}
       className="pd-qa-btn"
       style={{ marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}
-      onClick={() => a.path && navigate(a.path)}
+      onClick={() => { if (a.onClick) a.onClick(); else if (a.path) navigate(a.path) }}
     >
       <span style={{ color: 'var(--brand)', display: 'flex' }}>{a.icon}</span>
       <span className="pd-qa-label">{a.label}</span>
@@ -639,26 +688,14 @@ const activeCasesList = cases.filter(
 
             
 
-                  <div className="pd-side-card">
-                    <h2 className="pd-side-title">Recent Activity</h2>
-                    {activities.map((a, i) => (
-                      <div key={i} className="pd-activity-item" style={{ borderBottom: i < activities.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <div className="pd-activity-dot" />
-                        <div>
-                          <p className="pd-activity-title">{a.title}</p>
-                          <p className="pd-activity-desc">{a.desc}</p>
-                          <p className="pd-activity-date">{a.date}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                 
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <button className="pd-chat-btn"><MessageSquare size={21} color="white" /></button>
+       
       </div>
     </>
   )
