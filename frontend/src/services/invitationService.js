@@ -7,10 +7,10 @@ export const getInvitation = async (token) => {
   return response.data;
 };
 
-export const acceptInvitation = async (token, password, fullName = null) => {
+export const acceptInvitation = async (token, email, password, fullName = null) => {
   const response = await axios.post(
     `${BASE}/api/v1/invitations/${token}/accept`,
-    { password, full_name: fullName }
+    { email, password, full_name: fullName }
   )
   return response.data
 }

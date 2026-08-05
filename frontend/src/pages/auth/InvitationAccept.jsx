@@ -79,17 +79,18 @@ const handleAccept = async () => {
   setLoading(true)
   setApiError('')
   try {
-    const isLogin = accountChoice === 'has_account'
-    const data = isLogin
-      ? await acceptInvitation(token, password)
-      : await acceptInvitation(token, password, email.split('@')[0])
+   const isLogin = accountChoice === 'has_account'
+const data = isLogin
+  ? await acceptInvitation(token, email, password)
+  : await acceptInvitation(token, email, password, email.split('@')[0])
     localStorage.setItem('nlu_token', data.access_token)
     localStorage.setItem('nlu_role', 'party_user')
     localStorage.setItem('nlu_user', JSON.stringify({
-      email,
-      role: 'party_user',
-      case_id: data.case_id,
-    }))
+  email,
+  full_name: data.full_name || null,
+  role: 'party_user',
+  case_id: data.case_id,
+}))
     localStorage.setItem('nlu_case_role', data.role_in_this_case)
     navigate(`/party/cases/${data.case_id}/intake`)
   } catch (err) {
