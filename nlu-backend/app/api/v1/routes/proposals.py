@@ -456,56 +456,59 @@ async def respond_to_proposal(
             "rejection_reason": body.rejection_reason,
         },
     )
-
-    # Check if BOTH parties have now responded
+    # Check all responses recorded so far for this proposal
     all_responses = supabase.table("proposal_responses") \
         .select("decision").eq("proposal_id", proposal_id).execute()
 
-    if len(all_responses.data) >= 2:
-        decisions = [r["decision"] for r in all_responses.data]
+    decisions = [r["decision"] for r in all_responses.data]
 
-        if all(d == "accept" for d in decisions):
-            # Both accepted — case complete
-            transition(case_id=case_id, new_state=CaseState.MEDIATION_COMPLETE, actor_id="system")
-            _write_audit(
-                case_id=case_id, actor_id="system",
-                action="MEDIATION_COMPLETE",
-                old_state=CaseState.PROPOSAL_PUBLISHED.value, new_state=CaseState.MEDIATION_COMPLETE.value,
-                metadata={"proposal_id": proposal_id},
-            )
-            return {"status": "mediation_complete", "message": "Both parties accepted. The mediator has been notified to finalise the case."}
+    # A single rejection is enough to kill this proposal — do not wait for
+    # the second party. Waiting means a party can be stuck seeing a proposal
+    # that's already dead, and the mediator can't start revising until the
+    # other party bothers to respond (which may never happen).
+    if decision_val == "reject":
+        transition(case_id=case_id, new_state=CaseState.MEDIATION_IN_PROGRESS, actor_id="system")
 
-        else:
-            # At least one rejection — go to negotiation loop
-            transition(case_id=case_id, new_state=CaseState.MEDIATION_IN_PROGRESS, actor_id="system")
+        # Fire Sub-system H to generate revision suggestions
+        try:
+            from tasks import generate_proposal_revision
+            generate_proposal_revision.delay(case_id, proposal_id)
+            h_triggered = True
+        except Exception as e:
+            logger.error(f"Could not trigger generate_proposal_revision: {e}")
+            h_triggered = False
 
-            # Fire Sub-system H to generate revision suggestions
-            try:
-                from tasks import generate_proposal_revision
-                generate_proposal_revision.delay(case_id, proposal_id)
-                h_triggered = True
-            except Exception as e:
-                logger.error(f"Could not trigger generate_proposal_revision: {e}")
-                h_triggered = False
+        _write_audit(
+            case_id=case_id, actor_id="system",
+            action="MEDIATION_IN_PROGRESS",
+            old_state=CaseState.PROPOSAL_PUBLISHED.value, new_state=CaseState.MEDIATION_IN_PROGRESS.value,
+            metadata={"proposal_id": proposal_id, "revision_triggered": h_triggered},
+        )
+        return {
+            "status":             "mediation_in_progress",
+            "revision_triggered": h_triggered,
+            "message":            "Proposal rejected. The mediator will prepare a revised proposal.",
+        }
 
-            _write_audit(
-                case_id=case_id, actor_id="system",
-                action="MEDIATION_IN_PROGRESS",
-                old_state=CaseState.PROPOSAL_PUBLISHED.value, new_state=CaseState.MEDIATION_IN_PROGRESS.value,
-                metadata={"proposal_id": proposal_id, "revision_triggered": h_triggered},
-            )
-            return {
-                "status":             "mediation_in_progress",
-                "revision_triggered": h_triggered,
-                "message":            "Proposal rejected. The mediator will prepare a revised proposal.",
-            }
+    # decision_val == "accept" — only complete once BOTH parties have accepted
+    if len(decisions) >= 2 and all(d == "accept" for d in decisions):
+        transition(case_id=case_id, new_state=CaseState.MEDIATION_COMPLETE, actor_id="system")
+        _write_audit(
+            case_id=case_id, actor_id="system",
+            action="MEDIATION_COMPLETE",
+            old_state=CaseState.PROPOSAL_PUBLISHED.value, new_state=CaseState.MEDIATION_COMPLETE.value,
+            metadata={"proposal_id": proposal_id},
+        )
+        return {"status": "mediation_complete", "message": "Both parties accepted. The mediator has been notified to finalise the case."}
 
-    # Only one party responded so far
+    # Accepted, but still waiting on the other party
     return {
         "status":  "response_recorded",
         "waiting": True,
         "message": "Your response has been recorded. Waiting for the other party.",
     }
+
+   
 
 
 @router.get(
