@@ -1130,8 +1130,8 @@ export default function CaseOverview() {
           </div>
         )}
         {/* Finalise Case button */}
-       {caseData.status === "MEDIATION_COMPLETE" && !settlementDone && (
-          <div
+      {caseData.status === "MEDIATION_COMPLETE" && !settlementDone && !caseData.finalised_at && (
+  <div
             style={{
               padding: "12px 16px",
               borderRadius: 10,
