@@ -464,8 +464,8 @@ function SuccessScreen({ navigate }) {
           Submission received
         </h2>
         <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '2rem' }}>
-          Your dispute has been submitted successfully. The mediator will review your submission and notify you of the next steps. Please check back on your dashboard for updates.
-        </p>
+          Your dispute has been submitted successfully. We're now waiting for the other party to submit their statement. You'll be notified once both statements are in and AI analysis begins.
+</p>
         <button
           onClick={() => navigate('/party')}
           style={{

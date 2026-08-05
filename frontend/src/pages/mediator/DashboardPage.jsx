@@ -169,14 +169,19 @@ export default function Dashboard() {
       setNewCaseError('Case title is required');
       return;
     }
-    if (!newCaseForm.brief_description.trim() || newCaseForm.brief_description.trim().length < 20) {
-      setNewCaseError('Description is required and must be at least 20 characters.');
-      return;
-    }
-    if (!newCaseForm.requesting_party_email.trim()) {
-      setNewCaseError('Requesting party email is required');
-      return;
-    }
+    // Description is optional — only validate length if the user typed something
+if (newCaseForm.brief_description.trim() && newCaseForm.brief_description.trim().length < 20) {
+  setNewCaseError('Description must be at least 20 characters if provided.');
+  return;
+}
+if (!newCaseForm.requesting_party_email.trim()) {
+  setNewCaseError('Requesting party email is required');
+  return;
+}
+if (!newCaseForm.against_party_email.trim()) {
+  setNewCaseError('Against party email is required');
+  return;
+}
     setNewCaseLoading(true);
     setNewCaseError('');
     try {
@@ -762,10 +767,10 @@ export default function Dashboard() {
             {/* Against party email */}
             <div style={{ marginBottom: 20 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: tk.sub, display: 'block', marginBottom: 6 }}>
-                AGAINST PARTY EMAIL
-              </label>
-              <input
-                type="email"
+  AGAINST PARTY EMAIL *
+</label>
+<input
+  type="email"
                 placeholder="party-b@example.com (optional — can add later)"
                 value={newCaseForm.against_party_email}
                 onChange={e => setNewCaseForm(p => ({ ...p, against_party_email: e.target.value }))}

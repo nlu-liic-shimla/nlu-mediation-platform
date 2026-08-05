@@ -165,9 +165,9 @@ export default function Dashboard() {
   const [docCounts, setDocCounts] = useState({})
 
   const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
-  const userEmail = user.email || 'User'
-  const userInitials = userEmail.substring(0, 2).toUpperCase()
-  const userName = userEmail.split('@')[0]
+const userEmail = user.email || 'User'
+const userName = user.full_name || userEmail.split('@')[0]
+const userInitials = userName.substring(0, 2).toUpperCase()
  
 
   useEffect(() => {

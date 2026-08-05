@@ -42,7 +42,8 @@ class CaseResponse(BaseModel):
     dispute_type: Optional[str] = None
     brief_description: Optional[str] = None
     status: str
-    created_by: str                                # always mediator user_id
+      
+    created_by: Optional[str] = None                # ← now optional                              # always mediator user_id
     assigned_mediator: Optional[str] = None        # always mediator user_id
     requesting_party_email: Optional[str] = None
     against_party_email: Optional[str] = None

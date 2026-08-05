@@ -37,6 +37,8 @@ const STATUS_COLORS = {
   APPLICATION_REJECTED: "#ef4444",
   WITHDRAWN: "#64748b",
   BOTH_INVITED: "#6366f1",
+  AWAITING_INVITATIONS: "#f59e0b",
+  PARTIALLY_INVITED: "#f59e0b",
   FIRST_PARTY_SUBMITTED: "#f59e0b",
   BOTH_SUBMITTED: "#3b82f6",
   BURST_1_PROCESSING: "#8b5cf6",
@@ -73,6 +75,15 @@ const NEXT_ACTION = {
   MEDIATION_IN_PROGRESS: "Mediation in progress — monitor party responses",
   MEDIATION_COMPLETE: "Mediation complete — settlement PDF available",
   MEDIATION_FAILED: "Mediation failed — case is closed",
+};
+// Add this helper above the component or inline where StatusBadge is rendered
+const getDisplayStatus = (status, invitationStatus) => {
+  if (status !== "BOTH_INVITED") return status;
+  const reqInvited = invitationStatus.requesting_party?.link_generated;
+  const agInvited = invitationStatus.against_party?.link_generated;
+  if (reqInvited && agInvited) return "BOTH_INVITED";      // links actually generated
+  if (reqInvited || agInvited) return "PARTIALLY_INVITED";  // one done
+  return "AWAITING_INVITATIONS";                             // neither yet
 };
 
 function StatusBadge({ status }) {
@@ -681,6 +692,7 @@ export default function CaseOverview() {
   // Close case modal — { partyKey, partyLabel }
   const [closeModal, setCloseModal] = useState(null);
   const [closeLoading, setCloseLoading] = useState(false);
+  const [submissions, setSubmissions] = useState([]);
 
   const tk = tokens(isDark);
   const width = useWindowWidth();
@@ -691,6 +703,7 @@ export default function CaseOverview() {
     try {
       const res = await client.get(`/cases/${caseId}/submissions`);
       const subs = res.data?.submissions || [];
+      setSubmissions(subs); 
       const status = {
         party_a_email: null,
         party_a_submitted: false,
@@ -983,7 +996,7 @@ export default function CaseOverview() {
           >
             {caseTitle}
           </h1>
-          <StatusBadge status={caseData.status} />
+          <StatusBadge status={getDisplayStatus(caseData.status, invitationStatus)} />
         </div>
 
         {/* ── Next Action banner ── */}
@@ -1853,15 +1866,14 @@ export default function CaseOverview() {
                   : "Not specified",
               },
               {
-                label: "Description",
-                value: caseData.brief_description || "Not specified",
-              },
-              {
-                label: "Monetary Value",
-                value: caseData.monetary_value
-                  ? `INR ${Number(caseData.monetary_value).toLocaleString("en-IN")}`
-                  : "Not specified",
-              },
+  label: "Description",
+  value: caseData.brief_description || (
+    <span style={{ color: tk.sub, fontStyle: 'italic' }}>
+      Not specified — see individual statements in AI Analysis
+    </span>
+  ),
+},
+              
               {
                 label: "Created",
                 value: caseData.created_at
@@ -1911,6 +1923,37 @@ export default function CaseOverview() {
                 </span>
               </div>
             ))}
+           {/* Monetary Value — computed separately to compare both parties' claims */}
+{(() => {
+  const reqSub = submissions.find(s => s.invitation_role === 'requesting_party');
+  const agSub  = submissions.find(s => s.invitation_role === 'against_party');
+  const reqVal = reqSub?.monetary_amount;
+  const agVal  = agSub?.monetary_amount;
+
+  let monetaryDisplay;
+  if (caseData.monetary_value) {
+    monetaryDisplay = `INR ${Number(caseData.monetary_value).toLocaleString("en-IN")}`;
+  } else if (reqVal && agVal && reqVal !== agVal) {
+    monetaryDisplay = (
+      <span>
+        <span style={{ color: '#1e40af' }}>Requesting: ₹{Number(reqVal).toLocaleString("en-IN")}</span>
+        {'  ·  '}
+        <span style={{ color: '#dc2626' }}>Against: ₹{Number(agVal).toLocaleString("en-IN")}</span>
+      </span>
+    );
+  } else if (reqVal || agVal) {
+    monetaryDisplay = `INR ${Number(reqVal || agVal).toLocaleString("en-IN")}`;
+  } else {
+    monetaryDisplay = "Not specified";
+  }
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${tk.border}` }}>
+      <span style={{ color: tk.sub, minWidth: 140 }}>Monetary Value</span>
+      <span style={{ fontWeight: 500, color: tk.text, textAlign: "right" }}>{monetaryDisplay}</span>
+    </div>
+  );
+})()}
           </div>
         </div>
       </div>
