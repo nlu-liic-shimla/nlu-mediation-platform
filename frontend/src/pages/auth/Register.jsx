@@ -151,8 +151,25 @@ export default function Register() {
 })
         setStep(3)
       } catch (err) {
-        setApiError(err.response?.data?.detail || 'Registration failed. Please try again.')
-      } finally { setLoading(false) }
+  const detail = err.response?.data?.detail
+  let message = 'Registration failed. Please try again.'
+
+  if (typeof detail === 'string') {
+    message = detail
+  } else if (Array.isArray(detail)) {
+    // FastAPI/Pydantic validation errors — array of { loc, msg, type }
+    message = detail
+      .map(e => {
+        const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : ''
+        return field ? `${field}: ${e.msg}` : e.msg
+      })
+      .join(' ')
+  } else if (detail?.message) {
+    message = detail.message
+  }
+
+  setApiError(message)
+}
     }
   }
 

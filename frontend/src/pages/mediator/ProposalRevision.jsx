@@ -111,6 +111,7 @@ export default function ProposalRevision() {
   const navigate = useNavigate();
   const [dark, setDark] = useState(false);
 
+  const [proposalId, setProposalId] = useState(null); // NEW: the draft we actually save/publish
   const [revisedText, setRevisedText] = useState("");
   const [roundNumber, setRoundNumber] = useState(null);
   const [maxRounds, setMaxRounds] = useState(3);
@@ -137,39 +138,63 @@ export default function ProposalRevision() {
   }, []);
 
   // ── Load revision data from API ──────────────────────────
-  // Fetches the proposal by p_id, then reads revision_suggestions
-  // which is populated by Sub-system H (Celery task) after a rejection.
+  // Fetches the rejected proposal (by p_id) to read its rejection
+  // reasons + AI revision_suggestions, then ensures a NEW draft proposal
+  // exists for this round (creating one if needed) — because publishing
+  // requires the case to pass through PROPOSAL_DRAFT, which only
+  // POST /cases/{id}/proposals triggers. Reusing the old rejected
+  // proposal's id for publish always fails with an invalid state
+  // transition (MEDIATION_IN_PROGRESS -> PROPOSAL_PUBLISHED doesn't exist).
   useEffect(() => {
     const loadRevision = async () => {
       try {
-        // Fetch all proposals for this case, find the one matching p_id
         const res = await client.get(`/cases/${id}/proposals`);
         const proposals = Array.isArray(res.data)
           ? res.data
           : res.data?.proposals ?? [];
 
-        const proposal = proposals.find((p) => p.id === p_id) ?? proposals[proposals.length - 1];
+        const rejectedProposal =
+          proposals.find((p) => p.id === p_id) ?? proposals[proposals.length - 1];
 
-        if (!proposal) {
+        if (!rejectedProposal) {
           setError("Proposal not found.");
           return;
         }
 
         // revision_suggestions is set by Sub-system H after rejection
         // shape: { revised_draft, changes_summary, requesting_reason, against_reason }
-        const suggestions = proposal.revision_suggestions || {};
+        const suggestions = rejectedProposal.revision_suggestions || {};
 
-        setRevisedText(suggestions.revised_draft || proposal.content || proposal.raw_text || "");
-        setRoundNumber(proposal.round_number || proposal.round || 1);
-        setPreviousProposal(proposal.content || proposal.raw_text || "");
+        setPreviousProposal(
+          rejectedProposal.content || rejectedProposal.raw_text || ""
+        );
         setRequestingReason(suggestions.requesting_reason || "");
         setAgainstReason(suggestions.against_reason || "");
         setChangesSummary(suggestions.changes_summary || []);
 
-        // Get max_rounds from the case
+        // Find an existing draft for the next round, or create one.
+        let draftProposal = proposals.find((p) => p.status === "draft");
+
+        if (!draftProposal) {
+          // This POST is what actually transitions the case
+          // MEDIATION_IN_PROGRESS -> PROPOSAL_DRAFT on the backend.
+          const created = await client.post(`/cases/${id}/proposals`);
+          draftProposal = {
+            id: created.data.proposal_id,
+            content: created.data.draft_text,
+            round: created.data.round,
+          };
+        }
+
+        setProposalId(draftProposal.id);
+        // Prefer the AI revision suggestion text; fall back to the fresh draft's content
+        setRevisedText(suggestions.revised_draft || draftProposal.content || "");
+        setRoundNumber(
+          draftProposal.round || (rejectedProposal.round || 1) + 1
+        );
+
         const caseRes = await client.get(`/cases/${id}`);
         setMaxRounds(caseRes.data?.max_rounds || 3);
-
       } catch {
         setError("Failed to load revision data. Please go back and try again.");
       } finally {
@@ -180,10 +205,10 @@ export default function ProposalRevision() {
   }, [id, p_id]);
 
   const handleSaveDraft = async () => {
-    if (!p_id) return;
+    if (!proposalId) return;
     setSaving(true);
     try {
-      await updateProposal(id, p_id, revisedText);
+      await updateProposal(id, proposalId, revisedText);
       setSavedAt(new Date().toLocaleTimeString());
     } catch {
       alert("Failed to save draft. Try again.");
@@ -193,10 +218,12 @@ export default function ProposalRevision() {
   };
 
   const handlePublish = async () => {
-    if (!p_id) return;
+    if (!proposalId) return;
     setPublishing(true);
     try {
-      await publishProposal(id, p_id);
+      // Make sure the latest edits are saved before publishing
+      await updateProposal(id, proposalId, revisedText);
+      await publishProposal(id, proposalId);
       setShowPublishModal(false);
       navigate(`/mediator/cases/${id}`);
     } catch (err) {
