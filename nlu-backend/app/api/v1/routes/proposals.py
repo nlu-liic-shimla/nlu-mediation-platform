@@ -467,9 +467,34 @@ async def respond_to_proposal(
     # that's already dead, and the mediator can't start revising until the
     # other party bothers to respond (which may never happen).
     if decision_val == "reject":
+        # Fetch fresh case data to check round limits
+        case_resp = supabase.table("cases") \
+            .select("negotiation_round, max_rounds") \
+            .eq("id", case_id).single().execute()
+        current_round = case_resp.data.get("negotiation_round") or 0
+        max_rounds = case_resp.data.get("max_rounds") or 3
+
+        final_round_exhausted = current_round >= max_rounds
+
+        # Step 1: PROPOSAL_PUBLISHED -> MEDIATION_IN_PROGRESS (always valid first step)
         transition(case_id=case_id, new_state=CaseState.MEDIATION_IN_PROGRESS, actor_id="system")
 
-        # Fire Sub-system H to generate revision suggestions
+        if final_round_exhausted:
+            # Step 2: MEDIATION_IN_PROGRESS -> MEDIATION_FAILED
+            transition(case_id=case_id, new_state=CaseState.MEDIATION_FAILED, actor_id="system")
+
+            _write_audit(
+                case_id=case_id, actor_id="system",
+                action="MEDIATION_FAILED",
+                old_state=CaseState.MEDIATION_IN_PROGRESS.value, new_state=CaseState.MEDIATION_FAILED.value,
+                metadata={"proposal_id": proposal_id, "reason": "final_round_rejected", "round": current_round, "max_rounds": max_rounds},
+            )
+            return {
+                "status": "mediation_failed",
+                "message": "Final round rejected. Mediation has ended without a settlement.",
+            }
+
+        # Not final round — fire Sub-system H as before
         try:
             from tasks import generate_proposal_revision
             generate_proposal_revision.delay(case_id, proposal_id)
