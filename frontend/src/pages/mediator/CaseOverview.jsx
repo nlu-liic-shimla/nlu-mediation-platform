@@ -1215,6 +1215,36 @@ export default function CaseOverview() {
             </button>
           </div>
         )}
+        {/* ── MEDIATION_FAILED — final round rejected, no agreement reached ── */}
+{caseData.status === "MEDIATION_FAILED" && (
+  <div
+    style={{
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "#fef2f2",
+      border: "1px solid #fecaca",
+      marginBottom: 16,
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 10,
+    }}
+  >
+    <AlertTriangle
+      size={16}
+      color="#ef4444"
+      style={{ flexShrink: 0, marginTop: 2 }}
+    />
+    <div>
+      <div style={{ fontSize: 14, color: "#dc2626", fontWeight: 600 }}>
+        Mediation failed — maximum rounds exhausted
+      </div>
+      <div style={{ fontSize: 12, color: "#ef4444", marginTop: 2 }}>
+        The final round was rejected and no settlement was reached. This case
+        is now closed. Both parties have been notified.
+      </div>
+    </div>
+  </div>
+)}
 
         {/* ── Party declined 3 times warning + Close Case button ── */}
         {showDeclineWarning && (
@@ -1583,6 +1613,7 @@ export default function CaseOverview() {
 
                 const isRejected =
                   requestingStatus === "Rejected" || againstStatus === "Rejected";
+                const laterRoundExists = proposals.some((other) => other.round > p.round);
 
                 return (
                   <div
@@ -1702,60 +1733,85 @@ export default function CaseOverview() {
                       }}
                     >
                       {p.status === "draft" && (
-                        <button
-                          onClick={() =>
-                            navigate(`/mediator/cases/${id}/proposals/new`)
-                          }
-                          style={{
-                            padding: "5px 12px",
-                            borderRadius: 6,
-                            border: "none",
-                            background: "#1e40af",
-                            color: "#fff",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Edit & Publish Draft
-                        </button>
-                      )}
-                      {p.status === "published" && isRejected && (
-                        <button
-                          onClick={() =>
-                            navigate(
-                              `/mediator/cases/${id}/proposals/${p.id}/revise`,
-                              {
-                                state: {
-                                  revised_draft:
-                                    p.revision_suggestions?.revised_draft ||
-                                    p.content ||
-                                    "",
-                                  round_number: p.round,
-                                  max_rounds: caseData.max_rounds || 3,
-                                  previous_proposal: p.content,
-                                  requesting_reason: requestingReason,
-                                  against_reason: againstReason,
-                                  changes_summary:
-                                    p.revision_suggestions?.changes_summary || [],
-                                },
-                              }
-                            )
-                          }
-                          style={{
-                            padding: "5px 12px",
-                            borderRadius: 6,
-                            border: "none",
-                            background: "#1e40af",
-                            color: "#fff",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Revise Proposal
-                        </button>
-                      )}
+  <button
+    onClick={() => {
+      if (p.round === 1) {
+        navigate(`/mediator/cases/${id}/proposals/new`);
+      } else {
+        // Find the rejected proposal from the previous round to load its
+        // rejection reasons + AI revision suggestions
+        const prevRejected = proposals.find(
+          (prop) => prop.round === p.round - 1 && prop.status === "published"
+        );
+        navigate(
+          `/mediator/cases/${id}/proposals/${prevRejected?.id || p.id}/revise`
+        );
+      }
+    }}
+    style={{
+      padding: "5px 12px",
+      borderRadius: 6,
+      border: "none",
+      background: "#1e40af",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer",
+    }}
+  >
+    Edit & Publish Draft
+  </button>
+)}
+                     {p.status === "published" && isRejected && !laterRoundExists && (
+  p.round < (caseData.max_rounds || 3) ? (
+    <button
+      onClick={() =>
+        navigate(
+          `/mediator/cases/${id}/proposals/${p.id}/revise`,
+          {
+            state: {
+              revised_draft:
+                p.revision_suggestions?.revised_draft ||
+                p.content ||
+                "",
+              round_number: p.round,
+              max_rounds: caseData.max_rounds || 3,
+              previous_proposal: p.content,
+              requesting_reason: requestingReason,
+              against_reason: againstReason,
+              changes_summary:
+                p.revision_suggestions?.changes_summary || [],
+            },
+          }
+        )
+      }
+      style={{
+        padding: "5px 12px",
+        borderRadius: 6,
+        border: "none",
+        background: "#1e40af",
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      Revise Proposal
+    </button>
+  ) : (
+    <span
+      style={{
+        fontSize: 11,
+
+        fontWeight: 600,
+        color: "#dc2626",
+        padding: "5px 4px",
+      }}
+    >
+      Final round rejected — mediation cannot continue
+    </span>
+  )
+)}
                     </div>
                   </div>
                 );

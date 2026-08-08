@@ -167,6 +167,9 @@ export default function CaseDetails() {
 
 
 const currentStep = STATUS_STEP_MAP[caseData?.status] ?? 0
+
+const isFailed = caseData?.status === 'MEDIATION_FAILED'
+
   let actionInfo  = ACTION_NEEDED[caseData?.status]
   if (caseData?.status === 'QUESTIONNAIRE_ACTIVE' && caseData?.user_has_submitted_questionnaire) {
     actionInfo = { msg: 'Questionnaire submitted. Awaiting response from the other party.', action: null }
@@ -196,22 +199,23 @@ const currentStep = STATUS_STEP_MAP[caseData?.status] ?? 0
 
         .cd-card { background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border-card); padding: 1.5rem; margin-bottom: 1.25rem; }
         .cd-card-title { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px; }
-
-        .cd-timeline { display: flex; flex-direction: column; gap: 0; }
+.cd-timeline { display: flex; flex-direction: column; gap: 0; }
         .cd-timeline-item { display: flex; gap: 14px; }
         .cd-timeline-left { display: flex; flex-direction: column; align-items: center; }
         .cd-timeline-circle { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; font-weight: 600; transition: all 0.2s; }
         .cd-timeline-circle.done   { background: var(--brand); color: #fff; }
         .cd-timeline-circle.active { background: var(--brand-light); border: 2px solid var(--brand); color: var(--brand); }
+        .cd-timeline-circle.failed { background: #fef2f2; border: 2px solid #dc2626; color: #dc2626; }
         .cd-timeline-circle.pending{ background: var(--bg-muted); border: 2px solid var(--border); color: var(--text-muted); }
         .cd-timeline-line { width: 2px; flex: 1; min-height: 20px; background: var(--border); margin: 2px 0; }
         .cd-timeline-line.done { background: var(--brand); }
         .cd-timeline-content { padding-bottom: 20px; }
         .cd-timeline-label { font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 2px; }
         .cd-timeline-label.active { color: var(--brand); }
+        .cd-timeline-label.failed { color: #dc2626; }
         .cd-timeline-label.pending { color: var(--text-muted); }
         .cd-timeline-desc { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
-
+       
         .cd-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: var(--brand-light); border: 1.5px solid var(--brand); border-radius: 12px; margin-bottom: 1.25rem; flex-wrap: wrap; }
         .cd-action-text { font-size: 13px; color: var(--brand); font-weight: 500; display: flex; align-items: center; gap: 8px; }
         .cd-action-btn { display: flex; align-items: center; gap: 6px; background: var(--brand); color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-family: 'Sora', sans-serif; font-weight: 600; cursor: pointer; white-space: nowrap; }
@@ -335,20 +339,22 @@ const currentStep = STATUS_STEP_MAP[caseData?.status] ?? 0
                   return (
                     <div key={s.key} className="cd-timeline-item">
                       <div className="cd-timeline-left">
-                        <div className={`cd-timeline-circle ${isDone ? 'done' : isActive ? 'active' : 'pending'}`}>
-                          {isDone
-                            ? <CheckCircle size={14} />
-                            : isActive
-                              ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} />
-                              : i + 1
-                          }
+                        <div className={`cd-timeline-circle ${isDone ? 'done' : isActive ? (isFailed ? 'failed' : 'active') : 'pending'}`}> {isDone
+  ? <CheckCircle size={14} />
+  : isActive
+    ? (isFailed
+        ? <AlertCircle size={14} />
+        : <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} />
+      )
+    : i + 1
+}
                         </div>
                         {i < TIMELINE_STEPS.length - 1 && (
                           <div className={`cd-timeline-line ${isDone ? 'done' : ''}`} />
                         )}
                       </div>
                       <div className="cd-timeline-content">
-                        <p className={`cd-timeline-label ${isDone ? '' : isActive ? 'active' : 'pending'}`}>{s.label}</p>
+                       <p className={`cd-timeline-label ${isDone ? '' : isActive ? (isFailed ? 'failed' : 'active') : 'pending'}`}>{s.label}</p>
                         <p className="cd-timeline-desc">{s.desc}</p>
                       </div>
                     </div>

@@ -126,17 +126,6 @@ export const createProposal = async (caseId) => {
 };
 
 export const updateProposal = async (caseId, proposalId, content) => {
-  const storedStatus = localStorage.getItem(`case_status_${caseId}`);
-  if (storedStatus) {
-    const localProps = localStorage.getItem(`proposals_${caseId}`);
-    if (localProps) {
-      const proposals = JSON.parse(localProps);
-      const updated = proposals.map(p => p.id === proposalId ? { ...p, content: content } : p);
-      localStorage.setItem(`proposals_${caseId}`, JSON.stringify(updated));
-      return { status: "ok" };
-    }
-  }
-
   const response = await client.patch(`/cases/${caseId}/proposals/${proposalId}`, {
     content: content,
   });

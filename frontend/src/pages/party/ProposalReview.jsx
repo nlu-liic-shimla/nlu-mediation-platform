@@ -24,34 +24,62 @@ export default function ProposalReview() {
 
   const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
   const userKey = user.user_id || user.email || 'guest'
-  const decisionKey = `proposal_decision_${caseId}_${userKey}`
+  const getDecisionKey = (proposalId) => `proposal_decision_${caseId}_${proposalId}_${userKey}`
 
   const stripMarkdown = (text) => (text || '').replace(/\*\*/g, '').replace(/\*/g, '')
+  const [caseStatus, setCaseStatus] = useState(null)
 
-  useEffect(() => {
-    const savedDecision = localStorage.getItem(decisionKey)
-    if (savedDecision) {
-      setDecision(savedDecision)
-    }
-  }, [caseId, decisionKey])
+useEffect(() => {
+  const load = async () => {
+    try {
+      const [caseRes, propRes] = await Promise.all([
+        client.get(`/cases/${caseId}`),
+        client.get(`/cases/${caseId}/proposals`),
+      ])
+      setCaseStatus(caseRes.data?.status)
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await client.get(`/cases/${caseId}/proposals`)
-        const proposals = Array.isArray(res.data) ? res.data : res.data?.proposals ?? []
-        const published = proposals.filter(p => p.status === 'published')
-        const latest = published[published.length - 1] ?? proposals[proposals.length - 1] ?? null
+      const proposals = Array.isArray(propRes.data) ? propRes.data : propRes.data?.proposals ?? []
+      const published = proposals.filter(p => p.status === 'published')
+      const latest = published[published.length - 1] ?? proposals[proposals.length - 1] ?? null
+      setProposal(latest)
 
-        setProposal(latest)
-      } catch (err) {
-        setError(err?.response?.data?.detail ?? 'Failed to load proposal. Please try again.')
-      } finally {
-        setLoading(false)
+      if (latest) {
+        const savedDecision = localStorage.getItem(`proposal_decision_${caseId}_${latest.id}_${userKey}`)
+        if (savedDecision) setDecision(savedDecision)
       }
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? 'Failed to load proposal. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    load()
-  }, [caseId])
+  }
+  load()
+}, [caseId])
+  
+
+  useEffect(() => {
+  const load = async () => {
+    try {
+      const res = await client.get(`/cases/${caseId}/proposals`)
+      const proposals = Array.isArray(res.data) ? res.data : res.data?.proposals ?? []
+      const published = proposals.filter(p => p.status === 'published')
+      const latest = published[published.length - 1] ?? proposals[proposals.length - 1] ?? null
+
+      setProposal(latest)
+
+      // Check for a saved decision scoped to THIS proposal only
+      if (latest) {
+        const savedDecision = localStorage.getItem(`proposal_decision_${caseId}_${latest.id}_${userKey}`)
+        if (savedDecision) setDecision(savedDecision)
+      }
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? 'Failed to load proposal. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+  load()
+}, [caseId])
 
   const handleAccept = async () => {
     setSubmitting(true)
@@ -61,7 +89,7 @@ export default function ProposalReview() {
         decision: 'accept'
       })
       setDecision('done_accept')
-      localStorage.setItem(decisionKey, 'done_accept')
+      localStorage.setItem(`proposal_decision_${caseId}_${proposal.id}_${userKey}`, 'done_accept')
     } catch (err) {
       const detail = err?.response?.data?.detail
       const msg = typeof detail === 'object' && detail !== null ? (detail.message || JSON.stringify(detail)) : (detail ?? 'Something went wrong. Please try again.')
@@ -83,7 +111,7 @@ export default function ProposalReview() {
         rejection_reason: rejectionReason.trim()
       })
       setDecision('done_reject')
-      localStorage.setItem(decisionKey, 'done_reject')
+      localStorage.setItem(`proposal_decision_${caseId}_${proposal.id}_${userKey}`, 'done_reject')
     } catch (err) {
       if (err?.response?.status === 422) {
         const detail = err?.response?.data?.detail
@@ -262,15 +290,27 @@ export default function ProposalReview() {
               </div>
             )}
 
-            {decision === 'done_reject' && (
-              <div className="pr-status reject">
-                <XCircle size={20} color="#ea580c" style={{ flexShrink: 0, marginTop: 2 }} />
-                <div className="pr-status-text">
-                  <p className="pr-status-title reject">Your rejection has been submitted.</p>
-                  <p style={{ color: '#7c2d12', fontSize: 13 }}>The mediator is reviewing your feedback and will prepare a revised proposal.</p>
-                </div>
-              </div>
-            )}
+           {decision === 'done_reject' && (
+  <div className="pr-status reject">
+    <XCircle size={20} color="#ea580c" style={{ flexShrink: 0, marginTop: 2 }} />
+    <div className="pr-status-text">
+      {caseStatus === 'MEDIATION_FAILED' ? (
+        <>
+          <p className="pr-status-title reject">Mediation has ended.</p>
+          <p style={{ color: '#7c2d12', fontSize: 13 }}>
+            The maximum number of negotiation rounds was reached without an agreement.
+            This case is now closed. Please contact the mediator for next steps.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="pr-status-title reject">Your rejection has been submitted.</p>
+          <p style={{ color: '#7c2d12', fontSize: 13 }}>The mediator is reviewing your feedback and will prepare a revised proposal.</p>
+        </>
+      )}
+    </div>
+  </div>
+)}
 
             {/* Action buttons — only show if no decision yet */}
             {!decision && (

@@ -205,6 +205,9 @@ const activeCase = cases[0]
 const activeCasesList = cases.filter(
   c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status)
 )
+const closedCasesList = cases.filter(
+  c => ['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status)
+)
 
 const totalMonetaryValue = cases
   .filter(c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status))
@@ -552,6 +555,14 @@ useEffect(() => {
 <StatCard label="Completed" value={cases.filter(c => c.status === 'MEDIATION_COMPLETE').length} sub="Successfully resolved" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
 <StatCard label="Total Cases" value={cases.length} sub="All time" subColor="var(--text-muted)" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
 <StatCard label="Amount at Stake" value={`₹${totalMonetaryValue.toLocaleString('en-IN')}`} sub="Across active cases" subColor="#8b5cf6" iconBg="#f5f3ff" icon={<TrendingUp size={22} color="#8b5cf6" />} />
+<StatCard
+  label="Unsuccessful"
+  value={cases.filter(c => c.status === 'MEDIATION_FAILED').length}
+  sub="Mediation not reached"
+  subColor="#dc2626"
+  iconBg="#fef2f2"
+  icon={<AlertCircle size={22} color="#dc2626" />}
+/>
  </div>
 
                   <div className="pd-section">
@@ -650,6 +661,61 @@ useEffect(() => {
   />
 ))}
                   </div>
+
+                  {closedCasesList.length > 0 && (
+                    <div className="pd-section" style={{ marginTop: '1.25rem' }}>
+                      <div className="pd-section-head">
+                        <div>
+                          <h2 className="pd-section-title">Closed Cases</h2>
+                          <p className="pd-section-sub">Completed or ended mediations</p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {closedCasesList.map((c, i) => (
+                          <div
+                            key={c.id}
+                            onClick={() => navigate(`/party/cases/${c.id}`)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '12px',
+                              padding: '12px 4px',
+                              borderBottom: i < closedCasesList.length - 1 ? '1px solid var(--border)' : 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                                <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {c.dispute_type || c.brief_description || c.title || 'Mediation Case'}
+                                </h3>
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    fontWeight: 500,
+                                    padding: '2px 8px',
+                                    borderRadius: 99,
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
+                                    ...(c.status === 'MEDIATION_COMPLETE'
+                                      ? { color: '#16a34a', background: '#f0fdf4' }
+                                      : { color: '#dc2626', background: '#fef2f2' }),
+                                  }}
+                                >
+                                  {friendlyStatus(c.status)}
+                                </span>
+                              </div>
+                              <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {c.id.slice(0, 8).toUpperCase()} • vs. {c.against_party_email || c.requesting_party_email || '—'}
+                              </p>
+                            </div>
+                            <ChevronRight size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="pd-right-col">

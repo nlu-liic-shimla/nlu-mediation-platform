@@ -126,10 +126,12 @@ export default function ProposalRevision() {
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+ 
 
   const [width, setWidth] = useState(window.innerWidth);
   const tk = tokens(dark);
   const isSmall = width < 900;
+ 
 
   useEffect(() => {
     const h = () => setWidth(window.innerWidth);
@@ -161,10 +163,22 @@ export default function ProposalRevision() {
           return;
         }
 
+        // Enforce round cap BEFORE creating a new draft
+        const caseRes = await client.get(`/cases/${id}`);
+        const maxR = caseRes.data?.max_rounds || 3;
+        setMaxRounds(maxR);
+
+        const nextRound = (rejectedProposal.round || 1) + 1;
+        if (nextRound > maxR) {
+          setError(
+            `Round ${maxR} was the final round and it was rejected. No further rounds are available — this case should proceed to closure/escalation.`
+          );
+          return;
+        }
+
         // revision_suggestions is set by Sub-system H after rejection
         // shape: { revised_draft, changes_summary, requesting_reason, against_reason }
         const suggestions = rejectedProposal.revision_suggestions || {};
-
         setPreviousProposal(
           rejectedProposal.content || rejectedProposal.raw_text || ""
         );
@@ -173,11 +187,10 @@ export default function ProposalRevision() {
         setChangesSummary(suggestions.changes_summary || []);
 
         // Find an existing draft for the next round, or create one.
-        let draftProposal = proposals.find((p) => p.status === "draft");
+      let draftProposal = proposals.find((p) => p.status === "draft");
 
         if (!draftProposal) {
-          // This POST is what actually transitions the case
-          // MEDIATION_IN_PROGRESS -> PROPOSAL_DRAFT on the backend.
+          if (nextRound > maxR) return; // guarded above, but stay safe here too
           const created = await client.post(`/cases/${id}/proposals`);
           draftProposal = {
             id: created.data.proposal_id,
@@ -193,9 +206,9 @@ export default function ProposalRevision() {
           draftProposal.round || (rejectedProposal.round || 1) + 1
         );
 
-        const caseRes = await client.get(`/cases/${id}`);
-        setMaxRounds(caseRes.data?.max_rounds || 3);
-      } catch {
+       
+     } catch (err) {
+        console.error("loadRevision failed:", err?.response?.data || err);
         setError("Failed to load revision data. Please go back and try again.");
       } finally {
         setLoading(false);
