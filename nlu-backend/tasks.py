@@ -116,6 +116,10 @@ _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+_backend_root = os.path.dirname(os.path.abspath(__file__))
+if _backend_root not in sys.path:
+    sys.path.insert(0, _backend_root)
+    
 # ── Environment ───────────────────────────────────────────────────────────────
 from dotenv import load_dotenv
 load_dotenv()
@@ -756,7 +760,10 @@ def extract_proposal_structure(proposal_id: str):
 
 # ── Task 3: Sub-system H — Proposal revision after rejection ──────────────────
 
-@celery_app.task(time_limit=300)
+@celery_app.task(
+    name="tasks.generate_proposal_revision",
+    time_limit=300,
+)
 def generate_proposal_revision(case_id: str, proposal_id: str):
     """
     Runs Sub-system H to generate a revised proposal draft after rejection.
@@ -784,106 +791,163 @@ def generate_proposal_revision(case_id: str, proposal_id: str):
         Mediator can write their own revision from scratch.
         Log the error but do not block the mediator.
     """
-    logger.info(f"[ProposalRevision] Starting Sub-system H for case {case_id}, proposal {proposal_id}")
+    supabase = get_supabase()
+    logger.info(f"[ProposalRevision] Starting for case {case_id}, proposal {proposal_id}")
 
     try:
-        # Fetch proposal raw text
-        proposal_resp = supabase.table("proposals") \
-            .select("raw_text, round_number") \
-            .eq("id", proposal_id) \
-            .single() \
-            .execute()
+        # Fetch proposal
+        proposal_resp = supabase.table("proposals").select(
+            "raw_text, round_number"
+        ).eq("id", proposal_id).single().execute()
 
         if not proposal_resp.data:
             raise ValueError(f"Proposal {proposal_id} not found")
 
-        raw_text     = proposal_resp.data["raw_text"]
+        raw_text = proposal_resp.data["raw_text"]
         round_number = proposal_resp.data.get("round_number", 1)
 
-        # Fetch rejection reasons from proposal_responses
-        responses_resp = supabase.table("proposal_responses") \
-            .select("party_id, decision, rejection_reason") \
-            .eq("proposal_id", proposal_id) \
-            .execute()
+        # Fetch rejection reasons
+        responses_resp = supabase.table("proposal_responses").select(
+            "party_id, decision, rejection_reason"
+        ).eq("proposal_id", proposal_id).execute()
 
         requesting_reason = None
-        against_reason    = None
+        against_reason = None
 
         for r in (responses_resp.data or []):
             if r["decision"] != "reject":
                 continue
-            # Identify which party this is
-            inv = supabase.table("case_invitations") \
-                .select("invitation_role") \
-                .eq("case_id", case_id) \
-                .eq("accepted_by", r["party_id"]) \
-                .single() \
-                .execute()
+            inv = supabase.table("case_invitations").select(
+                "invitation_role"
+            ).eq("case_id", case_id).eq(
+                "accepted_by", r["party_id"]
+            ).single().execute()
+
             if inv.data:
-                if inv.data["invitation_role"] == "requesting_party":
+                role = inv.data["invitation_role"]
+                if role == "requesting_party":
                     requesting_reason = r["rejection_reason"]
-                else:
+                elif role == "against_party":
                     against_reason = r["rejection_reason"]
 
-        # Fetch BATNA/WATNA for Sub-system H context
-        batna_resp = supabase.table("ai_analysis") \
-            .select("batna_watna") \
-            .eq("case_id", case_id) \
-            .eq("burst_number", 2) \
-            .order("created_at", desc=True) \
-            .limit(1) \
-            .execute()
+        # ── FIXED: Fetch BATNA/WATNA from result column ──────────────
+        # Data is stored in "result" column by process_burst_2
+        # Also try "batna_watna" column after SQL fix above
+        batna_resp = supabase.table("ai_analysis").select(
+            "result, batna_watna"
+        ).eq("case_id", case_id).eq(
+            "burst_number", 2
+        ).order("created_at", desc=True).limit(1).execute()
 
-        batna_data = batna_resp.data[0] if batna_resp.data else {}
-        batna_watna = batna_data.get("batna_watna") if batna_data else {}
+        batna_watna_dict = None
+        if batna_resp.data:
+            row = batna_resp.data[0]
+            # Try batna_watna column first (after SQL fix), fall back to result
+            batna_watna_dict = row.get("batna_watna") or row.get("result")
 
-        # Fetch mediator's private notes (fed as professional context to Sub-system H)
-        case_resp = supabase.table("cases") \
-            .select("mediator_notes") \
-            .eq("id", case_id) \
-            .single() \
-            .execute()
+        # ── FIXED: Reconstruct BatnaWatnaOutput Pydantic object ──────
+        # subsystem_h.py expects a BatnaWatnaOutput object
+        # not a raw dict — batna_watna.party_a.batna_label must work
+        batna_watna_obj = None
+        if batna_watna_dict:
+            try:
+                from ai.schemas import BatnaWatnaOutput
+                batna_watna_obj = BatnaWatnaOutput(**batna_watna_dict)
+                logger.info(f"[ProposalRevision] BATNA/WATNA loaded successfully")
+            except Exception as e:
+                logger.warning(f"[ProposalRevision] Could not reconstruct BatnaWatnaOutput: {e}")
+                batna_watna_obj = None
+
+        if not batna_watna_obj:
+            logger.warning(f"[ProposalRevision] No BATNA/WATNA available — Sub-system H will have limited context")
+
+        # Fetch mediator notes
+        case_resp = supabase.table("cases").select(
+            "mediator_notes"
+        ).eq("id", case_id).single().execute()
 
         mediator_notes = case_resp.data.get("mediator_notes") if case_resp.data else None
 
-        # ── VAIDANT: Fill in the Sub-system H call here ──────────────────────
-        # Expected call:
-        #   from ai.subsystems.subsystem_h import generate_proposal_revision as run_h
-        #   result = run_h(
-        #       proposal_raw_text=raw_text,
-        #       requesting_party_rejection_reason=requesting_reason,
-        #       against_party_rejection_reason=against_reason,
-        #       batna_watna=batna_watna,
-        #       round_number=round_number,
-        #       mediator_notes=mediator_notes,
-        #   )
-        #   # result: { "revised_draft": str, "changes_summary": list[str], "reasoning": str }
-        #
-        # Placeholder:
-        result = {
-            "revised_draft":    raw_text,
-            "changes_summary":  ["Sub-system H placeholder — Vaidant to implement"],
-            "reasoning":        "Placeholder",
-        }
-        # ── END VAIDANT SECTION ──────────────────────────────────────────────
+        # ── Call Sub-system H ─────────────────────────────────────────
+        result = None
 
-        # Save revision suggestions to the proposal
+        if batna_watna_obj:
+            # Full call with BATNA/WATNA context
+            try:
+                from ai.subsystems.subsystem_h import generate_proposal_revision as run_h
+                result = run_h(
+                    proposal_raw_text=raw_text,
+                    requesting_party_rejection_reason=requesting_reason,
+                    against_party_rejection_reason=against_reason,
+                    batna_watna=batna_watna_obj,
+                    round_number=round_number,
+                    mediator_notes=mediator_notes,
+                )
+                logger.info(f"[ProposalRevision] Sub-system H called with full context")
+            except Exception as e:
+                logger.error(f"[ProposalRevision] Sub-system H failed: {e}", exc_info=True)
+                result = None
+        else:
+            # Fallback — call Sub-system H without BATNA/WATNA
+            # It will still revise based on rejection reasons alone
+            try:
+                from ai.utils.ai_client import call_large_json
+                fallback_result = call_large_json(
+                    system_prompt="""You are an expert legal mediator.
+Revise the following settlement proposal based on the rejection reasons provided.
+Return ONLY valid JSON:
+{
+    "revised_draft": "complete revised proposal text",
+    "changes_summary": ["change 1", "change 2"],
+    "reasoning": "overall revision strategy"
+}""",
+                    user_message=f"""
+ORIGINAL PROPOSAL:
+{raw_text}
+
+REQUESTING PARTY REJECTION: {requesting_reason or 'Accepted'}
+AGAINST PARTY REJECTION: {against_reason or 'Accepted'}
+ROUND: {round_number}
+
+Revise the proposal to address these rejection reasons.
+"""
+                )
+                if isinstance(fallback_result, dict) and not fallback_result.get("failed"):
+                    result = fallback_result
+            except Exception as e:
+                logger.error(f"[ProposalRevision] Fallback also failed: {e}")
+
+        # Final fallback if everything failed
+        if not result:
+            result = {
+                "revised_draft": raw_text,
+                "changes_summary": [
+                    "AI revision unavailable — please revise manually",
+                    f"Requesting party reason: {requesting_reason or 'N/A'}",
+                    f"Against party reason: {against_reason or 'N/A'}"
+                ],
+                "reasoning": "Automatic revision failed. Rejection reasons are shown above for manual revision."
+            }
+
+        # Save revision suggestions
         supabase.table("proposals").update({
             "revision_suggestions": result,
         }).eq("id", proposal_id).execute()
-        # Write audit log — PROPOSAL_REVISION_GENERATED
-        # Required by Week 4 Section 13 logging requirements
+
+        # Audit log
         import datetime
         supabase.table("audit_logs").insert({
-            "case_id":   case_id,
-            "actor_id":  "system",
-            "action":    "PROPOSAL_REVISION_GENERATED",
+            "case_id": case_id,
+            "actor_id": "system",
+            "action": "PROPOSAL_REVISION_GENERATED",
             "old_state": "MEDIATION_IN_PROGRESS",
             "new_state": "MEDIATION_IN_PROGRESS",
-            "metadata":  {
+            "metadata": {
                 "proposal_id": proposal_id,
                 "has_requesting_reason": requesting_reason is not None,
-                "has_against_reason":    against_reason is not None,
+                "has_against_reason": against_reason is not None,
+                "has_batna_watna": batna_watna_obj is not None,
+                "round_number": round_number,
             },
             "created_at": datetime.datetime.utcnow().isoformat(),
         }).execute()
