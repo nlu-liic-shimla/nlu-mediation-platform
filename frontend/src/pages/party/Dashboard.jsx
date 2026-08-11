@@ -4,10 +4,10 @@ import ThemeToggle from '../../components/ui/ThemeToggle'
 import client from '../../services/api'
 import AnalysisStatusBanner from '../../components/party/AnalysisStatusBanner'
 import {
-  Scale, LayoutDashboard, FilePlus, MessageSquare,
-  FileText, CheckSquare, Bell, Search, ChevronRight,
+  Scale, LayoutDashboard, FilePlus, 
+  FileText, CheckSquare, Bell, ChevronRight,
   ChevronLeft, Calendar, TrendingUp, Clock, AlertCircle,
-  Bot, LogOut, Menu, X,  DollarSign
+  LogOut, Menu, X,  DollarSign
 } from 'lucide-react'
 
 const PARTY_STATUS_LABELS = {
@@ -32,9 +32,6 @@ const friendlyStatus = (status) => PARTY_STATUS_LABELS[status] || 'In progress'
 const NAV_ITEMS = [
   { id: 'dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'new-case',      icon: FilePlus,        label: 'New Case' },
-  { id: 'questionnaire', icon: MessageSquare,   label: 'Questionnaire' },
-  { id: 'proposals',     icon: FileText,        label: 'Proposals' },
-  { id: 'settlement',    icon: CheckSquare,     label: 'Settlement' },
 ]
 
 const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile, mobileOpen, onMobileClose, visibleIds }) => (
@@ -74,16 +71,6 @@ const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile,
           )
         })}
       </nav>
-
-      {(!collapsed || isMobile) && (
-        <div className="pd-ai-box">
-          <div className="pd-ai-icon"><Bot size={18} color="var(--brand)" /></div>
-          <div>
-            <p className="pd-ai-title">AI Assistant</p>
-            <p className="pd-ai-sub">Always here to help</p>
-          </div>
-        </div>
-      )}
 
       {!isMobile && (
         <button className="pd-collapse-btn" onClick={onToggle}>
@@ -157,11 +144,11 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [activeNav, setActiveNav] = useState('dashboard')
   const [collapsed, setCollapsed] = useState(false)
-  const [search, setSearch] = useState('')
+  
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [timeline, setTimeline] = useState([])
+
   const [docCounts, setDocCounts] = useState({})
 
   const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
@@ -213,12 +200,7 @@ const totalMonetaryValue = cases
   .filter(c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status))
   .reduce((sum, c) => sum + (Number(c.monetary_value) || 0), 0)
 
-useEffect(() => {
-    if (!activeCase?.id) return
-    client.get(`/cases/${activeCase.id}/audit-log/party-view`).then(res => {
-      setTimeline((Array.isArray(res.data) ? res.data : []).slice(0, 5))
-    }).catch(() => setTimeline([]))
-  }, [activeCase?.id])
+
 
   useEffect(() => {
   activeCasesList.forEach(c => {
@@ -232,32 +214,13 @@ useEffect(() => {
 
   const quickActions = [
     { icon: <FilePlus size={17} />, label: 'Apply for Mediation', path: '/party/apply' },
-  
-  { 
-    icon: <FileText size={17} />, 
-    label: 'Upload Documents', 
-    onClick: () => {
-      if (cases[0]) {
-        navigate(`/party/cases/${cases[0].id}/documents`)
-      } else {
-        alert("You don't have an active case yet. Apply for mediation first.")
-      }
-    }
-  },
-]
+  ]
 
 
  
 
  
-  const visibleNavIds = new Set(['dashboard', 'new-case'])
-  if (activeCase) {
-    const qStages = ['QUESTIONNAIRE_ACTIVE', 'QUESTIONNAIRE_COMPLETE', 'BURST_2_PROCESSING', 'BURST_2_COMPLETE', 'PROPOSAL_DRAFT', 'PROPOSAL_PUBLISHED', 'MEDIATION_IN_PROGRESS', 'MEDIATION_COMPLETE']
-    const pStages = ['PROPOSAL_DRAFT', 'PROPOSAL_PUBLISHED', 'MEDIATION_IN_PROGRESS', 'MEDIATION_COMPLETE']
-    if (qStages.includes(activeCase.status)) visibleNavIds.add('questionnaire')
-    if (pStages.includes(activeCase.status)) visibleNavIds.add('proposals')
-    if (activeCase.status === 'MEDIATION_COMPLETE') visibleNavIds.add('settlement')
-  }
+ 
 
   return (
     <>
@@ -296,10 +259,7 @@ useEffect(() => {
         .pd-nav-btn.active { background: var(--brand-light); color: var(--brand); }
         .pd-nav-label { font-size: 14px; font-weight: 500; }
 
-        .pd-ai-box { display: flex; align-items: center; gap: 10px; margin: 8px; padding: 12px; background: var(--bg-muted); border-radius: 10px; flex-shrink: 0; }
-        .pd-ai-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .pd-ai-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-        .pd-ai-sub { font-size: 11px; color: var(--text-muted); }
+       
 
         .pd-collapse-btn { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border: none; border-top: 1px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; flex-shrink: 0; white-space: nowrap; }
         .pd-collapse-btn:hover { color: var(--text-primary); }
@@ -313,8 +273,6 @@ useEffect(() => {
         /* ── Topbar ── */
         .pd-topbar { height: 60px; background: var(--bg-card); border-bottom: 1px solid var(--border-card); display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; position: sticky; top: 0; z-index: 40; gap: 1rem; }
         .pd-hamburger { background: none; border: none; cursor: pointer; color: var(--text-secondary); display: none; align-items: center; padding: 4px; }
-        .pd-search-wrap { display: flex; align-items: center; gap: 8px; background: var(--bg-muted); border: 1px solid var(--border); border-radius: 8px; padding: 0 12px; flex: 0 1 360px; min-width: 0; }
-        .pd-search-input { border: none; background: none; outline: none; font-size: 13px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; width: 100%; padding: 9px 0; }
         .pd-topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
         .pd-notif-wrap { position: relative; }
@@ -419,7 +377,7 @@ useEffect(() => {
           .pd-avatar-name { display: none; }
           .pd-signout-btn span { display: none; }
           .pd-signout-btn { padding: 7px; }
-          .pd-search-wrap { flex: 1; }
+          
           .pd-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
           .pd-notif-dropdown { right: -60px; width: 270px; }
         }
@@ -439,40 +397,9 @@ useEffect(() => {
       <div className="pd-page">
         <Sidebar
   active={activeNav}
-  onNavigate={(id) => {
+ onNavigate={(id) => {
     setActiveNav(id)
     if (id === 'new-case') { navigate('/party/apply'); return }
-
-    const activeCase = cases[0]
-
-    if (id === 'questionnaire') {
-      if (!activeCase) { alert("You don't have an active case yet."); return }
-      const allowed = ['QUESTIONNAIRE_ACTIVE', 'QUESTIONNAIRE_COMPLETE', 'BURST_2_PROCESSING', 'BURST_2_COMPLETE', 'PROPOSAL_DRAFT', 'PROPOSAL_PUBLISHED', 'MEDIATION_IN_PROGRESS', 'MEDIATION_COMPLETE']
-      if (!allowed.includes(activeCase.status)) {
-        alert("The questionnaire isn't available yet for your case.")
-        return
-      }
-      navigate(`/party/cases/${activeCase.id}/questionnaire`)
-    }
-
-    if (id === 'proposals') {
-      if (!activeCase) { alert("You don't have an active case yet."); return }
-      const allowed = ['PROPOSAL_DRAFT', 'PROPOSAL_PUBLISHED', 'MEDIATION_IN_PROGRESS', 'MEDIATION_COMPLETE']
-      if (!allowed.includes(activeCase.status)) {
-        alert("No proposal has been published yet.")
-        return
-      }
-      navigate(`/party/cases/${activeCase.id}/proposal`)
-    }
-
-    if (id === 'settlement') {
-      if (!activeCase) { alert("You don't have an active case yet."); return }
-      if (activeCase.status !== 'MEDIATION_COMPLETE') {
-        alert("Settlement confirmation isn't available yet — both parties need to accept a proposal first.")
-        return
-      }
-      navigate(`/party/cases/${activeCase.id}/settlement`)
-    }
   }}
   collapsed={collapsed}
   onToggle={() => setCollapsed(p => !p)}
@@ -480,7 +407,6 @@ useEffect(() => {
   isMobile={isMobile}
   mobileOpen={mobileOpen}
   onMobileClose={() => setMobileOpen(false)}
-    visibleIds={visibleNavIds}
 />
 
         <div className="pd-main" style={{ marginLeft: isMobile ? 0 : (collapsed ? 60 : 240), transition: 'margin-left 0.25s ease' }}>
@@ -490,10 +416,7 @@ useEffect(() => {
               <button className="pd-hamburger" onClick={() => setMobileOpen(true)}>
                 <Menu size={22} color="var(--text-secondary)" />
               </button>
-              <div className="pd-search-wrap">
-                <Search size={15} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                <input className="pd-search-input" placeholder="Search cases, documents, or proposals..." value={search} onChange={e => setSearch(e.target.value)} />
-              </div>
+              
             </div>
             <div className="pd-topbar-right">
               <ThemeToggle />
@@ -718,24 +641,8 @@ useEffect(() => {
                   )}
                 </div>
 
-                <div className="pd-right-col">
-                  <div className="pd-side-card">
-                    <h2 className="pd-side-title">Case Timeline</h2>
-                    {timeline.length === 0 ? (
-                      <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No activity yet.</p>
-                    ) : (
-                      timeline.map((log, i) => (
-                        <div key={i} className="pd-activity-item" style={{ borderBottom: i < timeline.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                          <div className="pd-activity-dot" />
-                          <div>
-                            <p className="pd-activity-title">{log.action?.replace(/_/g, ' ')}</p>
-                            <p className="pd-activity-date">{new Date(log.created_at).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  
+                
+                    <div className="pd-right-col">
                   <div className="pd-side-card">
   <h2 className="pd-side-title">Quick Actions</h2>
   {quickActions.map((a, i) => (

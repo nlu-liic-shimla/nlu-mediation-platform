@@ -9,6 +9,7 @@ Endpoints:
 
 import uuid
 import logging
+from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form
 from app.core.dependencies import get_current_user, require_role
 from app.core.database import supabase
@@ -40,7 +41,7 @@ PDF_SIGNED_URL_EXPIRY = 86400  # 24 hours
 async def confirm_settlement(
     case_id: str,
     full_name: str = Form(...),
-    signature: UploadFile = File(...),
+    signature: Optional[UploadFile] = File(None),
     current_user: dict = Depends(require_role(["party_user"]))
 ):
     user_id = current_user["user_id"]
@@ -82,21 +83,6 @@ async def confirm_settlement(
             detail="Full name must be at least 2 characters"
         )
 
-    # Validate signature file type
-    if signature.content_type not in ALLOWED_SIGNATURE_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Signature must be a JPEG or PNG image"
-        )
-
-    # Read and validate signature file size
-    signature_bytes = await signature.read()
-    if len(signature_bytes) > SIGNATURE_MAX_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Signature image must be under 2MB"
-        )
-
     # Check if party already confirmed
     existing = supabase.table("settlement_confirmations") \
         .select("id") \
@@ -110,21 +96,36 @@ async def confirm_settlement(
             detail="You have already confirmed this settlement"
         )
 
-    # Upload signature to Supabase Storage
-    ext = "jpg" if signature.content_type == "image/jpeg" else "png"
-    signature_path = f"{case_id}/signature_{user_id[:8]}.{ext}"
+    # Signature upload is optional — only process if a file was provided
+    signature_path = None
+    if signature is not None:
+        if signature.content_type not in ALLOWED_SIGNATURE_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Signature must be a JPEG or PNG image"
+            )
 
-    try:
-        supabase.storage.from_(BUCKET_NAME).upload(
-            path=signature_path,
-            file=signature_bytes,
-            file_options={"content-type": signature.content_type, "upsert": "true"}
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload signature: {str(e)}"
-        )
+        signature_bytes = await signature.read()
+        if len(signature_bytes) > SIGNATURE_MAX_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Signature image must be under 2MB"
+            )
+
+        ext = "jpg" if signature.content_type == "image/jpeg" else "png"
+        signature_path = f"{case_id}/signature_{user_id[:8]}.{ext}"
+
+        try:
+            supabase.storage.from_(BUCKET_NAME).upload(
+                path=signature_path,
+                file=signature_bytes,
+                file_options={"content-type": signature.content_type, "upsert": "true"}
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload signature: {str(e)}"
+            )
 
     # Save confirmation record
     try:
@@ -139,6 +140,8 @@ async def confirm_settlement(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save confirmation: {str(e)}"
         )
+
+   
 
     # Check if both parties have now confirmed
     all_confirmations = supabase.table("settlement_confirmations") \

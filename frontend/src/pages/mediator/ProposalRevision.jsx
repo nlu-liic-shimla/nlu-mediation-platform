@@ -439,8 +439,8 @@ export default function ProposalRevision() {
             }}
           >
             <AlertTriangle size={16} color="#d97706" />
-            <span style={{ fontSize: 13, color: "#92400e", fontWeight: 500 }}>
-              This is the final round. Contact Backend Role to extend if needed.
+           <span style={{ fontSize: 13, color: "#92400e", fontWeight: 500 }}>
+              This is the final round. No further revisions can be published for this round.
             </span>
           </div>
         )}
@@ -505,7 +505,7 @@ export default function ProposalRevision() {
                   Previous Proposal
                 </span>
               </div>
-              <div style={{ padding: "14px 16px" }}>
+             <div style={{ padding: "14px 16px", maxHeight: 260, overflowY: "auto" }}>
                 <p
                   style={{
                     fontSize: 13,
@@ -543,12 +543,14 @@ export default function ProposalRevision() {
                     Rejection Reasons
                   </span>
                 </div>
-                <div
+               <div
                   style={{
                     padding: "14px 16px",
                     display: "flex",
                     flexDirection: "column",
                     gap: 12,
+                    maxHeight: 260,
+                    overflowY: "auto",
                   }}
                 >
                   {requestingReason && (
@@ -634,7 +636,7 @@ export default function ProposalRevision() {
                     AI Suggested Changes
                   </span>
                 </div>
-                <div style={{ padding: "14px 16px" }}>
+                <div style={{ padding: "14px 16px", maxHeight: 260, overflowY: "auto" }}>
                   <ol
                     style={{
                       margin: 0,

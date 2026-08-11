@@ -5,14 +5,14 @@ import {
   LayoutDashboard,
   Brain,
   FileText,
-  Settings2,
+
   ChevronLeft,
   ChevronRight,
-  Search,
+ 
 
   Moon,
   Sun,
-  MessageSquare,
+
   Scale,
  
   Menu,
@@ -32,7 +32,6 @@ const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/mediator" },
   { icon: Brain, label: "AI Analysis", path: "/mediator/analysis" },
   { icon: FileText, label: "Proposals", path: "/mediator/proposals" },
-  { icon: Settings2, label: "Admin Panel", path: "/mediator/admin" },
 ];
 
 export default function MediatorLayout({ children }) {
@@ -201,44 +200,8 @@ export default function MediatorLayout({ children }) {
           })}
         </nav>
 
-        {/* AI Assistant chip */}
-        {(!collapsed || isMobile) && (
-          <div
-            style={{
-              margin: "0 12px 16px",
-              padding: "12px",
-              background: isDark ? "#0f172a" : "#eff6ff",
-              borderRadius: 10,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              border: `1px solid ${isDark ? "#1e3a5f" : "#bfdbfe"}`,
-            }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                background: tk.accent,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <MessageSquare size={15} color="#fff" />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: tk.text }}>
-                AI Assistant
-              </div>
-              <div style={{ fontSize: 11, color: tk.sub }}>
-                Always here to help
-              </div>
-            </div>
-          </div>
-        )}
+      
+           
 
         {/* Collapse button */}
         {!isMobile && (
@@ -315,34 +278,7 @@ export default function MediatorLayout({ children }) {
             </button>
           )}
 
-          <div
-            style={{
-              flex: 1,
-              maxWidth: 420,
-              minWidth: 0,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              background: tk.inputBg,
-              border: `1px solid ${tk.border}`,
-              borderRadius: 8,
-              padding: "8px 14px",
-            }}
-          >
-            <Search size={15} color={tk.sub} />
-            <input
-              placeholder="Search cases, documents, or proposals…"
-              style={{
-                border: "none",
-                outline: "none",
-                background: "transparent",
-                fontSize: 13,
-                color: tk.text,
-                width: "100%",
-                minWidth: 0,
-              }}
-            />
-          </div>
+         
 
           <div style={{ flex: 1 }} />
 

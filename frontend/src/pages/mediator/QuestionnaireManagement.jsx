@@ -429,8 +429,8 @@ const [sendSuccess, setSendSuccess] = useState(false);
               <span style={{ fontSize: 14, fontWeight: 600, color: tk.text }}>
                 Send Questionnaire
               </span>
-              <p style={{ fontSize: 12, color: tk.sub, margin: "2px 0 0" }}>
-                Sub-system C will generate dispute-specific questions and send to both parties
+             <p style={{ fontSize: 12, color: tk.sub, margin: "2px 0 0" }}>
+                AI will generate questions specific to this dispute.
               </p>
             </div>
             <div style={{ padding: "20px 18px" }}>
@@ -466,9 +466,9 @@ const [sendSuccess, setSendSuccess] = useState(false);
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  <p style={{ fontSize: 13, color: tk.sub, margin: 0, lineHeight: 1.6 }}>
-                    Clicking <strong>Send Questionnaire</strong> will call Sub-system C to generate
-                    dispute-specific questions and notify both parties immediately. The case status
+                 <p style={{ fontSize: 13, color: tk.sub, margin: 0, lineHeight: 1.6 }}>
+                    Clicking <strong>Send Questionnaire</strong> will generate dispute-specific
+                    questions with AI and notify both parties immediately. The case status
                     will change to <strong>Questionnaire Active</strong>.
                   </p>
                   {sendError && (
