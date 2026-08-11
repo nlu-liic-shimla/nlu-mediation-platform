@@ -41,9 +41,10 @@ export default function ApplyForMediation() {
     if (!form.brief_description.trim()) e.brief_description = 'Please describe your dispute.'
     else if (form.brief_description.trim().length < 20) e.brief_description = 'Minimum 20 characters.'
     else if (form.brief_description.trim().length > 500) e.brief_description = 'Maximum 500 characters.'
-    if (form.against_party_email && !/\S+@\S+\.\S+/.test(form.against_party_email)) {
-      e.against_party_email = 'Enter a valid email address.'
-    }
+    if (!form.against_party_name.trim()) e.against_party_name = 'Name is required.'
+    if (!form.against_party_email.trim()) e.against_party_email = 'Email is required.'
+    else if (!/\S+@\S+\.\S+/.test(form.against_party_email)) e.against_party_email = 'Enter a valid email address.'
+    if (!form.against_party_phone.trim()) e.against_party_phone = 'Phone number is required.'
     if (form.monetary_value && isNaN(Number(form.monetary_value))) {
       e.monetary_value = 'Enter a valid number.'
     }
@@ -222,16 +223,16 @@ export default function ApplyForMediation() {
               <div className="af-divider" />
 
               {/* Against party details */}
-              <p className="af-section-title">Other Party Details <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '11px' }}>(Optional — provide what you know)</span></p>
-
-              <div className="af-field">
+             <p className="af-section-title">Other Party Details</p>
+             <div className="af-field">
                 <label className="af-label">Their name</label>
                 <input
-                  className="af-input"
+                  className={`af-input${errors.against_party_name ? ' err' : ''}`}
                   placeholder="Full name"
                   value={form.against_party_name}
                   onChange={e => update('against_party_name', e.target.value)}
                 />
+                {errors.against_party_name && <p className="af-err-text"><AlertCircle size={12} />{errors.against_party_name}</p>}
               </div>
 
               <div className="af-field">
@@ -244,17 +245,17 @@ export default function ApplyForMediation() {
                   onChange={e => update('against_party_email', e.target.value)}
                 />
                 {errors.against_party_email && <p className="af-err-text"><AlertCircle size={12} />{errors.against_party_email}</p>}
-                <p className="af-hint">If provided, the mediator will use this to send them an invitation.</p>
-              </div>
+                <p className="af-hint">The mediator will use this to send them an invitation.</p></div>
 
-              <div className="af-field">
+             <div className="af-field">
                 <label className="af-label">Their phone number</label>
                 <input
-                  className="af-input"
+                  className={`af-input${errors.against_party_phone ? ' err' : ''}`}
                   placeholder="+91 00000 00000"
                   value={form.against_party_phone}
                   onChange={e => update('against_party_phone', e.target.value)}
                 />
+                {errors.against_party_phone && <p className="af-err-text"><AlertCircle size={12} />{errors.against_party_phone}</p>}
               </div>
 
               {apiError && (

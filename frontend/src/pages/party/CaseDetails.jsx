@@ -99,6 +99,8 @@ export default function CaseDetails() {
   const [documents, setDocuments] = useState([])
   const [docsLoading, setDocsLoading] = useState(true)
   const [settlementConfirmed, setSettlementConfirmed] = useState(false)
+  const [pdfReady, setPdfReady] = useState(false)
+  const [pdfUrl, setPdfUrl] = useState(null)
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -158,6 +160,10 @@ export default function CaseDetails() {
         if (role && status?.[role]?.confirmed) {
           setSettlementConfirmed(true)
         }
+        if (status?.pdf_ready) {
+          setPdfReady(true)
+          setPdfUrl(status?.pdf_url || null)
+        }
       } catch {
         // fail silently
       }
@@ -174,10 +180,11 @@ const isFailed = caseData?.status === 'MEDIATION_FAILED'
   if (caseData?.status === 'QUESTIONNAIRE_ACTIVE' && caseData?.user_has_submitted_questionnaire) {
     actionInfo = { msg: 'Questionnaire submitted. Awaiting response from the other party.', action: null }
   }
-  if (caseData?.status === 'MEDIATION_COMPLETE' && settlementConfirmed) {
-    actionInfo = { msg: 'You have confirmed the settlement. You can download the PDF once it is ready.', action: null }
-  }
-  if (caseData?.status === 'MEDIATION_COMPLETE' && caseData?.finalised_at) {
+ if (caseData?.status === 'MEDIATION_COMPLETE' && settlementConfirmed) {
+    actionInfo = pdfReady
+      ? { msg: 'You have confirmed the settlement. Your PDF is ready.', action: 'download_pdf' }
+      : { msg: 'You have confirmed the settlement. You can download the PDF once it is ready.', action: null }
+  } else if (caseData?.status === 'MEDIATION_COMPLETE' && caseData?.finalised_at) {
     actionInfo = { msg: 'Please confirm your settlement.', action: 'settlement' }
   }
   const showBatna   = BURST_2_STATUSES.has(caseData?.status)
@@ -302,6 +309,17 @@ const isFailed = caseData?.status === 'MEDIATION_FAILED'
                     Confirm Settlement <ChevronRight size={14} />
                   </button>
                 )}
+                {actionInfo.action === 'download_pdf' && pdfUrl && (
+                  <a 
+                    className="cd-action-btn"
+                    href={pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    Download PDF <ChevronRight size={14} />
+                  </a>
+                )}
               </div>
             )}
 
@@ -402,8 +420,7 @@ const isFailed = caseData?.status === 'MEDIATION_FAILED'
                 </div>
               )}
             </div>
-
-            {/* Documents */}
+{/* Documents — read-only list once mediation is complete, no upload button */}
 <div className="cd-card">
   <p className="cd-card-title"><Upload size={16} color="var(--brand)" /> Documents</p>
   {docsLoading ? (
@@ -421,14 +438,18 @@ const isFailed = caseData?.status === 'MEDIATION_FAILED'
           </span>
         </div>
       ))}
-      <button
-        className="cd-submit-btn"
-        style={{ marginTop: 12 }}
-        onClick={() => navigate(`/party/cases/${caseId}/documents`)}
-      >
-        <Upload size={14} /> Upload More
-      </button>
+      {caseData?.status !== 'MEDIATION_COMPLETE' && (
+        <button
+          className="cd-submit-btn"
+          style={{ marginTop: 12 }}
+          onClick={() => navigate(`/party/cases/${caseId}/documents`)}
+        >
+          <Upload size={14} /> Upload More
+        </button>
+      )}
     </>
+  ) : caseData?.status === 'MEDIATION_COMPLETE' ? (
+    <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No documents were uploaded for this case.</p>
   ) : (
     <div className="cd-empty">
       <div className="cd-empty-icon">
@@ -441,6 +462,7 @@ const isFailed = caseData?.status === 'MEDIATION_FAILED'
     </div>
   )}
 </div>
+          
           </>
         )}
       </div>

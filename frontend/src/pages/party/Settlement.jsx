@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronLeft, CheckCircle, Download, Loader,
-  AlertCircle, Upload, FileText, User
+  AlertCircle, FileText, User
 } from 'lucide-react'
 import client from '../../services/api'
 
-const MAX_FILE_BYTES = 2 * 1024 * 1024   // 2 MB
+  // 2 MB
 const POLL_INTERVAL  = 3000              // 3 s
 
 export default function Settlement() {
@@ -20,9 +20,7 @@ export default function Settlement() {
 
   // Form state
   const [typedName, setTypedName]   = useState('')
-  const [sigFile, setSigFile]       = useState(null)       // File object
-  const [sigPreview, setSigPreview] = useState('')         // filename display
-  const [fileError, setFileError]   = useState('')
+  
 
   const stripMarkdown = (text) => (text || '').replace(/\*\*/g, '').replace(/\*/g, '')
 
@@ -30,7 +28,7 @@ export default function Settlement() {
   const [confirming, setConfirming]   = useState(false)
   const [confirmed, setConfirmed]     = useState(false)
   const [submitError, setSubmitError] = useState('')
-  const [signatureConfirmed, setSignatureConfirmed] = useState(false)
+  
 
   // PDF polling state
   const [pdfReady, setPdfReady]   = useState(false)
@@ -95,34 +93,16 @@ export default function Settlement() {
   useEffect(() => () => clearInterval(pollRef.current), [])
 
   // ── Signature file handler ───────────────────────────────────────────────
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0]
-    setFileError('')
-    if (!file) return
-    if (!['image/jpeg', 'image/png'].includes(file.type)) {
-      setFileError('Only JPG or PNG files are accepted.')
-      return
-    }
-    if (file.size > MAX_FILE_BYTES) {
-      setFileError('File must be under 2 MB.')
-      return
-    }
-    setSigFile(file)
-    setSigPreview(`${file.name} (${(file.size / 1024).toFixed(1)} KB)`)
-  }
 
   // ── Submit confirm ───────────────────────────────────────────────────────
   const handleConfirm = async () => {
-    if (!typedName.trim() || !sigFile) return
+    if (!typedName.trim()) return
     setConfirming(true)
     setSubmitError('')
     try {
       const form = new FormData()
       form.append('full_name', typedName.trim())
-      form.append('signature', sigFile)
-      await client.post(`/cases/${caseId}/settlement/confirm`, form, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      await client.post(`/cases/${caseId}/settlement/confirm`, form)
       setConfirmed(true)
       startPolling()
     } catch (err) {
@@ -132,7 +112,7 @@ export default function Settlement() {
     }
   }
 
-  const canConfirm = typedName.trim().length > 0 && sigFile !== null && !fileError && signatureConfirmed
+ const canConfirm = typedName.trim().length > 0
 
   const styles = `
     @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=DM+Sans:wght@400;500&display=swap');
@@ -273,45 +253,9 @@ export default function Settlement() {
               />
             </div>
 
-            {/* Signature upload */}
-            <div className="st-field">
-              <label className="st-label">
-                <Upload size={13} /> Upload signature image
-              </label>
-              <div className={`st-file-zone ${sigFile ? 'has-file' : ''}`}>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png"
-                  className="st-file-input"
-                  onChange={handleFileChange}
-                />
-                <div className="st-file-icon">
-                  <Upload size={18} color="var(--text-muted)" />
-                </div>
-                {sigPreview ? (
-                  <>
-                    <p className="st-file-name">{sigPreview}</p>
-                    <p className="st-file-hint">Click to change file</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="st-file-text">Click to upload your signature</p>
-                    <p className="st-file-hint">JPG or PNG · max 2 MB</p>
-                  </>
-                )}
-              </div>
-              {fileError && (
-                <p className="st-file-error"><AlertCircle size={13} /> {fileError}</p>
-              )}
-            </div>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, marginTop: 10 }}>
-  <input
-    type="checkbox"
-    checked={signatureConfirmed}
-    onChange={e => setSignatureConfirmed(e.target.checked)}
-  />
-  <span>I confirm the uploaded image is my genuine signature, and I am legally authorized to sign this settlement on my own behalf.</span>
-</label>
+           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.5 }}>
+              By typing your name and clicking confirm, you agree this constitutes your legally binding signature on this settlement, and that you are authorized to sign on your own behalf.
+            </p>
 
             {submitError && (
               <div className="st-submit-error">

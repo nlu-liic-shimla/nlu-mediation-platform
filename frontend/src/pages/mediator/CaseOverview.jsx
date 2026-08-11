@@ -664,6 +664,8 @@ export default function CaseOverview() {
   const [proposals, setProposals] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [settlementDone, setSettlementDone] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState(null);
+      const [analysis, setAnalysis] = useState(null);
 
   // Party submission status — from /submissions endpoint
   const [partyStatus, setPartyStatus] = useState({
@@ -767,16 +769,19 @@ export default function CaseOverview() {
         await fetchPartyStatus(id);
         await fetchInvitationStatus(id);
 
-        // Fetch proposals and audit logs
-        const [props, logs] = await Promise.all([
+        // Fetch proposals, audit logs, and AI analysis (for neutral summary)
+        const [props, logs, analysisRes] = await Promise.all([
           client.get(`/cases/${id}/proposals`).then((res) => res.data).catch(() => []),
           client.get(`/cases/${id}/audit-log`).then((res) => res.data).catch(() => []),
+          client.get(`/cases/${id}/analysis`).then((res) => res.data).catch(() => null),
         ]);
         setProposals(props);
         setAuditLogs(logs);
+        setAnalysis(analysisRes);
       try {
           const settlementRes = await client.get(`/cases/${id}/settlement/status`);
           setSettlementDone(!!settlementRes.data?.pdf_ready);
+          setPdfUrl(settlementRes.data?.pdf_url || null);
         } catch {
           // fail silently — not all cases have reached settlement yet
         }
@@ -1164,11 +1169,55 @@ export default function CaseOverview() {
                 fontWeight: 600,
               }}
             >
-              Finalise Case
+             Finalise Case
             </button>
           </div>
         )}
+        {/* ── Download Settlement PDF — visible any time PDF is ready ── */}
+        {caseData.status === "MEDIATION_COMPLETE" && settlementDone && pdfUrl && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              background: isDark ? "#052e16" : "#f0fdf4",
+              border: `1px solid ${isDark ? "#16a34a" : "#bbf7d0"}`,
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <CheckCircle2 size={16} color="#16a34a" />
+              <span style={{ fontSize: 14, color: "#16a34a", fontWeight: 500 }}>
+                Settlement PDF is ready
+              </span>
+            </div>
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                padding: "6px 16px",
+                borderRadius: 7,
+                background: "#16a34a",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+                textDecoration: "none",
+                display: "inline-block",
+              }}
+            >
+              Download Settlement PDF
+            </a>
+          </div>
+        )}
         {/* ── PROCESSING_FAILED ── */}
+           
         {caseData.status === "PROCESSING_FAILED" && (
           <div
             style={{
@@ -1921,9 +1970,9 @@ export default function CaseOverview() {
                       .replace(/\b\w/g, (c) => c.toUpperCase())
                   : "Not specified",
               },
-              {
-  label: "Description",
-  value: caseData.brief_description || (
+             {
+  label: analysis?.neutral_summary?.summary ? "Description (AI neutral summary)" : "Description (party's original text)",
+  value: analysis?.neutral_summary?.summary || caseData.brief_description || (
     <span style={{ color: tk.sub, fontStyle: 'italic' }}>
       Not specified — see individual statements in AI Analysis
     </span>
