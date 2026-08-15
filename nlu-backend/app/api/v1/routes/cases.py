@@ -194,6 +194,7 @@ async def list_cases(current_user: dict = Depends(get_current_user)):
                 assigned_mediator=user_id,
                 requesting_party_email=None,
                 against_party_email=app.get("against_party_email"),
+                monetary_value=app.get("monetary_value"),
                 created_at=app.get("created_at"),
                 updated_at=app.get("updated_at"),
             ))
@@ -253,6 +254,7 @@ async def get_case(
         "assigned_mediator": case.get("assigned_mediator"),
         "requesting_party_email": case.get("requesting_party_email"),
         "against_party_email": case.get("against_party_email"),
+        "monetary_value": case.get("monetary_value"),
         "negotiation_round": case.get("negotiation_round", 0),
         "max_rounds": case.get("max_rounds", 3),
         "mediator_notes": case.get("mediator_notes"),
@@ -981,7 +983,10 @@ async def accept_application(
         return {"token": raw, "expires_at": expires_at, "invitation_id": invitation_id}
 
     requesting_party_invite = make_token("requesting_party", None)
-    against_party_invite = make_token("against_party", app.get("against_party_email"))
+    # Do NOT eagerly create the against-party token here.
+    # The mediator generates it explicitly later via the existing
+    # "Get Invitation Link" button (POST /cases/{id}/invitations/regenerate),
+    # matching Path 2's behavior exactly.
 
     # FIX (related to #20): auto-link the applicant to their own
     # requesting_party invitation — they never need to click this link.
@@ -1010,9 +1015,8 @@ async def accept_application(
         "status": "BOTH_INVITED",
         "requesting_party_token": requesting_party_invite["token"],
         "requesting_party_expires_at": requesting_party_invite["expires_at"],
-        "against_party_token": against_party_invite["token"],
-        "against_party_expires_at": against_party_invite["expires_at"],
-        "message": "Copy these links now — they will not be shown again."
+        "message": "Copy the requesting party's link now — it will not be shown again. "
+                   "Generate the against party's invitation link separately using 'Get Invitation Link'."
     }
 
 

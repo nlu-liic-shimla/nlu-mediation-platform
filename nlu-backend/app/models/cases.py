@@ -48,6 +48,7 @@ class CaseResponse(BaseModel):
     requesting_party_email: Optional[str] = None
     against_party_email: Optional[str] = None
     negotiation_round: Optional[int] = 0
+    monetary_value: Optional[float] = None
     max_rounds: Optional[int] = 3
     mediator_notes: Optional[str] = None
     created_at: Optional[datetime] = None
