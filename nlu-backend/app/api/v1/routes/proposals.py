@@ -460,63 +460,22 @@ async def respond_to_proposal(
     all_responses = supabase.table("proposal_responses") \
         .select("decision").eq("proposal_id", proposal_id).execute()
 
-    decisions = [r["decision"] for r in all_responses.data]
+    decisions = [r["decision"] for r in (all_responses.data or [])]
 
-    # A single rejection is enough to kill this proposal — do not wait for
-    # the second party. Waiting means a party can be stuck seeing a proposal
-    # that's already dead, and the mediator can't start revising until the
-    # other party bothers to respond (which may never happen).
-    if decision_val == "reject":
-        # Fetch fresh case data to check round limits
-        case_resp = supabase.table("cases") \
-            .select("negotiation_round, max_rounds") \
-            .eq("id", case_id).single().execute()
-        current_round = case_resp.data.get("negotiation_round") or 0
-        max_rounds = case_resp.data.get("max_rounds") or 3
-
-        final_round_exhausted = current_round >= max_rounds
-
-        # Step 1: PROPOSAL_PUBLISHED -> MEDIATION_IN_PROGRESS (always valid first step)
-        transition(case_id=case_id, new_state=CaseState.MEDIATION_IN_PROGRESS, actor_id="system")
-
-        if final_round_exhausted:
-            # Step 2: MEDIATION_IN_PROGRESS -> MEDIATION_FAILED
-            transition(case_id=case_id, new_state=CaseState.MEDIATION_FAILED, actor_id="system")
-
-            _write_audit(
-                case_id=case_id, actor_id="system",
-                action="MEDIATION_FAILED",
-                old_state=CaseState.MEDIATION_IN_PROGRESS.value, new_state=CaseState.MEDIATION_FAILED.value,
-                metadata={"proposal_id": proposal_id, "reason": "final_round_rejected", "round": current_round, "max_rounds": max_rounds},
-            )
-            return {
-                "status": "mediation_failed",
-                "message": "Final round rejected. Mediation has ended without a settlement.",
-            }
-
-        # Not final round — fire Sub-system H as before
-        try:
-            from tasks import generate_proposal_revision
-            generate_proposal_revision.delay(case_id, proposal_id)
-            h_triggered = True
-        except Exception as e:
-            logger.error(f"Could not trigger generate_proposal_revision: {e}")
-            h_triggered = False
-
-        _write_audit(
-            case_id=case_id, actor_id="system",
-            action="MEDIATION_IN_PROGRESS",
-            old_state=CaseState.PROPOSAL_PUBLISHED.value, new_state=CaseState.MEDIATION_IN_PROGRESS.value,
-            metadata={"proposal_id": proposal_id, "revision_triggered": h_triggered},
-        )
+    # Wait until BOTH parties have responded before transitioning state or
+    # firing the revision pipeline. This prevents the non-responding party
+    # from being orphaned on a proposal the mediator has already started
+    # revising based on a single, possibly-premature rejection.
+    if len(decisions) < 2:
         return {
-            "status":             "mediation_in_progress",
-            "revision_triggered": h_triggered,
-            "message":            "Proposal rejected. The mediator will prepare a revised proposal.",
+            "status":  "response_recorded",
+            "waiting": True,
+            "message": "Your response has been recorded. Waiting for the other party.",
         }
 
-    # decision_val == "accept" — only complete once BOTH parties have accepted
-    if len(decisions) >= 2 and all(d == "accept" for d in decisions):
+    # ── Both parties have now responded ──
+
+    if all(d == "accept" for d in decisions):
         transition(case_id=case_id, new_state=CaseState.MEDIATION_COMPLETE, actor_id="system")
         _write_audit(
             case_id=case_id, actor_id="system",
@@ -526,14 +485,48 @@ async def respond_to_proposal(
         )
         return {"status": "mediation_complete", "message": "Both parties accepted. The mediator has been notified to finalise the case."}
 
-    # Accepted, but still waiting on the other party
-    return {
-        "status":  "response_recorded",
-        "waiting": True,
-        "message": "Your response has been recorded. Waiting for the other party.",
-    }
+    # At least one rejection, now that both have responded — check round limits
+    case_resp = supabase.table("cases") \
+        .select("negotiation_round, max_rounds") \
+        .eq("id", case_id).single().execute()
+    current_round = case_resp.data.get("negotiation_round") or 0
+    max_rounds = case_resp.data.get("max_rounds") or 3
+    final_round_exhausted = current_round >= max_rounds
 
-   
+    transition(case_id=case_id, new_state=CaseState.MEDIATION_IN_PROGRESS, actor_id="system")
+
+    if final_round_exhausted:
+        transition(case_id=case_id, new_state=CaseState.MEDIATION_FAILED, actor_id="system")
+        _write_audit(
+            case_id=case_id, actor_id="system",
+            action="MEDIATION_FAILED",
+            old_state=CaseState.MEDIATION_IN_PROGRESS.value, new_state=CaseState.MEDIATION_FAILED.value,
+            metadata={"proposal_id": proposal_id, "reason": "final_round_rejected", "round": current_round, "max_rounds": max_rounds},
+        )
+        return {
+            "status": "mediation_failed",
+            "message": "Final round rejected. Mediation has ended without a settlement.",
+        }
+
+    try:
+        from tasks import generate_proposal_revision
+        generate_proposal_revision.delay(case_id, proposal_id)
+        h_triggered = True
+    except Exception as e:
+        logger.error(f"Could not trigger generate_proposal_revision: {e}")
+        h_triggered = False
+
+    _write_audit(
+        case_id=case_id, actor_id="system",
+        action="MEDIATION_IN_PROGRESS",
+        old_state=CaseState.PROPOSAL_PUBLISHED.value, new_state=CaseState.MEDIATION_IN_PROGRESS.value,
+        metadata={"proposal_id": proposal_id, "revision_triggered": h_triggered},
+    )
+    return {
+        "status":             "mediation_in_progress",
+        "revision_triggered": h_triggered,
+        "message":            "Proposal rejected. The mediator will prepare a revised proposal.",
+    }
 
 
 @router.get(
