@@ -4,6 +4,16 @@ Backend Role 2 | NLU Mediation Platform | Week 4
 
 Generates a ReportLab PDF settlement report and saves it to Supabase Storage.
 Called after both parties confirm their settlement.
+
+FONT FIX (added):
+    ReportLab's default font (Helvetica) does not include the ₹ (Indian Rupee)
+    glyph, so any ₹ symbol in settlement text was rendering as a black box (■)
+    in the generated PDF. We register DejaVu Sans instead, which does support
+    ₹. Rather than requiring a font file to be manually downloaded and stored
+    in the project, we reuse the DejaVuSans.ttf / DejaVuSans-Bold.ttf files
+    that ship inside the `matplotlib` package (mpl-data/fonts/ttf/). This
+    means the only requirement is `pip install matplotlib` — no new files to
+    add to the repo, no extra paths to manage.
 """
 
 import os
@@ -19,8 +29,47 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 )
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 logger = logging.getLogger(__name__)
+
+
+# ── Font registration (module-level, runs once on import) ─────────────────────
+# We locate DejaVu Sans inside the installed matplotlib package and register
+# it with ReportLab under the names "DejaVuSans" and "DejaVuSans-Bold".
+# If matplotlib isn't installed, or the font files can't be found for any
+# reason, we fall back to Helvetica so PDF generation still works — it will
+# just show ■ for ₹ again, same as before this fix, rather than crashing.
+
+FONT_REGULAR = "Helvetica"
+FONT_BOLD = "Helvetica-Bold"
+
+try:
+    import matplotlib
+    _font_dir = os.path.join(
+        os.path.dirname(matplotlib.__file__), "mpl-data", "fonts", "ttf"
+    )
+    _regular_path = os.path.join(_font_dir, "DejaVuSans.ttf")
+    _bold_path = os.path.join(_font_dir, "DejaVuSans-Bold.ttf")
+
+    if os.path.exists(_regular_path) and os.path.exists(_bold_path):
+        pdfmetrics.registerFont(TTFont("DejaVuSans", _regular_path))
+        pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", _bold_path))
+        FONT_REGULAR = "DejaVuSans"
+        FONT_BOLD = "DejaVuSans-Bold"
+        logger.info("[PDF] Registered DejaVu Sans font (₹ symbol will render correctly)")
+    else:
+        logger.warning(
+            "[PDF] DejaVu Sans font files not found inside matplotlib install — "
+            "falling back to Helvetica. ₹ symbol may render as a black box. "
+            "Run: pip install matplotlib"
+        )
+except ImportError:
+    logger.warning(
+        "[PDF] matplotlib not installed — falling back to Helvetica. "
+        "₹ symbol may render as a black box. Run: pip install matplotlib"
+    )
 
 
 def generate_settlement_pdf(case_id: str) -> str:
@@ -72,18 +121,18 @@ def generate_settlement_pdf(case_id: str) -> str:
 
     # ── Step 4: Fetch accepted proposal ──────────────────────────────────────
     proposal_resp = supabase.table("proposals") \
-        .select("raw_text, round_number, published_at") \
+        .select("content, round, published_at") \
         .eq("case_id", case_id) \
-        .eq("is_published", True) \
-        .order("round_number", desc=True) \
+        .eq("status", "published") \
+        .order("round", desc=True) \
         .limit(1) \
         .execute()
 
     proposal_text = "Settlement terms as agreed by both parties."
     round_number = 1
     if proposal_resp.data:
-        proposal_text = proposal_resp.data[0].get("raw_text") or proposal_text
-        round_number = proposal_resp.data[0].get("round_number") or 1
+        proposal_text = proposal_resp.data[0].get("content") or proposal_text
+        round_number = proposal_resp.data[0].get("round") or 1
 
     # ── Step 5: Fetch conflict summary from Burst 1 ───────────────────────────
     analysis_resp = supabase.table("ai_analysis") \
@@ -124,6 +173,7 @@ def generate_settlement_pdf(case_id: str) -> str:
     title_style = ParagraphStyle(
         "Title",
         parent=styles["Heading1"],
+        fontName=FONT_BOLD,
         fontSize=18,
         textColor=colors.HexColor("#1e3a5f"),
         alignment=TA_CENTER,
@@ -132,6 +182,7 @@ def generate_settlement_pdf(case_id: str) -> str:
     subtitle_style = ParagraphStyle(
         "Subtitle",
         parent=styles["Normal"],
+        fontName=FONT_REGULAR,
         fontSize=11,
         textColor=colors.HexColor("#4a5568"),
         alignment=TA_CENTER,
@@ -140,6 +191,7 @@ def generate_settlement_pdf(case_id: str) -> str:
     section_heading_style = ParagraphStyle(
         "SectionHeading",
         parent=styles["Heading2"],
+        fontName=FONT_BOLD,
         fontSize=12,
         textColor=colors.HexColor("#1e3a5f"),
         spaceBefore=14,
@@ -148,6 +200,7 @@ def generate_settlement_pdf(case_id: str) -> str:
     body_style = ParagraphStyle(
         "Body",
         parent=styles["Normal"],
+        fontName=FONT_REGULAR,
         fontSize=10,
         leading=16,
         alignment=TA_JUSTIFY,
@@ -156,6 +209,7 @@ def generate_settlement_pdf(case_id: str) -> str:
     footer_style = ParagraphStyle(
         "Footer",
         parent=styles["Normal"],
+        fontName=FONT_REGULAR,
         fontSize=8,
         textColor=colors.HexColor("#718096"),
         alignment=TA_CENTER,
@@ -184,7 +238,8 @@ def generate_settlement_pdf(case_id: str) -> str:
 
     case_table = Table(case_details_data, colWidths=[5 * cm, 11 * cm])
     case_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (0, -1), FONT_BOLD),
+        ("FONTNAME", (1, 0), (1, -1), FONT_REGULAR),
         ("FONTSIZE", (0, 0), (-1, -1), 10),
         ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#4a5568")),
         ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.HexColor("#f7fafc"), colors.white]),
@@ -236,7 +291,8 @@ def generate_settlement_pdf(case_id: str) -> str:
 
         conf_table = Table(conf_data, colWidths=[5 * cm, 11 * cm])
         conf_table.setStyle(TableStyle([
-            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (0, 0), (0, -1), FONT_BOLD),
+            ("FONTNAME", (1, 0), (1, -1), FONT_REGULAR),
             ("FONTSIZE", (0, 0), (-1, -1), 10),
             ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#4a5568")),
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f0fff4")),

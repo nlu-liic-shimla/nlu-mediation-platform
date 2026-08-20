@@ -726,7 +726,7 @@ def extract_proposal_structure(proposal_id: str):
 
     try:
         proposal_resp = supabase.table("proposals") \
-            .select("raw_text") \
+            .select("content") \
             .eq("id", proposal_id) \
             .single() \
             .execute()
@@ -735,7 +735,7 @@ def extract_proposal_structure(proposal_id: str):
             logger.warning(f"[ProposalStructure] Proposal {proposal_id} not found")
             return
 
-        raw_text = proposal_resp.data["raw_text"]
+        raw_text = proposal_resp.data["content"]
 
         # ── NIHARIKA or VAIDANT: Fill in the structurer call here ────────────
         # Expected call:
@@ -780,7 +780,7 @@ def generate_proposal_revision(case_id: str, proposal_id: str):
         5. Calls Sub-system H
         6. Saves { revised_draft, changes_summary } to proposals.revision_suggestions
 
-    MEDIATOR SEES:
+    MEDIATOR SEES:h
         LEFT panel: previous proposal, rejection reasons, AI changes list
         RIGHT panel: editable text area pre-filled with revised_draft
         Mediator edits freely then publishes as new round.
@@ -797,14 +797,14 @@ def generate_proposal_revision(case_id: str, proposal_id: str):
     try:
         # Fetch proposal
         proposal_resp = supabase.table("proposals").select(
-            "raw_text, round_number"
+            "content, round"
         ).eq("id", proposal_id).single().execute()
 
         if not proposal_resp.data:
             raise ValueError(f"Proposal {proposal_id} not found")
 
-        raw_text = proposal_resp.data["raw_text"]
-        round_number = proposal_resp.data.get("round_number", 1)
+        raw_text = proposal_resp.data["content"]
+        round_number = proposal_resp.data.get("round", 1)
 
         # Fetch rejection reasons
         responses_resp = supabase.table("proposal_responses").select(
