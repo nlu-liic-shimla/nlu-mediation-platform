@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { updateProposal, publishProposal } from "../../api/cases";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
 import client from "../../services/api";
 
@@ -15,6 +15,10 @@ const tokens = (dark) => ({
   inputBg: dark ? "#0f172a" : "#f8fafc",
   accent: "#1e40af",
 });
+
+// Polling config for waiting on Sub-system H (AI revision generation)
+const POLL_INTERVAL_MS = 2500;
+const POLL_TIMEOUT_MS = 60000; // give up showing the spinner after ~60s, but keep editor usable
 
 /* ── PublishModal ───────────────────────────────────────── */
 function PublishModal({ onCancel, onConfirm, loading, tk }) {
@@ -124,14 +128,23 @@ export default function ProposalRevision() {
   const [savedAt, setSavedAt] = useState(null);
   const [publishing, setPublishing] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
+
+  // loading: initial "figure out what round/proposal we're on" phase
+  // waitingOnAI: revision_suggestions isn't populated yet, we're polling for it
   const [loading, setLoading] = useState(true);
+  const [waitingOnAI, setWaitingOnAI] = useState(false);
   const [error, setError] = useState(null);
- 
+
+  // Guards so a stale poll loop from a previous mount/param-change can't
+  // clobber state after the component has moved on.
+  const pollTimerRef = useRef(null);
+  const pollStartRef = useRef(null);
+  const cancelledRef = useRef(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const [width, setWidth] = useState(window.innerWidth);
   const tk = tokens(dark);
   const isSmall = width < 900;
- 
 
   useEffect(() => {
     const h = () => setWidth(window.innerWidth);
@@ -139,7 +152,7 @@ export default function ProposalRevision() {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  // ── Load revision data from API ──────────────────────────
+  // ── Load revision data from API (with polling for AI suggestions) ──
   // Fetches the rejected proposal (by p_id) to read its rejection
   // reasons + AI revision_suggestions, then ensures a NEW draft proposal
   // exists for this round (creating one if needed) — because publishing
@@ -147,10 +160,28 @@ export default function ProposalRevision() {
   // POST /cases/{id}/proposals triggers. Reusing the old rejected
   // proposal's id for publish always fails with an invalid state
   // transition (MEDIATION_IN_PROGRESS -> PROPOSAL_PUBLISHED doesn't exist).
+  //
+  // Race condition fix: generate_proposal_revision runs as a background
+  // Celery task and can take up to ~50s. Instead of fetching once and
+  // erroring out if revision_suggestions isn't there yet, we poll
+  // GET /cases/{id}/proposals until it shows up, surfacing a
+  // "Generating AI revision..." state in the meantime.
   useEffect(() => {
-    const loadRevision = async () => {
+    cancelledRef.current = false;
+    pollStartRef.current = Date.now();
+
+    const clearPoll = () => {
+      if (pollTimerRef.current) {
+        clearTimeout(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+
+    const loadRevision = async ({ isPoll = false } = {}) => {
       try {
         const res = await client.get(`/cases/${id}/proposals`);
+        if (cancelledRef.current) return;
+
         const proposals = Array.isArray(res.data)
           ? res.data
           : res.data?.proposals ?? [];
@@ -160,11 +191,14 @@ export default function ProposalRevision() {
 
         if (!rejectedProposal) {
           setError("Proposal not found.");
+          setLoading(false);
+          setWaitingOnAI(false);
           return;
         }
 
         // Enforce round cap BEFORE creating a new draft
         const caseRes = await client.get(`/cases/${id}`);
+        if (cancelledRef.current) return;
         const maxR = caseRes.data?.max_rounds || 3;
         setMaxRounds(maxR);
 
@@ -173,25 +207,50 @@ export default function ProposalRevision() {
           setError(
             `Round ${maxR} was the final round and it was rejected. No further rounds are available — this case should proceed to closure/escalation.`
           );
+          setLoading(false);
+          setWaitingOnAI(false);
           return;
         }
 
         // revision_suggestions is set by Sub-system H after rejection
         // shape: { revised_draft, changes_summary, requesting_reason, against_reason }
-        const suggestions = rejectedProposal.revision_suggestions || {};
+        const suggestions = rejectedProposal.revision_suggestions;
+        const suggestionsReady =
+          suggestions && Object.keys(suggestions).length > 0;
+
+        // Still generating — poll again shortly instead of erroring out.
+        if (!suggestionsReady) {
+          const elapsed = Date.now() - pollStartRef.current;
+          if (elapsed < POLL_TIMEOUT_MS) {
+            setLoading(false);
+            setWaitingOnAI(true);
+            pollTimerRef.current = setTimeout(
+              () => loadRevision({ isPoll: true }),
+              POLL_INTERVAL_MS
+            );
+            return;
+          }
+          // Timed out waiting — fall through and let the mediator write
+          // their own revision manually rather than blocking them forever.
+          setWaitingOnAI(false);
+        } else {
+          setWaitingOnAI(false);
+        }
+
         setPreviousProposal(
           rejectedProposal.content || rejectedProposal.raw_text || ""
         );
-        setRequestingReason(suggestions.requesting_reason || "");
-        setAgainstReason(suggestions.against_reason || "");
-        setChangesSummary(suggestions.changes_summary || []);
+        setRequestingReason(suggestions?.requesting_reason || "");
+        setAgainstReason(suggestions?.against_reason || "");
+        setChangesSummary(suggestions?.changes_summary || []);
 
         // Find an existing draft for the next round, or create one.
-      let draftProposal = proposals.find((p) => p.status === "draft");
+        let draftProposal = proposals.find((p) => p.status === "draft");
 
         if (!draftProposal) {
           if (nextRound > maxR) return; // guarded above, but stay safe here too
           const created = await client.post(`/cases/${id}/proposals`);
+          if (cancelledRef.current) return;
           draftProposal = {
             id: created.data.proposal_id,
             content: created.data.draft_text,
@@ -200,22 +259,39 @@ export default function ProposalRevision() {
         }
 
         setProposalId(draftProposal.id);
-        // Prefer the AI revision suggestion text; fall back to the fresh draft's content
-        setRevisedText(suggestions.revised_draft || draftProposal.content || "");
+        // Prefer the AI revision suggestion text; fall back to the fresh draft's content.
+        // Don't stomp on text the mediator may already be typing during a poll.
+        setRevisedText((prev) =>
+          isPoll && prev
+            ? prev
+            : suggestions?.revised_draft || draftProposal.content || ""
+        );
         setRoundNumber(
           draftProposal.round || (rejectedProposal.round || 1) + 1
         );
-
-       
-     } catch (err) {
+        setLoading(false);
+      } catch (err) {
+        if (cancelledRef.current) return;
         console.error("loadRevision failed:", err?.response?.data || err);
         setError("Failed to load revision data. Please go back and try again.");
-      } finally {
         setLoading(false);
+        setWaitingOnAI(false);
       }
     };
+
+    setError(null);
+    setLoading(true);
+    setWaitingOnAI(false);
     loadRevision();
-  }, [id, p_id]);
+
+    return () => {
+      cancelledRef.current = true;
+      clearPoll();
+    };
+  }, [id, p_id, reloadKey]);
+
+  // Bumping reloadKey re-runs the effect above from scratch (fresh poll window).
+  const handleRetry = () => setReloadKey((k) => k + 1);
 
   const handleSaveDraft = async () => {
     if (!proposalId) return;
@@ -284,20 +360,37 @@ export default function ProposalRevision() {
         >
           <AlertTriangle size={24} color="#ef4444" />
           <p style={{ color: "#ef4444", fontSize: 15 }}>{error}</p>
-          <button
-            onClick={() => navigate(`/mediator/cases/${id}`)}
-            style={{
-              padding: "8px 20px",
-              borderRadius: 8,
-              background: "#1e40af",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 13,
-            }}
-          >
-            Back to Case
-          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={handleRetry}
+              style={{
+                padding: "8px 20px",
+                borderRadius: 8,
+                background: "#1e40af",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => navigate(`/mediator/cases/${id}`)}
+              style={{
+                padding: "8px 20px",
+                borderRadius: 8,
+                background: "transparent",
+                color: tk.text,
+                border: `1px solid ${tk.border}`,
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+            >
+              Back to Case
+            </button>
+          </div>
         </div>
       </MediatorLayout>
     );
@@ -445,8 +538,35 @@ export default function ProposalRevision() {
           </div>
         )}
 
-        {/* Sub-system H not ready yet notice */}
-        {changesSummary.length === 0 && !revisedText && (
+        {/* AI is still generating the revision — polling in the background */}
+        {waitingOnAI && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <Loader2
+              size={16}
+              color="#1e40af"
+              style={{ animation: "spin 1s linear infinite" }}
+            />
+            <span style={{ fontSize: 13, color: "#1e40af" }}>
+              Generating AI revision... this can take up to a minute. You can
+              start drafting your own text below while you wait.
+            </span>
+            <style>{`@keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }`}</style>
+          </div>
+        )}
+
+        {/* Sub-system H not ready and polling has given up — manual fallback */}
+        {!waitingOnAI && changesSummary.length === 0 && !revisedText && (
           <div
             style={{
               padding: "12px 16px",
@@ -461,7 +581,9 @@ export default function ProposalRevision() {
           >
             <AlertTriangle size={16} color="#f59e0b" />
             <span style={{ fontSize: 13, color: "#92400e" }}>
-              AI revision suggestions are still being generated. You can write your own revision in the editor on the right, or wait a moment and refresh.
+              AI revision suggestions aren't available yet. You can write your
+              own revision in the editor on the right, or go back and reopen
+              this page to check again.
             </span>
           </div>
         )}

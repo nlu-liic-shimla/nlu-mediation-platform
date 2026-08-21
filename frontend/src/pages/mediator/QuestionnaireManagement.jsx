@@ -196,44 +196,47 @@ const [sendSuccess, setSendSuccess] = useState(false);
   }, []);
 
   // ── Fetch case + questionnaire data ──────────────────────
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Fetch case details
-        const caseRes = await client.get(`/cases/${id}`);
-        setCaseData(caseRes.data);
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Fetch case details
+      const caseRes = await client.get(`/cases/${id}`);
+      setCaseData(caseRes.data);
 
-        // Fetch questionnaires for the case
-        const qRes = await client.get(`/cases/${id}/questionnaires`);
-        const qList = Array.isArray(qRes.data)
-          ? qRes.data
-          : qRes.data?.questionnaires ?? [];
+      // Fetch questionnaires for the case
+      const qRes = await client.get(`/cases/${id}/questionnaires`);
+      const qList = Array.isArray(qRes.data)
+        ? qRes.data
+        : qRes.data?.questionnaires ?? [];
 
-        if (qList.length > 0) {
-          const q = qList[0];
-          setQuestionnaire(q);
+      if (qList.length > 0) {
+        const q = qList[0];
+        setQuestionnaire(q);
 
-          // Fetch responses for the questionnaire (mediator gets all)
-          try {
-            const rRes = await client.get(
-              `/cases/${id}/questionnaires/${q.id}/responses`
-            );
-            const rList = Array.isArray(rRes.data)
-              ? rRes.data
-              : rRes.data?.responses ?? [];
-            setResponses(rList);
-          } catch {
-            setResponses([]);
-          }
+        // Fetch responses for the questionnaire (mediator gets all)
+        try {
+          const rRes = await client.get(
+            `/cases/${id}/questionnaires/${q.id}/responses`
+          );
+          const rList = Array.isArray(rRes.data)
+            ? rRes.data
+            : rRes.data?.responses ?? [];
+          setResponses(rList);
+        } catch {
+          setResponses([]);
         }
-      } catch {
-        setError("Failed to load questionnaire data.");
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch {
+      setError("Failed to load questionnaire data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // ── Send questionnaire to both parties ───────────────────
@@ -322,20 +325,37 @@ const [sendSuccess, setSendSuccess] = useState(false);
         >
           <AlertTriangle size={24} color="#ef4444" />
           <p style={{ color: "#ef4444", fontSize: 15 }}>{error}</p>
-          <button
-            onClick={() => navigate(`/mediator/cases/${id}`)}
-            style={{
-              padding: "8px 20px",
-              borderRadius: 8,
-              background: "#1e40af",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 13,
-            }}
-          >
-            Back to Case
-          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={fetchData}
+              style={{
+                padding: "8px 20px",
+                borderRadius: 8,
+                background: "#1e40af",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => navigate(`/mediator/cases/${id}`)}
+              style={{
+                padding: "8px 20px",
+                borderRadius: 8,
+                background: "transparent",
+                color: tk.text,
+                border: `1px solid ${tk.border}`,
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+            >
+              Back to Case
+            </button>
+          </div>
         </div>
       </MediatorLayout>
     );
@@ -389,24 +409,6 @@ const [sendSuccess, setSendSuccess] = useState(false);
             {status && <StatusBadge status={status} />}
           </div>
         </div>
-
-        {error && (
-          <div
-            style={{
-              padding: "12px 16px",
-              borderRadius: 10,
-              background: "#fef2f2",
-              border: "1px solid #fecaca",
-              marginBottom: 16,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
-            <AlertTriangle size={16} color="#ef4444" />
-            <span style={{ fontSize: 13, color: "#dc2626" }}>{error}</span>
-          </div>
-        )}
 
         {/* ── Send questionnaire panel ── */}
         {!questionnaireActive && (
