@@ -559,15 +559,17 @@ def extract_proposal_structure(proposal_id: str):
     logger.info(f"[ProposalStructure] Starting extraction for proposal {proposal_id}")
 
     try:
-        proposal_resp = supabase.table("proposals").select(
-            "raw_text"
-        ).eq("id", proposal_id).single().execute()
+        proposal_resp = supabase.table("proposals") \
+            .select("content") \
+            .eq("id", proposal_id) \
+            .single() \
+            .execute()
 
         if not proposal_resp.data:
             logger.warning(f"[ProposalStructure] Proposal {proposal_id} not found")
             return
 
-        raw_text = proposal_resp.data["raw_text"]
+        raw_text = proposal_resp.data["content"]
 
         try:
             from ai.subsystems.proposal_structurer import extract_structure
@@ -605,10 +607,25 @@ def generate_proposal_revision(case_id: str, proposal_id: str):
     Triggered when any party rejects and case moves to MEDIATION_IN_PROGRESS.
     Non-critical -- mediator can write revision manually if this fails.
 
-    FIXED:
-    - Fetches BATNA/WATNA from both 'batna_watna' and 'result' columns
-    - Reconstructs BatnaWatnaOutput Pydantic object before passing to Sub-system H
-    - Falls back gracefully if BATNA/WATNA not available
+    WHAT IT DOES:
+        1. Fetches the current proposal text
+        2. Fetches both parties' rejection reasons (if they rejected)
+        3. Fetches BATNA/WATNA data for context (from either 'batna_watna' or
+           'result' column, reconstructed into a BatnaWatnaOutput object)
+        4. Fetches mediator's private notes (fed as professional context)
+        5. Calls Sub-system H
+        6. Saves { revised_draft, changes_summary } to proposals.revision_suggestions
+
+    MEDIATOR SEES:
+        LEFT panel: previous proposal, rejection reasons, AI changes list
+        RIGHT panel: editable text area pre-filled with revised_draft
+        Mediator edits freely then publishes as new round.
+
+    FAILURE HANDLING:
+        If Sub-system H fails, revision_suggestions stays null.
+        Mediator still sees the rejection reasons and can write their own
+        revision from scratch. Falls back gracefully if BATNA/WATNA isn't
+        available. Log the error but do not block the mediator.
     """
     supabase = get_supabase()
     logger.info(f"[ProposalRevision] Starting for case {case_id}, proposal {proposal_id}")
@@ -616,14 +633,14 @@ def generate_proposal_revision(case_id: str, proposal_id: str):
     try:
         # ── Fetch proposal ────────────────────────────────────────────────────
         proposal_resp = supabase.table("proposals").select(
-            "raw_text, round_number"
+            "content, round"
         ).eq("id", proposal_id).single().execute()
 
         if not proposal_resp.data:
             raise ValueError(f"Proposal {proposal_id} not found")
 
-        raw_text = proposal_resp.data["raw_text"]
-        round_number = proposal_resp.data.get("round_number", 1)
+        raw_text = proposal_resp.data["content"]
+        round_number = proposal_resp.data.get("round", 1)
 
         # ── Fetch rejection reasons ───────────────────────────────────────────
         responses_resp = supabase.table("proposal_responses").select(

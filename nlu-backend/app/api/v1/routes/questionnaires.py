@@ -141,11 +141,15 @@ async def send_questionnaire(
     WHAT THIS DOES:
     ──────────────
     1. Verifies mediator owns the case
-    2. Checks case is in BURST_1_COMPLETE (cannot send questionnaire before AI analysis)
+    2. Checks case is in BURST_1_COMPLETE (normal path) OR in
+       QUESTIONNAIRE_ACTIVE with an empty/failed questionnaire (retry path —
+       e.g. Sub-system C failed earlier due to a Groq rate limit and left
+       behind a questionnaire row with no questions in it)
     3. Fetches conflict_extraction JSON from ai_analysis table (Burst 1 result)
     4. Calls Sub-system C to generate 8-12 targeted questions
-    5. Saves questions to questionnaires table
-    6. Transitions case to QUESTIONNAIRE_ACTIVE
+    5. Saves questions to questionnaires table (insert on first send,
+       update in place on retry — avoids duplicate rows for the same case)
+    6. Transitions case to QUESTIONNAIRE_ACTIVE (skipped if already there)
     7. Writes audit log
 
     WHY we check BURST_1_COMPLETE:
@@ -157,12 +161,53 @@ async def send_questionnaire(
         The mediator may want to review the AI analysis before sending questions.
         They might flag AI claims, add notes, or decide the case needs more info.
         This is a deliberate human checkpoint per the V5.0 flow.
+
+    WHY the retry path exists:
+        Sub-system C calls Groq, which can hit rate limits (429 errors) especially
+        right after Burst 1 has already made several calls in the same minute.
+        Previously, a failed generation left the case stuck in QUESTIONNAIRE_ACTIVE
+        with an empty questionnaire and no way to retry without manually editing
+        the database. This retry path lets the mediator just click the button again.
     """
     # Step 1: Verify mediator owns this case
     case = _verify_mediator_owns_case(case_id, current_user["user_id"])
 
-    # Step 2: Case must be in BURST_1_COMPLETE to send questionnaire
-    if case["status"] != CaseState.BURST_1_COMPLETE.value:
+    # Step 2: Case must be in BURST_1_COMPLETE (first send), OR in
+    # QUESTIONNAIRE_ACTIVE with an empty questionnaire (retry after failure)
+    existing_q = supabase.table("questionnaires") \
+        .select("id, questions") \
+        .eq("case_id", case_id) \
+        .order("created_at", desc=True) \
+        .limit(1) \
+        .execute()
+
+    existing_questionnaire = existing_q.data[0] if existing_q.data else None
+    is_retry = False
+
+    if case["status"] == CaseState.BURST_1_COMPLETE.value:
+        pass  # normal first send — proceed as before
+    elif case["status"] == CaseState.QUESTIONNAIRE_ACTIVE.value and existing_questionnaire:
+        q_content = existing_questionnaire.get("questions") or {}
+        if isinstance(q_content, dict):
+            q_list = q_content.get("questions", [])
+        elif isinstance(q_content, list):
+            q_list = q_content
+        else:
+            q_list = []
+
+        if not q_list:
+            # Existing questionnaire has no actual questions — safe to retry
+            is_retry = True
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": True,
+                    "code": "QUESTIONNAIRE_ALREADY_ACTIVE",
+                    "message": "A questionnaire with questions already exists for this case.",
+                },
+            )
+    else:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -245,35 +290,57 @@ async def send_questionnaire(
         )
 
     # Step 5: Save questionnaire to database
-    q_insert = supabase.table("questionnaires").insert({
-        "case_id":    case_id,
-        "created_by": current_user["user_id"],
-        "questions":  questions_data,
-    }).execute()
+    # Retry path: update the existing empty row in place (avoids duplicate
+    # questionnaire rows for the same case, and any responses already tied
+    # to this questionnaire_id — though there shouldn't be any yet since
+    # parties can't answer an empty questionnaire).
+    # First-send path: insert a new row, same as before.
+    if is_retry:
+        q_update = supabase.table("questionnaires").update({
+            "questions": questions_data,
+        }).eq("id", existing_questionnaire["id"]).execute()
 
-    if not q_insert.data:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": True, "code": "DB_INSERT_FAILED", "message": "Failed to save questionnaire"},
+        if not q_update.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": True, "code": "DB_UPDATE_FAILED", "message": "Failed to update questionnaire"},
+            )
+        questionnaire_id = existing_questionnaire["id"]
+    else:
+        q_insert = supabase.table("questionnaires").insert({
+            "case_id":    case_id,
+            "created_by": current_user["user_id"],
+            "questions":  questions_data,
+        }).execute()
+
+        if not q_insert.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": True, "code": "DB_INSERT_FAILED", "message": "Failed to save questionnaire"},
+            )
+        questionnaire_id = q_insert.data[0]["id"]
+
+    # Step 6: Transition case to QUESTIONNAIRE_ACTIVE (skip if already there — retry case)
+    if case["status"] != CaseState.QUESTIONNAIRE_ACTIVE.value:
+        transition(
+            case_id=case_id,
+            new_state=CaseState.QUESTIONNAIRE_ACTIVE,
+            actor_id=current_user["user_id"],
+            metadata={"questionnaire_id": questionnaire_id},
         )
 
-    questionnaire_id = q_insert.data[0]["id"]
-
-    # Step 6: Transition case to QUESTIONNAIRE_ACTIVE
-    transition(
-        case_id=case_id,
-        new_state=CaseState.QUESTIONNAIRE_ACTIVE,
-        actor_id=current_user["user_id"],
-        metadata={"questionnaire_id": questionnaire_id},
+    logger.info(
+        f"Questionnaire {questionnaire_id} {'re-generated (retry)' if is_retry else 'sent'} "
+        f"for case {case_id} by mediator {current_user['user_id']}"
     )
-
-    logger.info(f"Questionnaire {questionnaire_id} sent for case {case_id} by mediator {current_user["user_id"]}")
 
     return {
         "questionnaire_id": questionnaire_id,
         "case_id": case_id,
         "status": "questionnaire_active",
-        "message": "Questionnaire sent. Both parties have been notified.",
+        "retried": is_retry,
+        "message": "Questionnaire regenerated successfully." if is_retry
+                   else "Questionnaire sent. Both parties have been notified.",
     }
 
     # ─────────────────────────────────────────────────────────────────────────────

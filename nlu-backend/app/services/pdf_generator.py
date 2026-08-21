@@ -2,14 +2,24 @@
 PDF Generator -- Settlement Report
 Backend Role 2 | NLU Mediation Platform | Week 4
 
-Generates a ReportLab PDF settlement report and saves it to
-Supabase Storage. Called after both parties confirm their settlement.
+Generates a ReportLab PDF settlement report and saves it to Supabase Storage.
+Called after both parties confirm their settlement.
 
 FIXED:
-- _clean_symbols() replaces rupee symbol and special chars before PDF rendering
-- _get_accepted_proposal() finds the proposal BOTH parties actually accepted
-  instead of just highest round_number (which failed when round_number
-  was not incremented on revision -- both proposals had round_number=1)
+- FONT: ReportLab's default font (Helvetica) does not include the ₹ (Indian
+  Rupee) glyph, so any ₹ symbol in settlement text was rendering as a black
+  box (■) in the generated PDF. We register DejaVu Sans instead, which does
+  support ₹. We reuse the DejaVuSans.ttf / DejaVuSans-Bold.ttf files that
+  ship inside the `matplotlib` package (mpl-data/fonts/ttf/), so the only
+  requirement is `pip install matplotlib` -- no new font files to add to
+  the repo. _clean_symbols() still normalises a few other characters
+  (smart quotes, em-dashes, ellipses) that can render oddly even with a
+  full-coverage font, but no longer touches ₹ since DejaVu Sans renders it
+  correctly now.
+- ACCEPTED PROPOSAL LOOKUP: _get_accepted_proposal() finds the proposal
+  BOTH parties actually accepted (via proposal_responses), instead of just
+  ordering by round/round_number. This is more robust than relying on any
+  single round-tracking column being consistently incremented.
 """
 
 import os
@@ -26,21 +36,60 @@ from reportlab.platypus import (
     HRFlowable
 )
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 logger = logging.getLogger(__name__)
 
 
+# ── Font registration (module-level, runs once on import) ─────────────────────
+# We locate DejaVu Sans inside the installed matplotlib package and register
+# it with ReportLab under the names "DejaVuSans" and "DejaVuSans-Bold".
+# If matplotlib isn't installed, or the font files can't be found for any
+# reason, we fall back to Helvetica so PDF generation still works -- it will
+# just show ■ for ₹ again, same as before this fix, rather than crashing.
+
+FONT_REGULAR = "Helvetica"
+FONT_BOLD = "Helvetica-Bold"
+
+try:
+    import matplotlib
+    _font_dir = os.path.join(
+        os.path.dirname(matplotlib.__file__), "mpl-data", "fonts", "ttf"
+    )
+    _regular_path = os.path.join(_font_dir, "DejaVuSans.ttf")
+    _bold_path = os.path.join(_font_dir, "DejaVuSans-Bold.ttf")
+
+    if os.path.exists(_regular_path) and os.path.exists(_bold_path):
+        pdfmetrics.registerFont(TTFont("DejaVuSans", _regular_path))
+        pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", _bold_path))
+        FONT_REGULAR = "DejaVuSans"
+        FONT_BOLD = "DejaVuSans-Bold"
+        logger.info("[PDF] Registered DejaVu Sans font (₹ symbol will render correctly)")
+    else:
+        logger.warning(
+            "[PDF] DejaVu Sans font files not found inside matplotlib install -- "
+            "falling back to Helvetica. ₹ symbol may render as a black box. "
+            "Run: pip install matplotlib"
+        )
+except ImportError:
+    logger.warning(
+        "[PDF] matplotlib not installed -- falling back to Helvetica. "
+        "₹ symbol may render as a black box. Run: pip install matplotlib"
+    )
+
+
 def _clean_symbols(text: str) -> str:
     """
-    Replace symbols that ReportLab default Helvetica font cannot render.
-    The rupee sign (U+20B9) and smart quotes appear as black boxes without this.
-    Called on all text before it enters the PDF story.
+    Normalise a few characters that can render oddly even with a
+    full-coverage font (smart quotes, em/en-dashes, ellipses, bullets,
+    non-breaking spaces). ₹ is intentionally NOT included here anymore --
+    DejaVu Sans renders it correctly, so replacing it with "Rs." would
+    actually be a downgrade now that the font supports the real symbol.
     """
     if not text:
         return text
     replacements = {
-        "\u20b9": "Rs.",
-        "₹":      "Rs.",
         "\u2013": "-",
         "\u2014": "-",
         "\u2018": "'",
@@ -61,27 +110,25 @@ def _get_accepted_proposal(supabase, case_id: str):
     Find the specific proposal that BOTH parties accepted.
 
     WHY this exists:
-        The naive .order("round_number", desc=True) query fails when
-        revised proposals are saved without incrementing round_number.
-        Both the original and the revised end up with round_number=1
-        so the query returns the original (first inserted) -- wrong terms in PDF.
-
-    FIX:
-        Find the proposal where proposal_responses has two rows
-        both with decision='accept'. That is definitively the settled proposal.
+        Ordering by round alone is not fully reliable if a round-tracking
+        column is ever not incremented on revision. Instead, we find the
+        proposal that both parties explicitly accepted via
+        proposal_responses, which is definitively correct regardless of
+        any round-tracking column's state.
 
     FALLBACK:
-        Most recently created published proposal if no clear winner found.
+        Most recently published proposal (by round desc) if no proposal
+        has two accept responses yet.
     """
     all_proposals = supabase.table("proposals").select(
-        "id, raw_text, round_number, published_at, created_at"
+        "id, content, round, published_at, created_at"
     ).eq("case_id", case_id).eq(
-        "is_published", True
-    ).order("created_at", desc=True).execute()
+        "status", "published"
+    ).order("round", desc=True).execute()
 
     if not all_proposals.data:
         any_proposal = supabase.table("proposals").select(
-            "id, raw_text, round_number, published_at, created_at"
+            "id, content, round, published_at, created_at"
         ).eq("case_id", case_id).order(
             "created_at", desc=True
         ).limit(1).execute()
@@ -102,7 +149,7 @@ def _get_accepted_proposal(supabase, case_id: str):
         if len(decisions) == 2 and all(d == "accept" for d in decisions):
             logger.info(
                 f"[PDF] Found accepted proposal: {proposal_id} "
-                f"round={proposal.get('round_number')}"
+                f"round={proposal.get('round')}"
             )
             return proposal
 
@@ -168,9 +215,9 @@ def generate_settlement_pdf(case_id: str) -> str:
     round_number = 1
 
     if accepted_proposal:
-        raw_text = accepted_proposal.get("raw_text", "")
-        proposal_text = _clean_symbols(raw_text) if raw_text else proposal_text
-        round_number = accepted_proposal.get("round_number") or 1
+        content_text = accepted_proposal.get("content", "")
+        proposal_text = _clean_symbols(content_text) if content_text else proposal_text
+        round_number = accepted_proposal.get("round") or 1
         logger.info(
             f"[PDF] Using proposal round={round_number} "
             f"id={accepted_proposal.get('id')}"
@@ -215,6 +262,7 @@ def generate_settlement_pdf(case_id: str) -> str:
     title_style = ParagraphStyle(
         "Title",
         parent=styles["Heading1"],
+        fontName=FONT_BOLD,
         fontSize=18,
         textColor=colors.HexColor("#1e3a5f"),
         alignment=TA_CENTER,
@@ -223,6 +271,7 @@ def generate_settlement_pdf(case_id: str) -> str:
     subtitle_style = ParagraphStyle(
         "Subtitle",
         parent=styles["Normal"],
+        fontName=FONT_REGULAR,
         fontSize=11,
         textColor=colors.HexColor("#4a5568"),
         alignment=TA_CENTER,
@@ -231,6 +280,7 @@ def generate_settlement_pdf(case_id: str) -> str:
     section_heading_style = ParagraphStyle(
         "SectionHeading",
         parent=styles["Heading2"],
+        fontName=FONT_BOLD,
         fontSize=12,
         textColor=colors.HexColor("#1e3a5f"),
         spaceBefore=14,
@@ -239,6 +289,7 @@ def generate_settlement_pdf(case_id: str) -> str:
     body_style = ParagraphStyle(
         "Body",
         parent=styles["Normal"],
+        fontName=FONT_REGULAR,
         fontSize=10,
         leading=16,
         alignment=TA_JUSTIFY,
@@ -247,6 +298,7 @@ def generate_settlement_pdf(case_id: str) -> str:
     footer_style = ParagraphStyle(
         "Footer",
         parent=styles["Normal"],
+        fontName=FONT_REGULAR,
         fontSize=8,
         textColor=colors.HexColor("#718096"),
         alignment=TA_CENTER,
@@ -275,7 +327,8 @@ def generate_settlement_pdf(case_id: str) -> str:
 
     case_table = Table(case_details_data, colWidths=[5 * cm, 11 * cm])
     case_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (0, -1), FONT_BOLD),
+        ("FONTNAME", (1, 0), (1, -1), FONT_REGULAR),
         ("FONTSIZE", (0, 0), (-1, -1), 10),
         ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#4a5568")),
         ("ROWBACKGROUNDS", (0, 0), (-1, -1),
@@ -333,7 +386,8 @@ def generate_settlement_pdf(case_id: str) -> str:
 
         conf_table = Table(conf_data, colWidths=[5 * cm, 11 * cm])
         conf_table.setStyle(TableStyle([
-            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (0, 0), (0, -1), FONT_BOLD),
+            ("FONTNAME", (1, 0), (1, -1), FONT_REGULAR),
             ("FONTSIZE", (0, 0), (-1, -1), 10),
             ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#4a5568")),
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f0fff4")),
