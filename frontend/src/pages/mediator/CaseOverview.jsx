@@ -761,40 +761,46 @@ export default function CaseOverview() {
   }, []);
 
   // ── Main poll ─────────────────────────────────────────────
-  useEffect(() => {
-    const fetchCase = async () => {
-      try {
-        const data = await getCaseById(id);
-        setCaseData(data);
-        await fetchPartyStatus(id);
-        await fetchInvitationStatus(id);
+ useEffect(() => {
+  const fetchCase = async () => {
+    try {
+      const data = await getCaseById(id);
+      setCaseData(data);
+      await fetchPartyStatus(id);
+      await fetchInvitationStatus(id);
 
-        // Fetch proposals, audit logs, and AI analysis (for neutral summary)
-        const [props, logs, analysisRes] = await Promise.all([
-          client.get(`/cases/${id}/proposals`).then((res) => res.data).catch(() => []),
-          client.get(`/cases/${id}/audit-log`).then((res) => res.data).catch(() => []),
-          client.get(`/cases/${id}/analysis`).then((res) => res.data).catch(() => null),
-        ]);
-        setProposals(props);
-        setAuditLogs(logs);
-        setAnalysis(analysisRes);
-      try {
+      // Fetch proposals, audit logs, and AI analysis (for neutral summary)
+      const [props, logs, analysisRes] = await Promise.all([
+        client.get(`/cases/${id}/proposals`).then((res) => res.data).catch(() => []),
+        client.get(`/cases/${id}/audit-log`).then((res) => res.data).catch(() => []),
+        client.get(`/cases/${id}/analysis`).then((res) => res.data).catch(() => null),
+      ]);
+      setProposals(props);
+      setAuditLogs(logs);
+      setAnalysis(analysisRes);
+
+      // Only poll settlement status once the case has actually reached
+      // MEDIATION_COMPLETE — calling this earlier was hitting the backend
+      // unnecessarily on every 5s poll for every case in every state.
+      if (data.status === "MEDIATION_COMPLETE") {
+        try {
           const settlementRes = await client.get(`/cases/${id}/settlement/status`);
           setSettlementDone(!!settlementRes.data?.pdf_ready);
           setPdfUrl(settlementRes.data?.pdf_url || null);
         } catch {
-          // fail silently — not all cases have reached settlement yet
+          // fail silently
         }
-      } catch {
-        setError("Failed to load case");
-      } finally {
-        setLoading(false);
       }
-    };
-    fetchCase();
-    const interval = setInterval(fetchCase, 5000);
-    return () => clearInterval(interval);
-  }, [id, fetchPartyStatus, fetchInvitationStatus]);
+    } catch {
+      setError("Failed to load case");
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchCase();
+  const interval = setInterval(fetchCase, 5000);
+  return () => clearInterval(interval);
+}, [id, fetchPartyStatus, fetchInvitationStatus]);
 
   // ── Generate / Regenerate link ───────────────────────────
   const handleInviteConfirm = async () => {
