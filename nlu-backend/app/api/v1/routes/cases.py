@@ -182,7 +182,7 @@ async def list_cases(current_user: dict = Depends(get_current_user)):
 
         app_result = supabase.table("application_requests").select("*").eq(
             "assigned_mediator", user_id
-        ).order("created_at", desc=True).execute()
+        ).eq("status", "APPLICATION_PENDING").order("created_at", desc=True).execute()
 
         for app in (app_result.data or []):
             cases.append(CaseResponse(

@@ -52,6 +52,14 @@ def _verify_mediator_owns_case(case_id: str, mediator_id: str) -> dict:
     throws an unhandled exception whenever the ID belongs to an
     application_request instead of a real case — causing 500s on
     GET /audit-log, PATCH /notes, etc. for any pre-acceptance case_id.
+
+    FIX #32: application_requests has no `mediator_notes` column (that
+    column only exists on `cases`). Selecting it here raised
+    postgrest.exceptions.APIError 42703 whenever a mediator hit an
+    endpoint (e.g. audit log) while the record was still an
+    application_request and not yet promoted to a full case. Removed
+    it from the select — app.get("mediator_notes") below safely
+    returns None since the key is simply absent from the dict.
     """
     case_resp = supabase.table("cases") \
         .select("id, status, assigned_mediator, negotiation_round, max_rounds, mediator_notes") \
@@ -67,7 +75,7 @@ def _verify_mediator_owns_case(case_id: str, mediator_id: str) -> dict:
         return case
 
     app_resp = supabase.table("application_requests") \
-        .select("id, status, assigned_mediator, mediator_notes") \
+        .select("id, status, assigned_mediator") \
         .eq("id", case_id).execute()
 
     if app_resp.data:
@@ -672,8 +680,8 @@ async def settlement_status(
             pdf_url = pdf_resp.data[0]["pdf_url"]
 
     # BUG #31 FIX: expose finalised_at so frontend can confirm mediator actually finalised
-    case_check = supabase.table("cases").select("finalised_at").eq("id", case_id).single().execute()
-    finalised_at = case_check.data.get("finalised_at") if case_check.data else None
+    case_check = supabase.table("cases").select("finalised_at").eq("id", case_id).execute()
+    finalised_at = case_check.data[0].get("finalised_at") if case_check.data else None
 
     return {
         **result,
