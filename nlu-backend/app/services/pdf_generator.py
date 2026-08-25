@@ -25,6 +25,7 @@ FIXED:
 import os
 import io
 import logging
+import re
 from datetime import datetime, timezone
 
 from reportlab.lib.pagesizes import A4
@@ -345,14 +346,17 @@ def generate_settlement_pdf(case_id: str) -> str:
 
     # ── Settlement Terms ──────────────────────────────────────────────────────
     story.append(Paragraph("AGREED SETTLEMENT TERMS", section_heading_style))
-    story.append(HRFlowable(
-        width="100%", thickness=0.5, color=colors.HexColor("#e2e8f0")
-    ))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#e2e8f0")))
     story.append(Spacer(1, 0.2 * cm))
-
+    
+    def markdown_bold_to_html(text: str) -> str:
+        """Converts **bold** (markdown) to <b>bold</b> (ReportLab-compatible HTML)."""
+        return re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+    
     for para in str(proposal_text).split("\n"):
-        para = _clean_symbols(para.strip())
+        para = para.strip()
         if para:
+            para = markdown_bold_to_html(para)
             story.append(Paragraph(para, body_style))
 
     story.append(Spacer(1, 0.3 * cm))
