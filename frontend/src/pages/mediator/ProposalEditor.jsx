@@ -238,37 +238,49 @@ export default function ProposalEditor() {
 
   // On mount — create proposal and get AI draft (or resume existing draft)
  useEffect(() => {
-    const init = async () => {
-      try {
-        const [proposalsList, batnaRes] = await Promise.all([
-          getProposals(id).catch(() => []),
-          getBatnaWatna(id).catch(() => null),
-        ]);
+  const init = async () => {
+    try {
+      const [proposalsList, batnaRes] = await Promise.all([
+        getProposals(id).catch(() => []),
+        getBatnaWatna(id).catch(() => null),
+      ]);
 
-        const draft = proposalsList.find((p) => p.status === "draft");
-        if (draft) {
-          setProposalId(draft.id);
-          setDraftText(draft.content || "");
-          setRoundNumber(draft.round || 1);
-        } else {
-          const proposalRes = await createProposal(id);
-          setProposalId(proposalRes.proposal_id);
-          setDraftText(proposalRes.draft_text || "");
-          setRoundNumber(proposalRes.round_number || 1);
-        }
+      const draft = proposalsList.find((p) => p.status === "draft");
+      if (draft) {
+        setProposalId(draft.id);
+        setDraftText(draft.content || "");
+        setRoundNumber(draft.round || 1);
         setBatnaData(batnaRes);
-      } catch (err) {
-        const backendMsg = err?.response?.data?.detail?.message || err?.response?.data?.detail;
-        setError(
-          backendMsg ||
-          "Failed to load or create proposal. Make sure BATNA/WATNA is complete.",
-        );
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
-    init();
-  }, [id]);
+
+      // Retry once after a short delay — handles the brief window where
+      // the case status flips to BURST_2_COMPLETE slightly before the
+      // Burst 2 ai_analysis row is fully readable on the backend.
+      let proposalRes;
+      try {
+        proposalRes = await createProposal(id);
+      } catch (firstErr) {
+        await new Promise((r) => setTimeout(r, 1500));
+        proposalRes = await createProposal(id);
+      }
+
+      setProposalId(proposalRes.proposal_id);
+      setDraftText(proposalRes.draft_text || "");
+      setRoundNumber(proposalRes.round_number || 1);
+      setBatnaData(batnaRes);
+    } catch (err) {
+      const backendMsg = err?.response?.data?.detail?.message || err?.response?.data?.detail;
+      setError(
+        backendMsg ||
+        "Failed to load or create proposal. Make sure BATNA/WATNA is complete.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+  init();
+}, [id]);
 
   useEffect(() => {
   const fetchQuestionnaireSummary = async () => {

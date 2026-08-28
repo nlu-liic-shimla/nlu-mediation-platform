@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from typing import Optional
 import logging
 from datetime import datetime
+from app.enums import DisputeType
 
 from app.core.dependencies import get_current_user, require_role
 from app.core.database import supabase
@@ -464,11 +465,10 @@ async def create_submission(
     verify_case_access(case_id, current_user)
 
     valid_types = [
-        "landlord_tenant", "employer_employee",
-        "business_partners", "neighbours",
-        "contractor_client", "customer_business",
-        "commercial", "family", "other"
-    ]
+    "landlord_tenant", "employment", "commercial_contract",
+    "neighbour_dispute", "family_business", "construction",
+    "consumer", "debt_recovery", "other"
+]
     if relationship_type not in valid_types:
         raise HTTPException(
             status_code=422,
@@ -797,7 +797,7 @@ async def get_analysis(
 
 
 class ApplicationRequest(BaseModel):
-    dispute_type: str
+    dispute_type: DisputeType
     brief_description: str
     against_party_name: Optional[str] = None
     against_party_phone: Optional[str] = None

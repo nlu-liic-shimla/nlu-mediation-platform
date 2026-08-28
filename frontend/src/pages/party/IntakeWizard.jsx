@@ -11,11 +11,17 @@ const STEPS = [
   { id: 6, label: 'Outcome', title: 'What outcome are you seeking?' },
 ]
 
+// Keep this list in sync with ApplyForMediation.jsx's DISPUTE_TYPES and
+// CaseDetails.jsx's RELATIONSHIP_LABELS map.
 const RELATIONSHIP_OPTIONS = [
   { value: 'landlord_tenant', label: 'Landlord / Tenant', icon: '🏠' },
-  { value: 'employer_employee', label: 'Employer / Employee', icon: '💼' },
-  { value: 'commercial', label: 'Commercial / Business', icon: '🤝' },
-  { value: 'family', label: 'Family', icon: '👨‍👩‍👧' },
+  { value: 'employment', label: 'Employer / Employee', icon: '💼' },
+  { value: 'commercial_contract', label: 'Business / Contract', icon: '🤝' },
+  { value: 'neighbour_dispute', label: 'Neighbour Dispute', icon: '🏘️' },
+  { value: 'family_business', label: 'Family / Partnership', icon: '👨‍👩‍👧' },
+  { value: 'construction', label: 'Construction', icon: '🏗️' },
+  { value: 'consumer', label: 'Consumer / Product', icon: '🛒' },
+  { value: 'debt_recovery', label: 'Debt / Loan', icon: '💰' },
   { value: 'other', label: 'Other', icon: '📋' },
 ]
 
@@ -262,7 +268,7 @@ export default function IntakeWizard() {
           {step === 1 && (
             <div>
               <div className="iw-rel-grid">
-                {RELATIONSHIP_OPTIONS.slice(0, 4).map(opt => (
+                {RELATIONSHIP_OPTIONS.slice(0, -1).map(opt => (
                   <div
                     key={opt.value}
                     className={`iw-rel-card${form.relationship_type === opt.value ? ' active' : ''}`}
@@ -272,13 +278,16 @@ export default function IntakeWizard() {
                     <span className="iw-rel-label">{opt.label}</span>
                   </div>
                 ))}
-                <div
-                  className={`iw-rel-card full${form.relationship_type === 'other' ? ' active' : ''}`}
-                  onClick={() => update('relationship_type', 'other')}
-                >
-                  <span className="iw-rel-emoji">📋</span>
-                  <span className="iw-rel-label">Other</span>
-                </div>
+                {RELATIONSHIP_OPTIONS.slice(-1).map(opt => (
+                  <div
+                    key={opt.value}
+                    className={`iw-rel-card full${form.relationship_type === opt.value ? ' active' : ''}`}
+                    onClick={() => update('relationship_type', opt.value)}
+                  >
+                    <span className="iw-rel-emoji">{opt.icon}</span>
+                    <span className="iw-rel-label">{opt.label}</span>
+                  </div>
+                ))}
               </div>
               {errors.relationship_type && <p className="iw-err-text"><AlertCircle size={12} />{errors.relationship_type}</p>}
             </div>

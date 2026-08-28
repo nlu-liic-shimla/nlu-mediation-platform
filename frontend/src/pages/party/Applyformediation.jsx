@@ -3,13 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { Scale, ChevronRight, ChevronLeft, AlertCircle, CheckCircle } from 'lucide-react'
 import client from '../../services/api'
 
+// Keep this list in sync with IntakeWizard.jsx's RELATIONSHIP_OPTIONS and
+// CaseDetails.jsx's RELATIONSHIP_LABELS map.
 const DISPUTE_TYPES = [
   { value: 'landlord_tenant', label: 'Landlord / Tenant', icon: '🏠' },
-  { value: 'employer_employee', label: 'Employer / Employee', icon: '💼' },
-  { value: 'commercial', label: 'Commercial / Business', icon: '🤝' },
-  { value: 'family', label: 'Family', icon: '👨‍👩‍👧' },
-  { value: 'neighbours', label: 'Neighbours', icon: '🏘️' },
-  { value: 'contractor_client', label: 'Contractor / Client', icon: '🔧' },
+  { value: 'employment', label: 'Employer / Employee', icon: '💼' },
+  { value: 'commercial_contract', label: 'Business / Contract', icon: '🤝' },
+  { value: 'neighbour_dispute', label: 'Neighbour Dispute', icon: '🏘️' },
+  { value: 'family_business', label: 'Family / Partnership', icon: '👨‍👩‍👧' },
+  { value: 'construction', label: 'Construction', icon: '🏗️' },
+  { value: 'consumer', label: 'Consumer / Product', icon: '🛒' },
+  { value: 'debt_recovery', label: 'Debt / Loan', icon: '💰' },
   { value: 'other', label: 'Other', icon: '📋' },
 ]
 
@@ -159,7 +163,7 @@ export default function ApplyForMediation() {
               {/* Dispute type */}
               <p className="af-section-title">Dispute Type</p>
               <div className="af-type-grid">
-                {DISPUTE_TYPES.slice(0, 6).map(opt => (
+                {DISPUTE_TYPES.slice(0, -1).map(opt => (
                   <div
                     key={opt.value}
                     className={`af-type-card${form.dispute_type === opt.value ? ' active' : ''}`}
@@ -169,13 +173,16 @@ export default function ApplyForMediation() {
                     <span className="af-type-label">{opt.label}</span>
                   </div>
                 ))}
-                <div
-                  className={`af-type-card full${form.dispute_type === 'other' ? ' active' : ''}`}
-                  onClick={() => update('dispute_type', 'other')}
-                >
-                  <span className="af-type-emoji">📋</span>
-                  <span className="af-type-label">Other</span>
-                </div>
+                {DISPUTE_TYPES.slice(-1).map(opt => (
+                  <div
+                    key={opt.value}
+                    className={`af-type-card full${form.dispute_type === opt.value ? ' active' : ''}`}
+                    onClick={() => update('dispute_type', opt.value)}
+                  >
+                    <span className="af-type-emoji">{opt.icon}</span>
+                    <span className="af-type-label">{opt.label}</span>
+                  </div>
+                ))}
               </div>
               {errors.dispute_type && <p className="af-err-text" style={{ marginBottom: '1rem' }}><AlertCircle size={12} />{errors.dispute_type}</p>}
 

@@ -57,12 +57,18 @@ const BURST_2_STATUSES = new Set([
   'MEDIATION_FAILED',
 ])
 
+// Replace the existing RELATIONSHIP_LABELS block in CaseDetails.jsx with this:
+
 const RELATIONSHIP_LABELS = {
-  landlord_tenant:   'Landlord / Tenant',
-  employer_employee: 'Employer / Employee',
-  commercial:        'Commercial / Business',
-  family:            'Family',
-  other:             'Other',
+  landlord_tenant:      'Landlord / Tenant',
+  employment:           'Employer / Employee',
+  commercial_contract:  'Business / Contract',
+  neighbour_dispute: 'Neighbour Dispute',
+  family_business:      'Family / Partnership',
+  construction:         'Construction',
+  consumer:             'Consumer / Product',
+  debt_recovery:        'Debt / Loan',
+  other:                'Other',
 }
 
 const ACTION_NEEDED = {

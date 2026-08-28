@@ -4,7 +4,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
-
+from app.enums import DisputeType
 
 # ── Request Models ─────────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ class CreateCaseRequest(BaseModel):
     Used by mediator for Path 2 (direct case creation).
     All party fields are optional — mediator may not have them yet.
     """
-    dispute_type: str                              # e.g. "landlord_tenant", "employment"
+    dispute_type: DisputeType                              # e.g. "landlord_tenant", "employment"
     brief_description: str                         # min 20, max 500 chars
     requesting_party_email: Optional[str] = None
     against_party_email: Optional[str] = None

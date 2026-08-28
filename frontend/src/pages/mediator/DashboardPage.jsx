@@ -182,19 +182,23 @@ if (!newCaseForm.against_party_email.trim()) {
   setNewCaseError('Against party email is required');
   return;
 }
+if (!newCaseForm.dispute_type) {
+  setNewCaseError('Please select a dispute type');
+  return;
+}
     setNewCaseLoading(true);
     setNewCaseError('');
     try {
       const payload = {
-        dispute_type: newCaseForm.title,
-        brief_description: newCaseForm.brief_description,
+        dispute_type: newCaseForm.dispute_type,
+        brief_description: newCaseForm.brief_description || newCaseForm.title,
         requesting_party_email: newCaseForm.requesting_party_email || null,
         against_party_email: newCaseForm.against_party_email || null,
         monetary_value: newCaseForm.monetary_value ? Number(newCaseForm.monetary_value) : null
       };
       await createCase(payload);
       setShowNewCase(false);
-      setNewCaseForm({ title: '', brief_description: '', requesting_party_email: '', against_party_email: '' });
+            setNewCaseForm({ title: '', dispute_type: '', brief_description: '', requesting_party_email: '', against_party_email: '', monetary_value: '' });
       // Refresh cases list
       const data = await getCases();
       setCases(data);
@@ -475,30 +479,36 @@ if (!newCaseForm.against_party_email.trim()) {
         }}
       >
         {[
-          {
-            label: "Total Cases",
-            value: cases.filter((c) => !APPLICATION_STATES.includes(c.status)).length.toString(),
-            sub: "Active cases", subC: "#10b981",
-            icon: FileText, iconBg: "#eff6ff",
-          },
-          {
-            label: "Applications",
-            value: cases.filter((c) => c.status === "APPLICATION_PENDING").length.toString(),
-            sub: "Awaiting review", subC: "#f59e0b",
-            icon: Clock, iconBg: "#fff7ed",
-          },
-          {
-            label: "Resolved",
-            value: cases.filter((c) => c.status === "MEDIATION_COMPLETE").length.toString(),
-            sub: "Completed", subC: "#10b981",
-            icon: CheckCircle2, iconBg: "#f0fdf4",
-          },
-          {
-  label: "Value in Mediation",
-  value: `₹${totalMonetaryValue.toLocaleString('en-IN')}`,
-  sub: "Across active cases", subC: "#8b5cf6",
-  icon: TrendingUp, iconBg: "#f5f3ff",
-},
+  {
+    label: "Total Cases",
+    value: cases.filter((c) => !APPLICATION_STATES.includes(c.status)).length.toString(),
+    sub: "All accepted cases", subC: "#64748b",
+    icon: FileText, iconBg: "#eff6ff",
+  },
+  {
+    label: "Active Cases",
+    value: cases.filter((c) => !APPLICATION_STATES.includes(c.status) && !CLOSED_STATES.includes(c.status)).length.toString(),
+    sub: "In progress", subC: "#10b981",
+    icon: Brain, iconBg: "#eff6ff",
+  },
+  {
+    label: "Applications",
+    value: cases.filter((c) => c.status === "APPLICATION_PENDING").length.toString(),
+    sub: "Awaiting review", subC: "#f59e0b",
+    icon: Clock, iconBg: "#fff7ed",
+  },
+  {
+    label: "Resolved",
+    value: cases.filter((c) => c.status === "MEDIATION_COMPLETE").length.toString(),
+    sub: "Completed", subC: "#10b981",
+    icon: CheckCircle2, iconBg: "#f0fdf4",
+  },
+  {
+    label: "Value in Mediation",
+    value: `₹${totalMonetaryValue.toLocaleString('en-IN')}`,
+    sub: "Across active cases", subC: "#8b5cf6",
+    icon: TrendingUp, iconBg: "#f5f3ff",
+  },
          
         ].map(({ label, value, sub, subC, icon: Icon, iconBg }) => (
           <div
@@ -734,6 +744,28 @@ if (!newCaseForm.against_party_email.trim()) {
                 onChange={e => setNewCaseForm(p => ({ ...p, title: e.target.value }))}
                 style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: `1px solid ${tk.border}`, background: tk.bg, color: tk.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
               />
+            </div>
+            {/* Dispute Type */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: tk.sub, display: 'block', marginBottom: 6 }}>
+                DISPUTE TYPE *
+              </label>
+              <select
+                value={newCaseForm.dispute_type}
+                onChange={e => setNewCaseForm(p => ({ ...p, dispute_type: e.target.value }))}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: `1px solid ${tk.border}`, background: tk.bg, color: tk.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              >
+                <option value="">Select dispute type</option>
+                <option value="landlord_tenant">Landlord / Tenant</option>
+                <option value="employment">Employer / Employee</option>
+                <option value="commercial_contract">Business / Contract</option>
+                <option value="neighbour_dispute">Neighbour Dispute</option>
+                <option value="family_business">Family / Partnership</option>
+                <option value="construction">Construction</option>
+                <option value="consumer">Consumer / Product</option>
+                <option value="debt_recovery">Debt / Loan</option>
+                <option value="other">Other</option>
+              </select>
             </div>
 
             {/* Brief description */}
