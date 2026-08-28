@@ -32,14 +32,22 @@ RULES:
      below 0.5 since the dispute is unclear by definition
 
 DISPUTE TYPES — pick exactly one:
-landlord_tenant, employment, commercial_contract, property_boundary,
+landlord_tenant, employment, commercial_contract, neighbour_dispute,
 family_business, construction, consumer, debt_recovery, other
 
 DISPUTE TYPE DEFINITIONS — read carefully before choosing:
 - "landlord_tenant"     : disputes between a landlord and tenant about rent, deposit, damage, eviction
 - "employment"          : disputes between employer and employee about salary, termination, contract
 - "commercial_contract" : disputes between two businesses or individuals over a service or product contract
-- "property_boundary"   : disputes between neighbours about land boundaries, walls, encroachment
+- "neighbour_dispute"   : disputes between neighbours about shared physical
+  space or resources — includes land boundaries, walls, fences,
+  encroachment, overhanging trees, shared driveways, water drainage,
+  noise, parking, common area access, or any dispute where the two
+  parties live or own property adjacent to each other.
+  Key distinguisher: the two parties must be NEIGHBOURS
+  (living or owning property adjacent to each other).
+  If it is a land boundary dispute between strangers or
+  companies — use commercial_contract or other.
 - "family_business"     : disputes between FAMILY MEMBERS or PARTNERS who personally know each other about a shared business, partnership dissolution, profit sharing — even if it looks like a contract dispute, if the parties are partners or family, use this
 - "construction"        : disputes about building work quality, delays, payments to contractors
 - "consumer"            : disputes between a customer and a seller or manufacturer about a product or service

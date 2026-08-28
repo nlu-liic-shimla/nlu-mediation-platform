@@ -438,7 +438,7 @@ def process_burst_2(self, case_id: str):
 
         valid_dispute_types = {
             "landlord_tenant", "employment", "commercial_contract",
-            "property_boundary", "family_business", "construction",
+            "neighbour_dispute", "family_business", "construction",
             "consumer", "debt_recovery", "other"
         }
         dt_val = conflict_extraction_json.get("dispute_type")

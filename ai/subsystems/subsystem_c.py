@@ -39,11 +39,19 @@ RULES:
    - landlord_tenant: focus on deposit, condition, dates, notice period
    - employment: focus on contract terms, notice period, performance records
    - commercial_contract: focus on deliverables, deadlines, payment terms
-   - property_boundary: focus on survey records, documents, timeline of construction
+   - neighbour_dispute: focus on survey records, documents, timeline of construction
    - family_business: focus on partnership deed, contributions, profit sharing
    - construction: focus on contract, deadlines, quality standards, payments
    - consumer: focus on warranty, usage, complaint timeline
    - debt_recovery: focus on loan agreement, repayment terms, evidence
+
+For neighbour_dispute:
+  - How long have the parties been neighbours?
+  - Have they attempted informal resolution before?
+  - Is there a written agreement about shared space?
+  - What specific resource or space is at dispute?
+  - Has this caused any physical damage or financial loss?
+
 3. Each question must have a clear purpose
 4. directed_at must be "requesting_party", "against_party", or "both"
 5. question_type must be "open_ended", "yes_no", or "scale_1_5"
