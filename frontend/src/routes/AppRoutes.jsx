@@ -268,7 +268,7 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute>
               <RoleBasedRoute allowedRoles={PARTY_ROLES}>
-                <ApplyForMediation />
+                <Applyformediation />
               </RoleBasedRoute>
             </ProtectedRoute>
           }
