@@ -42,7 +42,7 @@ T = TypeVar("T", bound=BaseModel)
 # ── Models ────────────────────────────────────────────────────────────────────
 # Groq (free — use during development)
 LARGE_MODEL = "openai/gpt-oss-120b"
-SMALL_MODEL = "groq/compound-mini"
+SMALL_MODEL = "openai/gpt-oss-20b"
 # ── Switch to Claude for demo week ────────────────────────────────────────────
 # When you're ready for demo, comment out the Groq lines above and uncomment these:
 # from anthropic import Anthropic  — also swap the client below

@@ -149,7 +149,7 @@ Write the mediatability justification.
         import os
         client = Groq(api_key=os.environ["GROQ_API_KEY"])
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
