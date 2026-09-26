@@ -30,16 +30,15 @@ from pydantic import BaseModel, Field, model_validator
 # ──────────────────────────────────────────────────────────────────────────────
 
 class DisputeType(str, Enum):
-    LANDLORD_TENANT       = "landlord_tenant"
-    EMPLOYMENT            = "employment"
-    COMMERCIAL_CONTRACT   = "commercial_contract"
-    PROPERTY_BOUNDARY     = "property_boundary"
-    FAMILY_BUSINESS       = "family_business"
-    CONSTRUCTION          = "construction"
-    CONSUMER              = "consumer"
-    DEBT_RECOVERY         = "debt_recovery"
-    OTHER                 = "other"
-
+    LANDLORD_TENANT     = "landlord_tenant"
+    EMPLOYMENT          = "employment"
+    COMMERCIAL_CONTRACT = "commercial_contract"
+    NEIGHBOUR_DISPUTE   = "neighbour_dispute"
+    FAMILY_BUSINESS     = "family_business"
+    CONSTRUCTION        = "construction"
+    CONSUMER            = "consumer"
+    DEBT_RECOVERY       = "debt_recovery"
+    OTHER               = "other"
 
 class StrengthLabel(str, Enum):
     """Human-facing label shown to parties and mediator."""
@@ -321,9 +320,9 @@ class BatnaWatnaOutput(BaseModel):
     )
     disclaimer: str = Field(
         default=(
-            "This analysis provides negotiation guidance only and does not constitute "
-            "legal advice. Parties should consult a qualified legal professional for "
-            "advice specific to their situation."
+            "This analysis is meant to support your negotiation, not replace legal counsel. "
+            "For complex situations, speaking with a qualified solicitor can help you "
+            "understand your options more fully."
         ),
         description="Mandatory disclaimer shown alongside all BATNA/WATNA output."
     )

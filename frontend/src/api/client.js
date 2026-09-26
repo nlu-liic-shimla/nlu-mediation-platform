@@ -13,10 +13,12 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("nlu_token");
-      localStorage.removeItem("nlu_role");
-      window.location.href = "/";
+    const isAuthEndpoint = error.config?.url?.includes('/auth/login') 
+                         || error.config?.url?.includes('/auth/register');
+    if (error.response?.status === 401 && !isAuthEndpoint) {
+      localStorage.removeItem('nlu_token');
+      localStorage.removeItem('nlu_role');
+      window.location.href = '/';
     }
     return Promise.reject(error);
   }

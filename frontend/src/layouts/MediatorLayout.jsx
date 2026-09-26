@@ -1,19 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTheme } from "../context/ThemeContext";
 import {
   LayoutDashboard,
   Brain,
   FileText,
-  Settings2,
+
   ChevronLeft,
   ChevronRight,
-  Search,
-  Bell,
+ 
+
   Moon,
   Sun,
-  MessageSquare,
+
   Scale,
-  X,
+ 
   Menu,
 } from "lucide-react";
 
@@ -31,20 +32,19 @@ const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/mediator" },
   { icon: Brain, label: "AI Analysis", path: "/mediator/analysis" },
   { icon: FileText, label: "Proposals", path: "/mediator/proposals" },
-  { icon: Settings2, label: "Admin Panel", path: "/mediator/admin" },
 ];
 
-export default function MediatorLayout({ children, dark, setDark }) {
+export default function MediatorLayout({ children }) {
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const notifRef = useRef(null);
+ 
 
   const user = JSON.parse(localStorage.getItem("nlu_user") || "{}");
-  const tk = tokens(dark);
+  const tk = tokens(isDark);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 900);
@@ -57,14 +57,7 @@ export default function MediatorLayout({ children, dark, setDark }) {
     if (!isMobile) setMobileOpen(false);
   }, [isMobile]);
 
-  useEffect(() => {
-    const h = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target))
-        setNotifOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+ 
 
   const handleLogout = () => {
     localStorage.removeItem("nlu_token");
@@ -207,44 +200,8 @@ export default function MediatorLayout({ children, dark, setDark }) {
           })}
         </nav>
 
-        {/* AI Assistant chip */}
-        {(!collapsed || isMobile) && (
-          <div
-            style={{
-              margin: "0 12px 16px",
-              padding: "12px",
-              background: dark ? "#0f172a" : "#eff6ff",
-              borderRadius: 10,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              border: `1px solid ${dark ? "#1e3a5f" : "#bfdbfe"}`,
-            }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                background: tk.accent,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <MessageSquare size={15} color="#fff" />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: tk.text }}>
-                AI Assistant
-              </div>
-              <div style={{ fontSize: 11, color: tk.sub }}>
-                Always here to help
-              </div>
-            </div>
-          </div>
-        )}
+      
+           
 
         {/* Collapse button */}
         {!isMobile && (
@@ -321,40 +278,13 @@ export default function MediatorLayout({ children, dark, setDark }) {
             </button>
           )}
 
-          <div
-            style={{
-              flex: 1,
-              maxWidth: 420,
-              minWidth: 0,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              background: tk.inputBg,
-              border: `1px solid ${tk.border}`,
-              borderRadius: 8,
-              padding: "8px 14px",
-            }}
-          >
-            <Search size={15} color={tk.sub} />
-            <input
-              placeholder="Search cases, documents, or proposals…"
-              style={{
-                border: "none",
-                outline: "none",
-                background: "transparent",
-                fontSize: 13,
-                color: tk.text,
-                width: "100%",
-                minWidth: 0,
-              }}
-            />
-          </div>
+         
 
           <div style={{ flex: 1 }} />
 
           {/* Theme toggle */}
           <button
-            onClick={() => setDark((d) => !d)}
+            onClick={toggleTheme}
             style={{
               width: 36,
               height: 36,
@@ -369,98 +299,14 @@ export default function MediatorLayout({ children, dark, setDark }) {
               flexShrink: 0,
             }}
           >
-            {dark ? <Sun size={16} /> : <Moon size={16} />}
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          {/* Notifications */}
-          <div ref={notifRef} style={{ position: "relative", flexShrink: 0 }}>
-            <button
-              onClick={() => setNotifOpen((o) => !o)}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 8,
-                border: `1px solid ${tk.border}`,
-                background: tk.inputBg,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: tk.sub,
-                position: "relative",
-              }}
-            >
-              <Bell size={16} />
-              <span
-                style={{
-                  position: "absolute",
-                  top: 4,
-                  right: 4,
-                  width: 16,
-                  height: 16,
-                  borderRadius: "50%",
-                  background: "#ef4444",
-                  fontSize: 10,
-                  color: "#fff",
-                  fontWeight: 700,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                2
-              </span>
-            </button>
-
-            {notifOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: 44,
-                  right: 0,
-                  width: 290,
-                  background: tk.surface,
-                  border: `1px solid ${tk.border}`,
-                  borderRadius: 10,
-                  boxShadow: "0 8px 32px rgba(0,0,0,.14)",
-                  zIndex: 200,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "12px 16px",
-                    borderBottom: `1px solid ${tk.border}`,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    style={{ fontWeight: 600, fontSize: 14, color: tk.text }}
-                  >
-                    Notifications
-                  </span>
-                  <button
-                    onClick={() => setNotifOpen(false)}
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      cursor: "pointer",
-                      color: tk.sub,
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-                <div
-                  style={{ padding: "12px 16px", fontSize: 13, color: tk.sub }}
-                >
-                  No new notifications
-                </div>
-              </div>
-            )}
-          </div>
+          
+             
+           
+            
+            
 
           {/* Avatar */}
           <div

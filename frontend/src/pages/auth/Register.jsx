@@ -47,7 +47,7 @@ const Step2 = ({ data, onChange, errors }) => (
     <div className="rg-field">
       <label className="rg-label">Account Type</label>
       {[
-        { value: 'requesting_party', label: 'Party User', desc: 'File disputes, submit documents, and manage settlements' },
+        { value: 'party_user', label: 'Party User', desc: 'File disputes, submit documents, and manage settlements' },
         { value: 'mediator', label: 'Mediator', desc: 'Manage cases, review AI analysis, and facilitate resolutions' },
       ].map((opt, i) => (
         <div
@@ -93,7 +93,7 @@ const Step3 = () => (
     </div>
     <div className="rg-next-box">
       <p className="rg-next-title">What happens next?</p>
-      {["You'll receive a verification email", "Complete your profile to unlock all features", "Start your first mediation case or review"].map(item => (
+      {["Complete your profile to unlock all features", "Start your first mediation case or review"].map(item => (
         <div key={item} className="rg-next-item">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 6L9 17l-5-5" />
@@ -111,7 +111,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [apiError, setApiError] = useState('')
   const [errors, setErrors] = useState({})
-  const [data, setData] = useState({ fullName: '', email: '', password: '', confirmPassword: '', role: 'requesting_party', organization: '', phone: '' })
+  const [data, setData] = useState({ fullName: '', email: '', password: '', confirmPassword: '', role: 'party_user', organization: '', phone: '' })
 
   const update = (key, value) => {
     setData(prev => ({ ...prev, [key]: value }))
@@ -141,11 +141,35 @@ export default function Register() {
       if (!data.role) { setErrors({ role: 'Please select an account type.' }); return }
       setLoading(true)
       try {
-        await register(data.email, data.password, data.role)
+        await register({
+  email: data.email,
+  password: data.password,
+  role: data.role,
+  fullName: data.fullName,
+  phoneNumber: data.phone,
+  organization: data.organization,
+})
         setStep(3)
       } catch (err) {
-        setApiError(err.response?.data?.detail || 'Registration failed. Please try again.')
-      } finally { setLoading(false) }
+  const detail = err.response?.data?.detail
+  let message = 'Registration failed. Please try again.'
+
+  if (typeof detail === 'string') {
+    message = detail
+  } else if (Array.isArray(detail)) {
+    // FastAPI/Pydantic validation errors — array of { loc, msg, type }
+    message = detail
+      .map(e => {
+        const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : ''
+        return field ? `${field}: ${e.msg}` : e.msg
+      })
+      .join(' ')
+  } else if (detail?.message) {
+    message = detail.message
+  }
+
+  setApiError(message)
+}
     }
   }
 

@@ -12,18 +12,12 @@ class UserRole(str, Enum):
 
 
 class RegisterRequest(BaseModel):
-    """
-    Registration fields per hpnlu_final_flow.docx:
-
-    Mediator:   email, password (min 8), role, phone_number (required), organization (required)
-    Party User: email, password, role, phone_number (optional), full_name (optional)
-    """
     email: EmailStr
     password: str
     role: UserRole
     full_name: Optional[str] = None
-    phone_number: Optional[str] = None      # required for mediator, optional for party
-    organization: Optional[str] = None      # mediator only
+    phone_number: Optional[str] = None
+    organization: Optional[str] = None
 
     @validator("password")
     def password_min_length(cls, v):

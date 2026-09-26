@@ -1,40 +1,14 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Dependencies
-node_modules/
-
-# Build output
-dist
-dist-ssr
-*.local
-
-# Environment variables
-.env
-
 # Python
 __pycache__/
-venv/
 *.pyc
-*.pyo
+venv/
+.env
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Node / Frontend
+frontend/node_modules/
+frontend/.vite/
+frontend/dist/
 
-# OS files
+# OS
 .DS_Store
-
-# Windows
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db

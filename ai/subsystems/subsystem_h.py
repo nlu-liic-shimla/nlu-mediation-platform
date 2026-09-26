@@ -1,23 +1,23 @@
 """
 subsystem_h.py
-Sub-system H — Proposal Revision
+Sub-system H -- Proposal Revision
 Owner: Vaidant
 Week 4
 
 Input:
-  proposal_raw_text               — the rejected proposal text
-  requesting_party_rejection_reason — why requesting party rejected (or None)
-  against_party_rejection_reason    — why against party rejected (or None)
-  batna_watna                     — BatnaWatnaOutput from Burst 2
-  round_number                    — current negotiation round (1, 2, or 3)
-  mediator_notes                  — optional private mediator notes
+  proposal_raw_text                 -- the rejected proposal text
+  requesting_party_rejection_reason -- why requesting party rejected (or None)
+  against_party_rejection_reason    -- why against party rejected (or None)
+  batna_watna                       -- BatnaWatnaOutput from Burst 2
+  round_number                      -- current negotiation round (1, 2, or 3)
+  mediator_notes                    -- optional private mediator notes
 
 Output: dict with keys:
-  revised_draft    — str: full revised proposal text
-  changes_summary  — list[str]: specific changes made and why
-  reasoning        — str: overall revision reasoning
+  revised_draft    -- str: full revised proposal text
+  changes_summary  -- list[str]: specific changes made and why
+  reasoning        -- str: overall revision reasoning
 
-Uses large model — proposal revision is high stakes.
+Uses large model -- proposal revision is high stakes.
 Never mentions numeric BATNA/WATNA scores in output.
 """
 
@@ -27,6 +27,32 @@ load_dotenv()
 from typing import Optional
 from ai.schemas import BatnaWatnaOutput
 from ai.utils.ai_client import call_large_json, is_failed
+
+
+def _clean_symbols(text: str) -> str:
+    """
+    Replace symbols that do not render correctly in ReportLab PDF.
+    Called on revised_draft before returning.
+    """
+    if not text:
+        return text
+    replacements = {
+        "\u20b9": "Rs.",
+        "₹":      "Rs.",
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2022": "-",
+        "\u00a0": " ",
+        "\u2026": "...",
+    }
+    for symbol, replacement in replacements.items():
+        text = text.replace(symbol, replacement)
+    return text
+
 
 SYSTEM_PROMPT = """
 You are an expert legal mediator helping revise a settlement proposal
@@ -40,16 +66,23 @@ Your job is to:
 5. Make the proposal more likely to be accepted by both parties
 
 CRITICAL RULES:
-1. Never mention BATNA or WATNA scores — use only labels (Strong/Moderate/Weak)
+1. Never mention BATNA or WATNA scores -- use only labels (Strong/Moderate/Weak)
 2. Never suggest terms outside what both parties can realistically accept
 3. Every change must be justified by a specific rejection reason
-4. If only one party rejected — focus on their reasons without disadvantaging the other
+4. If only one party rejected -- focus on their reasons without disadvantaging the other
 5. Keep legal language neutral and professional
-6. The revised draft must be complete — not just a summary of changes
+6. The revised draft must be complete -- not just a summary of changes
+7. For currency always write Rs. followed by the number -- never use rupee symbol
+8. Use only plain ASCII characters -- no special symbols or fancy quotes
+9. Use straight hyphens - not dashes
+10. The proposal header must use the new round number provided in the user message
+    Example: SETTLEMENT PROPOSAL -- Round 2
+11. NEVER use the word "Revised" anywhere in the proposal header or body
+    The round number communicates that this is a new version
 
 Return ONLY valid JSON in this EXACT format:
 {
-    "revised_draft": "complete revised proposal text here — full proposal not just changes",
+    "revised_draft": "complete revised proposal text here -- full proposal not just changes",
     "changes_summary": [
         "Changed X because Party A rejected the original amount as too low",
         "Removed clause Y because both parties objected to the timeline",
@@ -58,8 +91,8 @@ Return ONLY valid JSON in this EXACT format:
     "reasoning": "one paragraph explaining the overall revision strategy"
 }
 
-changes_summary must be a list of specific strings — minimum 2 items.
-revised_draft must be a complete proposal — not a diff or summary.
+changes_summary must be a list of specific strings -- minimum 2 items.
+revised_draft must be a complete proposal -- not a diff or summary.
 Return ONLY JSON. No explanation. No markdown.
 """
 
@@ -75,44 +108,62 @@ def generate_proposal_revision(
     """
     Generate a revised proposal after rejection.
 
-    Returns dict with keys:
-        revised_draft    — complete revised proposal text
-        changes_summary  — list of specific changes made
-        reasoning        — overall revision strategy
+    round_number is the CURRENT round that was rejected.
+    The revised draft will be for round_number + 1.
 
-    Returns failure dict on error — always check is_failed().
+    Returns dict with keys:
+      revised_draft    -- complete revised proposal text
+      changes_summary  -- list of specific changes made
+      reasoning        -- overall revision strategy
+
+    Returns failure dict on error -- always check is_failed().
     """
+
+    # The new round number for the revised proposal
+    new_round = round_number + 1
 
     # Build rejection context
     rejection_context = ""
     if requesting_party_rejection_reason:
-        rejection_context += f"\nREQUESTING PARTY REJECTION REASON:\n{requesting_party_rejection_reason}\n"
+        rejection_context += (
+            f"\nREQUESTING PARTY REJECTION REASON:\n"
+            f"{requesting_party_rejection_reason}\n"
+        )
     else:
         rejection_context += "\nREQUESTING PARTY: Accepted the proposal.\n"
 
     if against_party_rejection_reason:
-        rejection_context += f"\nAGAINST PARTY REJECTION REASON:\n{against_party_rejection_reason}\n"
+        rejection_context += (
+            f"\nAGAINST PARTY REJECTION REASON:\n"
+            f"{against_party_rejection_reason}\n"
+        )
     else:
         rejection_context += "\nAGAINST PARTY: Accepted the proposal.\n"
 
-    # Build BATNA/WATNA context — labels only, never scores
+    # Build BATNA/WATNA context -- labels only, never scores
     batna_context = f"""
-NEGOTIATION POSITIONS (labels only — do not mention scores):
+NEGOTIATION POSITIONS (labels only -- do not mention scores):
 Requesting Party: BATNA is {batna_watna.party_a.batna_label}, WATNA is {batna_watna.party_a.watna_label}
 Against Party:    BATNA is {batna_watna.party_b.batna_label}, WATNA is {batna_watna.party_b.watna_label}
 Settlement zone:  {batna_watna.overall_settlement_zone or 'Not specified'}
 """
 
-    # Build mediator notes context
     notes_context = ""
     if mediator_notes:
         notes_context = f"\nMEDIATOR PRIVATE NOTES:\n{mediator_notes}\n"
 
     user_message = f"""
 This is Round {round_number} of negotiation. The previous proposal was rejected.
-Revise the proposal to address the rejection reasons.
+Generate a revised proposal for Round {new_round}.
 
-ORIGINAL PROPOSAL:
+CRITICAL HEADER RULE:
+The revised_draft header must say exactly:
+SETTLEMENT PROPOSAL -- Round {new_round}
+Do NOT use the word "Revised" anywhere in the proposal text.
+Do NOT write "Revised Settlement Proposal" or any variation.
+The round number tells parties where they are in the process.
+
+ORIGINAL PROPOSAL (Round {round_number}):
 {proposal_raw_text}
 
 REJECTION REASONS:
@@ -121,8 +172,9 @@ REJECTION REASONS:
 {batna_context}
 {notes_context}
 
-Generate a revised proposal that addresses the rejection reasons
+Generate a revised proposal for Round {new_round} that addresses the rejection reasons
 while staying within realistic settlement bounds for both parties.
+Use Rs. for all currency amounts. Use only plain text characters.
 """
 
     result = call_large_json(
@@ -132,22 +184,24 @@ while staying within realistic settlement bounds for both parties.
 
     # Handle plain dict response
     if isinstance(result, dict) and not result.get("failed"):
+        # Clean symbols from revised_draft before returning
+        if result.get("revised_draft"):
+            result["revised_draft"] = _clean_symbols(result["revised_draft"])
         return result
 
     if is_failed(result):
-        # Fallback response if AI call fails
         return {
             "failed": True,
             "reason": result.get("reason", "Unknown error"),
-            "revised_draft": proposal_raw_text,  # return original as fallback
-            "changes_summary": ["AI revision failed — original proposal returned"],
+            "revised_draft": proposal_raw_text,
+            "changes_summary": ["AI revision failed -- original proposal returned"],
             "reasoning": "Revision could not be generated. Mediator should revise manually."
         }
 
     return result
 
 
-# ── Public alias ──────────────────────────────────────────────
+# -- Public alias -------------------------------------------------------------
 def run_subsystem_h(
     proposal_raw_text: str,
     requesting_party_rejection_reason: Optional[str],
@@ -170,7 +224,7 @@ def run_subsystem_h(
     )
 
 
-# ── Quick test ────────────────────────────────────────────────
+# -- Quick test ---------------------------------------------------------------
 if __name__ == "__main__":
     from ai.subsystems.subsystem_a import extract_conflict
     from ai.subsystems.subsystem_d import generate_batna_watna
@@ -192,32 +246,33 @@ if __name__ == "__main__":
     conflict = extract_conflict(party_a, party_b)
     batna_watna = generate_batna_watna(conflict)
 
-    original_proposal = """
-SETTLEMENT PROPOSAL — Round 1
+    original_proposal = """SETTLEMENT PROPOSAL -- Round 1
 
 The parties agree to the following terms:
 
-1. Party B (landlord) shall return INR 20,000 to Party A (tenant)
+1. Party B (landlord) shall return Rs. 20,000 to Party A (tenant)
    within 14 days of signing this agreement.
 
 2. Party A acknowledges that some repair costs were incurred
-   and accepts a deduction of INR 30,000 from the original deposit.
+   and accepts a deduction of Rs. 30,000 from the original deposit.
 
 3. Both parties agree that this settlement is in full and final
    settlement of all claims arising from this tenancy.
 
 4. Party A shall provide all move-out photographs to Party B
-   within 7 days.
-"""
+   within 7 days."""
 
     print("\n" + "="*50)
-    print("TEST — Proposal Revision (Round 1 rejection)")
+    print("TEST -- Proposal Revision Round 1 rejected, generating Round 2")
     print("="*50)
 
     result = generate_proposal_revision(
         proposal_raw_text=original_proposal,
-        requesting_party_rejection_reason="The amount of INR 20,000 is too low. I want at least INR 35,000 returned as the flat was in good condition.",
-        against_party_rejection_reason=None,  # Party B accepted
+        requesting_party_rejection_reason=(
+            "The amount of Rs. 20,000 is too low. "
+            "I want at least Rs. 35,000 returned as the flat was in good condition."
+        ),
+        against_party_rejection_reason=None,
         batna_watna=batna_watna,
         round_number=1,
         mediator_notes="Party A has strong photographic evidence. Consider increasing return amount."
@@ -226,9 +281,9 @@ The parties agree to the following terms:
     if is_failed(result):
         print(f"FAILED: {result}")
     else:
-        print("\n✅ Revision generated successfully")
+        print("\nRevision generated successfully")
         print(f"\nCHANGES SUMMARY:")
         for change in result.get("changes_summary", []):
-            print(f"  • {change}")
+            print(f"  - {change}")
         print(f"\nREASONING:\n{result.get('reasoning')}")
         print(f"\nREVISED DRAFT:\n{result.get('revised_draft')}")

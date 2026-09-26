@@ -276,3 +276,94 @@ ORDER BY tablename;
 
 -- Storage:
 -- case-documents bucket: INSERT and SELECT allowed for authenticated users
+
+-- ============================================================
+-- Week 3 Updates
+-- Database Role | Week 3
+-- ============================================================
+
+-- New Tables Added:
+
+-- application_requests
+-- Purpose: Stores party-initiated mediation applications (Path 1)
+-- Columns: id, applicant_id, dispute_type, brief_description,
+--          against_party_name, against_party_phone, against_party_email,
+--          monetary_value, status, rejection_reason, assigned_mediator, created_at
+-- RLS: Party sees own, mediator sees all, mediator can update
+-- Indexes: idx_application_requests_applicant, idx_application_requests_status
+
+-- ai_analysis_flags
+-- Purpose: Stores flagged claims from AI analysis
+-- Columns: id, case_id, claim_text, reason, flagged_by, flagged_at
+-- RLS: Enabled
+
+-- Updated Tables:
+
+-- cases
+-- Status constraint updated with 16 new states:
+-- BOTH_INVITED, FIRST_PARTY_SUBMITTED, BOTH_SUBMITTED,
+-- AI_ANALYSIS_PENDING, AI_ANALYSIS_COMPLETE, QUESTIONNAIRE_SENT,
+-- QUESTIONNAIRE_COMPLETE, PROPOSAL_DRAFTED, PROPOSAL_SENT,
+-- NEGOTIATION, SETTLEMENT_REACHED, CLOSED
+
+-- case_invitations
+-- Added columns: accepted_by, invitation_role, accepted_at, created_by
+
+-- users
+-- Added column: full_name
+
+-- audit_logs
+-- Added column: metadata (jsonb)
+-- ============================================================
+-- Week 4 Updates
+-- Database Role | Week 4
+-- ============================================================
+
+-- New Tables Added:
+
+-- questionnaires
+-- Purpose: Stores AI-generated questionnaire questions per case
+-- Columns: id, case_id, created_by, questions (jsonb), created_at
+-- RLS: anon full access (backend uses anon key)
+-- Index: case_id
+
+-- questionnaire_responses
+-- Purpose: Stores party answers to questionnaire
+-- Columns: id, questionnaire_id, respondent_id, answers (jsonb), submitted_at
+-- RLS: anon full access
+-- Index: questionnaire_id
+-- Constraint: UNIQUE(questionnaire_id, respondent_id)
+
+-- proposals
+-- Purpose: Stores mediator proposal drafts and revisions
+-- Columns: id, case_id, created_by, raw_text, structured_json,
+--          revision_suggestions, is_published, round_number,
+--          published_at, created_at, updated_at
+-- RLS: anon full access
+-- Index: case_id
+
+-- proposal_responses
+-- Purpose: Stores party accept/reject decisions on proposals
+-- Columns: id, proposal_id, party_id, decision, rejection_reason, responded_at
+-- RLS: anon full access
+-- Index: proposal_id
+-- Constraint: UNIQUE(proposal_id, party_id), decision CHECK (accept/reject)
+
+-- settlement_confirmations
+-- Purpose: Stores typed name + signature confirmation from each party
+-- Columns: id, case_id, party_id, typed_name, signature_url, confirmed_at
+-- RLS: anon full access
+-- Index: case_id
+-- Constraint: UNIQUE(case_id, party_id)
+
+-- mediation_reports
+-- Purpose: Stores generated settlement PDF metadata
+-- Columns: id, case_id, pdf_url, generated_at, case_summary_json
+-- RLS: anon full access
+-- Index: case_id
+
+-- Verification:
+-- audit_logs confirmed INSERT-only (no UPDATE/DELETE policy exists)
+-- Policies found: audit_logs_service_select (SELECT),
+--                 audit_logs_anon_insert (INSERT),
+--                 audit_logs_anon_select (SELECT)

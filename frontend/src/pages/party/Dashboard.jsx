@@ -1,22 +1,40 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ThemeToggle from '../../components/ui/ThemeToggle'
+import client from '../../services/api'
+import AnalysisStatusBanner from '../../components/party/AnalysisStatusBanner'
 import {
-  Scale, LayoutDashboard, FilePlus, MessageSquare,
-  FileText, CheckSquare, Bell, Search, ChevronRight,
+  Scale, LayoutDashboard, FilePlus, 
+  FileText, CheckSquare, Bell, ChevronRight,
   ChevronLeft, Calendar, TrendingUp, Clock, AlertCircle,
-  Bot, LogOut, Menu, X
+  LogOut, Menu, X,  DollarSign
 } from 'lucide-react'
+
+const PARTY_STATUS_LABELS = {
+  BOTH_INVITED: 'Waiting for both parties',
+  FIRST_PARTY_SUBMITTED: 'Waiting for other party',
+  BOTH_SUBMITTED: 'Processing',
+  BURST_1_PROCESSING: 'Analyzing your case',
+  BURST_1_COMPLETE: 'Analysis complete',
+  PROCESSING_FAILED: 'Analysis delayed',
+  QUESTIONNAIRE_ACTIVE: 'Questionnaire pending',
+  QUESTIONNAIRE_COMPLETE: 'Reviewing responses',
+  BURST_2_PROCESSING: 'Preparing your case summary',
+  BURST_2_COMPLETE: 'Case summary ready',
+  PROPOSAL_DRAFT: 'Mediator preparing proposal',
+  PROPOSAL_PUBLISHED: 'Proposal ready for review',
+  MEDIATION_IN_PROGRESS: 'Negotiation ongoing',
+  MEDIATION_COMPLETE: 'Settlement reached',
+  MEDIATION_FAILED: 'Mediation unsuccessful',
+}
+const friendlyStatus = (status) => PARTY_STATUS_LABELS[status] || 'In progress'
 
 const NAV_ITEMS = [
   { id: 'dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'new-case',      icon: FilePlus,        label: 'New Case' },
-  { id: 'questionnaire', icon: MessageSquare,   label: 'Questionnaire' },
-  { id: 'proposals',     icon: FileText,        label: 'Proposals' },
-  { id: 'settlement',    icon: CheckSquare,     label: 'Settlement' },
 ]
 
-const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile, mobileOpen, onMobileClose }) => (
+const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile, mobileOpen, onMobileClose, visibleIds }) => (
   <>
     {/* Mobile overlay */}
     {isMobile && mobileOpen && (
@@ -36,9 +54,10 @@ const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile,
         )}
       </div>
 
-      <nav className="pd-sidebar-nav">
-        {NAV_ITEMS.map(({ id, icon: Icon, label }) => {
+       <nav className="pd-sidebar-nav">
+        {NAV_ITEMS.filter(item => !visibleIds || visibleIds.has(item.id)).map(({ id, icon: Icon, label }) => {
           const isActive = active === id
+          
           return (
             <button
               key={id}
@@ -52,16 +71,6 @@ const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile,
           )
         })}
       </nav>
-
-      {(!collapsed || isMobile) && (
-        <div className="pd-ai-box">
-          <div className="pd-ai-icon"><Bot size={18} color="var(--brand)" /></div>
-          <div>
-            <p className="pd-ai-title">AI Assistant</p>
-            <p className="pd-ai-sub">Always here to help</p>
-          </div>
-        </div>
-      )}
 
       {!isMobile && (
         <button className="pd-collapse-btn" onClick={onToggle}>
@@ -93,7 +102,7 @@ const StatCard = ({ label, value, sub, subColor, icon, iconBg }) => (
   </div>
 )
 
-const CaseCard = ({ title, status, caseId, vs, progress, aiScore, nextDate, statusColor, statusBg, onView }) => (
+const CaseCard = ({ title, status, rawStatus, caseId, displayId, vs, progress, nextDate, statusColor, statusBg, onView, docCount  }) => (
   <div className="pd-case-card">
     <div className="pd-case-top">
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -101,13 +110,17 @@ const CaseCard = ({ title, status, caseId, vs, progress, aiScore, nextDate, stat
           <h3 className="pd-case-title">{title}</h3>
           <span className="pd-case-badge" style={{ color: statusColor, background: statusBg }}>{status}</span>
         </div>
-        <p className="pd-case-meta">Case ID: {caseId} • vs. {vs}</p>
+        <p className="pd-case-meta">Case ID: {displayId || caseId} • vs. {vs}</p>
       </div>
-      <div className="pd-ai-score">
-        <p className="pd-ai-score-label">AI Score</p>
-        <p className="pd-ai-score-value">{aiScore}%</p>
-      </div>
+      
     </div>
+    
+
+    {/* ← ADD HERE */}
+     {['BOTH_SUBMITTED', 'BURST_1_PROCESSING', 'BURST_1_COMPLETE', 'PROCESSING_FAILED'].includes(rawStatus) && (
+    <AnalysisStatusBanner caseId={caseId} />
+     )}
+
     <div className="pd-progress-section">
       <div className="pd-progress-row">
         <span className="pd-progress-label">Case Progress</span>
@@ -131,15 +144,18 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [activeNav, setActiveNav] = useState('dashboard')
   const [collapsed, setCollapsed] = useState(false)
-  const [search, setSearch] = useState('')
-  const [showNotifs, setShowNotifs] = useState(false)
+  
+  
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  const [docCounts, setDocCounts] = useState({})
+
   const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
-  const userEmail = user.email || 'User'
-  const userInitials = userEmail.substring(0, 2).toUpperCase()
-  const userName = userEmail.split('@')[0]
+const userEmail = user.email || 'User'
+const userName = user.full_name || userEmail.split('@')[0]
+const userInitials = userName.substring(0, 2).toUpperCase()
+ 
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)
@@ -156,32 +172,55 @@ export default function Dashboard() {
 
   const sidebarWidth = isMobile ? 0 : (collapsed ? 60 : 240)
 
-  const cases = [
-    { title: 'Contract Dispute Resolution', status: 'in progress', statusColor: '#1a56b0', statusBg: '#dbeafe', caseId: 'CASE-2024-001', vs: 'TechCorp Inc.', progress: 65, aiScore: 78, nextDate: '5/25/2026' },
-    { title: 'Property Settlement', status: 'proposal review', statusColor: '#7c3aed', statusBg: '#ede9fe', caseId: 'CASE-2024-002', vs: 'Green Valley LLC', progress: 82, aiScore: 85, nextDate: '5/28/2026' },
-  ]
+  
+const [cases, setCases] = useState([])
+const [applications, setApplications] = useState([])
 
-  const notifications = [
-    { text: 'New settlement proposal received for CASE-2024-001', time: '2 hours ago' },
-    { text: 'Upcoming mediation session on May 25 at 2:00 PM', time: '5 hours ago' },
-    { text: 'Document analysis completed', time: '1 day ago' },
-  ]
+useEffect(() => {
+  client.get('/cases').then(res => {
+    const data = res.data
+    const arr = Array.isArray(data) ? data : data.cases || data.data || []
+    setCases(arr)
+  }).catch(() => setCases([]))
 
-  const activities = [
-    { title: 'Settlement Proposal Submitted', desc: 'Mediator submitted revised settlement proposal', date: '5/21/2026' },
-    { title: 'Mediation Session #3', desc: 'Virtual session discussing payment terms', date: '5/18/2026' },
-    { title: 'Document Analysis Completed', desc: 'AI analysis of all submitted evidence', date: '5/15/2026' },
-  ]
+  client.get('/cases/applications/my').then(res => {
+    setApplications(res.data?.applications || [])
+  }).catch(() => setApplications([]))
+}, [])
+const activeCase = cases[0]
+
+const activeCasesList = cases.filter(
+  c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status)
+)
+const closedCasesList = cases.filter(
+  c => ['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status)
+)
+
+const totalMonetaryValue = cases
+  .filter(c => !['MEDIATION_COMPLETE', 'MEDIATION_FAILED'].includes(c.status))
+  .reduce((sum, c) => sum + (Number(c.monetary_value) || 0), 0)
+
+
+
+  useEffect(() => {
+  activeCasesList.forEach(c => {
+    client.get(`/cases/${c.id}/documents`).then(res => {
+      const docs = Array.isArray(res.data) ? res.data : res.data?.documents ?? []
+      setDocCounts(prev => ({ ...prev, [c.id]: docs.length }))
+    }).catch(() => {})
+  })
+}, [cases])
+
 
   const quickActions = [
-  { icon: <FilePlus size={17} />, label: 'Start New Case', onClick: () => {} },
-  { 
-    icon: <FileText size={17} />, 
-    label: 'Upload Documents', 
-    onClick: () => cases[0] && navigate(`/party/cases/${cases[0].id}/documents`)
-  },
-  { icon: <Calendar size={17} />, label: 'Schedule Session', onClick: () => {} },
-]
+    { icon: <FilePlus size={17} />, label: 'Apply for Mediation', path: '/party/apply' },
+  ]
+
+
+ 
+
+ 
+ 
 
   return (
     <>
@@ -220,10 +259,7 @@ export default function Dashboard() {
         .pd-nav-btn.active { background: var(--brand-light); color: var(--brand); }
         .pd-nav-label { font-size: 14px; font-weight: 500; }
 
-        .pd-ai-box { display: flex; align-items: center; gap: 10px; margin: 8px; padding: 12px; background: var(--bg-muted); border-radius: 10px; flex-shrink: 0; }
-        .pd-ai-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .pd-ai-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-        .pd-ai-sub { font-size: 11px; color: var(--text-muted); }
+       
 
         .pd-collapse-btn { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border: none; border-top: 1px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; flex-shrink: 0; white-space: nowrap; }
         .pd-collapse-btn:hover { color: var(--text-primary); }
@@ -237,8 +273,6 @@ export default function Dashboard() {
         /* ── Topbar ── */
         .pd-topbar { height: 60px; background: var(--bg-card); border-bottom: 1px solid var(--border-card); display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; position: sticky; top: 0; z-index: 40; gap: 1rem; }
         .pd-hamburger { background: none; border: none; cursor: pointer; color: var(--text-secondary); display: none; align-items: center; padding: 4px; }
-        .pd-search-wrap { display: flex; align-items: center; gap: 8px; background: var(--bg-muted); border: 1px solid var(--border); border-radius: 8px; padding: 0 12px; flex: 0 1 360px; min-width: 0; }
-        .pd-search-input { border: none; background: none; outline: none; font-size: 13px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; width: 100%; padding: 9px 0; }
         .pd-topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
         .pd-notif-wrap { position: relative; }
@@ -343,7 +377,7 @@ export default function Dashboard() {
           .pd-avatar-name { display: none; }
           .pd-signout-btn span { display: none; }
           .pd-signout-btn { padding: 7px; }
-          .pd-search-wrap { flex: 1; }
+          
           .pd-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
           .pd-notif-dropdown { right: -60px; width: 270px; }
         }
@@ -362,15 +396,18 @@ export default function Dashboard() {
 
       <div className="pd-page">
         <Sidebar
-          active={activeNav}
-          onNavigate={setActiveNav}
-          collapsed={collapsed}
-          onToggle={() => setCollapsed(p => !p)}
-          onSignOut={handleSignOut}
-          isMobile={isMobile}
-          mobileOpen={mobileOpen}
-          onMobileClose={() => setMobileOpen(false)}
-        />
+  active={activeNav}
+ onNavigate={(id) => {
+    setActiveNav(id)
+    if (id === 'new-case') { navigate('/party/apply'); return }
+  }}
+  collapsed={collapsed}
+  onToggle={() => setCollapsed(p => !p)}
+  onSignOut={handleSignOut}
+  isMobile={isMobile}
+  mobileOpen={mobileOpen}
+  onMobileClose={() => setMobileOpen(false)}
+/>
 
         <div className="pd-main" style={{ marginLeft: isMobile ? 0 : (collapsed ? 60 : 240), transition: 'margin-left 0.25s ease' }}>
           {/* Topbar */}
@@ -379,34 +416,11 @@ export default function Dashboard() {
               <button className="pd-hamburger" onClick={() => setMobileOpen(true)}>
                 <Menu size={22} color="var(--text-secondary)" />
               </button>
-              <div className="pd-search-wrap">
-                <Search size={15} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                <input className="pd-search-input" placeholder="Search cases, documents, or proposals..." value={search} onChange={e => setSearch(e.target.value)} />
-              </div>
+              
             </div>
             <div className="pd-topbar-right">
               <ThemeToggle />
-              <div className="pd-notif-wrap">
-                <button className="pd-notif-btn" onClick={() => setShowNotifs(p => !p)}>
-                  <Bell size={20} color="var(--text-secondary)" />
-                  <span className="pd-notif-badge">2</span>
-                </button>
-                {showNotifs && (
-                  <div className="pd-notif-dropdown">
-                    <p className="pd-notif-title">Notifications</p>
-                    {notifications.map((n, i) => (
-                      <div key={i} className="pd-notif-item-drop">
-                        <div className="pd-notif-drop-icon"><AlertCircle size={14} color="var(--brand)" /></div>
-                        <div>
-                          <p className="pd-notif-drop-text">{n.text}</p>
-                          <p className="pd-notif-drop-time">{n.time}</p>
-                        </div>
-                      </div>
-                    ))}
-                    <button className="pd-notif-view-all">View all notifications</button>
-                  </div>
-                )}
-              </div>
+             
               <div className="pd-avatar">{userInitials}</div>
               <span className="pd-avatar-name">{userName}</span>
               <button className="pd-signout-btn" onClick={handleSignOut}>
@@ -423,15 +437,56 @@ export default function Dashboard() {
                 <h1 className="pd-page-title">Dashboard</h1>
                 <p className="pd-page-sub">Welcome back, {userName}. Here's your case overview.</p>
               </div>
+              {activeCase && (
+  ['QUESTIONNAIRE_ACTIVE', 'PROPOSAL_PUBLISHED'].includes(activeCase.status) ||
+  (activeCase.status === 'MEDIATION_COMPLETE' && activeCase.finalised_at)
+) && ( <div style={{
+    padding: '14px 18px',
+    borderRadius: 10,
+    background: 'var(--brand-light)',
+    border: '1.5px solid var(--brand)',
+    marginBottom: '1.25rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    flexWrap: 'wrap',
+  }}>
+    <span style={{ fontSize: 14, color: 'var(--brand)', fontWeight: 500 }}>
+      {activeCase.status === 'QUESTIONNAIRE_ACTIVE' && 'Action needed: Answer your questionnaire'}
+      {activeCase.status === 'PROPOSAL_PUBLISHED' && 'Action needed: Review the mediator\'s proposal'}
+      {activeCase.status === 'MEDIATION_COMPLETE' && 'Action needed: Confirm your settlement'}
+    </span>
+    <button
+      onClick={() => {
+        if (activeCase.status === 'QUESTIONNAIRE_ACTIVE') navigate(`/party/cases/${activeCase.id}/questionnaire`)
+        if (activeCase.status === 'PROPOSAL_PUBLISHED') navigate(`/party/cases/${activeCase.id}/proposal`)
+        if (activeCase.status === 'MEDIATION_COMPLETE') navigate(`/party/cases/${activeCase.id}/settlement`)
+      }}
+      style={{ background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+    >
+      Take Action →
+    </button>
+  </div>
+)}
 
               <div className="pd-layout">
                 <div className="pd-left-col">
                   <div className="pd-stats-grid">
-                    <StatCard label="Active Cases" value="2" sub="+1 this month" subColor="#16a34a" iconBg="#eef1fb" icon={<FileText size={22} color="#2a3f8f" />} />
-                    <StatCard label="Pending Proposals" value="3" sub="2 require action" iconBg="#fff7ed" icon={<Clock size={22} color="#ea8c0d" />} />
-                    <StatCard label="Completed" value="5" sub="100% success rate" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
-                    <StatCard label="Avg. Resolution Time" value="45 days" sub="-12 days vs avg" subColor="#dc2626" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
-                  </div>
+                    <StatCard label="Active Cases" value={cases.filter(c => !['MEDIATION_COMPLETE','MEDIATION_FAILED'].includes(c.status)).length} sub={cases.length > 0 ? 'Your ongoing cases' : 'No cases yet'} subColor="#16a34a" iconBg="#eef1fb" icon={<FileText size={22} color="#2a3f8f" />} />
+<StatCard label="Pending Proposals" value={cases.filter(c => c.status === 'PROPOSAL_PUBLISHED').length} sub="Awaiting your response" iconBg="#fff7ed" icon={<Clock size={22} color="#ea8c0d" />} />
+<StatCard label="Completed" value={cases.filter(c => c.status === 'MEDIATION_COMPLETE').length} sub="Successfully resolved" subColor="#16a34a" iconBg="#f0fdf4" icon={<CheckSquare size={22} color="#16a34a" />} />
+<StatCard label="Total Cases" value={cases.length} sub="All time" subColor="var(--text-muted)" iconBg="#fdf4ff" icon={<TrendingUp size={22} color="#9333ea" />} />
+<StatCard label="Amount at Stake" value={`₹${totalMonetaryValue.toLocaleString('en-IN')}`} sub="Across active cases" subColor="#8b5cf6" iconBg="#f5f3ff" icon={<TrendingUp size={22} color="#8b5cf6" />} />
+<StatCard
+  label="Unsuccessful"
+  value={cases.filter(c => c.status === 'MEDIATION_FAILED').length}
+  sub="Mediation not reached"
+  subColor="#dc2626"
+  iconBg="#fef2f2"
+  icon={<AlertCircle size={22} color="#dc2626" />}
+/>
+ </div>
 
                   <div className="pd-section">
                     <div className="pd-section-head">
@@ -439,60 +494,181 @@ export default function Dashboard() {
                         <h2 className="pd-section-title">Active Cases</h2>
                         <p className="pd-section-sub">Track your ongoing mediation cases</p>
                       </div>
-                      <button className="pd-new-case-btn">New Case</button>
-                    </div>
-                    {cases.map(c => (
-                      <CaseCard key={c.caseId} {...c} onView={() => navigate(`/party/cases/${c.id}/intake`)} />
-                    ))}
+                      
+                     <button
+  className="pd-new-case-btn"
+  onClick={() => navigate('/party/apply')}
+  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+>
+  <FilePlus size={15} />
+  New Case
+</button>
+                    </div>{applications
+    .filter(a => a.status === 'APPLICATION_PENDING')
+    .map(a => (
+      <div key={a.id} className="pd-case-card">
+        <div className="pd-case-top">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="pd-case-title-row">
+              <h3 className="pd-case-title">
+                {a.dispute_type ? a.dispute_type.replace(/_/g, ' ') : 'Mediation Application'}
+              </h3>
+              <span
+                className="pd-case-badge"
+                style={{ color: '#ca8a04', background: '#fef9c3' }}
+              >
+                Waiting for mediator review
+              </span>
+            </div>
+            <p className="pd-case-meta">
+              Submitted {new Date(a.created_at).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+      </div>
+  ))}
+
+                    {activeCasesList.length === 0 && (
+  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', border: '1.5px dashed var(--border)', borderRadius: '12px' }}>
+    <FileText size={32} style={{ margin: '0 auto 0.75rem', opacity: 0.4 }} />
+    <p style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>No active cases yet</p>
+    <p>Once you accept an invitation or apply for mediation, your cases will appear here.</p>
+  </div>
+)}
+                    {activeCasesList.map(c => (
+  <CaseCard
+    key={c.id}
+    title={c.dispute_type || c.brief_description || c.title || 'Mediation Case'}
+    status={friendlyStatus(c.status)}
+    rawStatus={c.status}
+    statusColor="#1a56b0"
+    statusBg="#dbeafe"
+    caseId={c.id}
+    displayId={c.id.slice(0, 8).toUpperCase()}
+    vs={c.against_party_email || c.requesting_party_email || '—'}
+    progress={(() => {
+      const statusMap = {
+        'DRAFT': 'BOTH_INVITED',
+        'PARTY_A_SUBMITTED': 'FIRST_PARTY_SUBMITTED',
+        'AI_RUNNING': 'BURST_1_PROCESSING',
+        'ANALYSIS_READY': 'BURST_1_COMPLETE',
+        'QUESTIONNAIRE_SENT': 'QUESTIONNAIRE_ACTIVE',
+        'PROPOSAL_SENT': 'PROPOSAL_PUBLISHED',
+        'PROPOSAL_ACCEPTED': 'MEDIATION_COMPLETE',
+        'SETTLED': 'MEDIATION_COMPLETE',
+        'CLOSED': 'MEDIATION_COMPLETE'
+      }
+      const mappedStatus = statusMap[c.status] || c.status
+      const steps = [
+        'BOTH_INVITED',
+        'FIRST_PARTY_SUBMITTED',
+        'BOTH_SUBMITTED',
+        'BURST_1_PROCESSING',
+        'BURST_1_COMPLETE',
+        'QUESTIONNAIRE_ACTIVE',
+        'QUESTIONNAIRE_COMPLETE',
+        'BURST_2_PROCESSING',
+        'BURST_2_COMPLETE',
+        'PROPOSAL_DRAFT',
+        'PROPOSAL_PUBLISHED',
+        'MEDIATION_IN_PROGRESS',
+        'MEDIATION_COMPLETE'
+      ]
+      const idx = steps.indexOf(mappedStatus)
+      return idx >= 0 ? Math.round((idx / (steps.length - 1)) * 100) : 0
+    })()}
+    nextDate={'—'}
+         docCount={docCounts[c.id]}
+    onView={() => navigate(`/party/cases/${c.id}`)}
+   
+  />
+))}
                   </div>
+
+                  {closedCasesList.length > 0 && (
+                    <div className="pd-section" style={{ marginTop: '1.25rem' }}>
+                      <div className="pd-section-head">
+                        <div>
+                          <h2 className="pd-section-title">Closed Cases</h2>
+                          <p className="pd-section-sub">Completed or ended mediations</p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {closedCasesList.map((c, i) => (
+                          <div
+                            key={c.id}
+                            onClick={() => navigate(`/party/cases/${c.id}`)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '12px',
+                              padding: '12px 4px',
+                              borderBottom: i < closedCasesList.length - 1 ? '1px solid var(--border)' : 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                                <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {c.dispute_type || c.brief_description || c.title || 'Mediation Case'}
+                                </h3>
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    fontWeight: 500,
+                                    padding: '2px 8px',
+                                    borderRadius: 99,
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
+                                    ...(c.status === 'MEDIATION_COMPLETE'
+                                      ? { color: '#16a34a', background: '#f0fdf4' }
+                                      : { color: '#dc2626', background: '#fef2f2' }),
+                                  }}
+                                >
+                                  {friendlyStatus(c.status)}
+                                </span>
+                              </div>
+                              <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {c.id.slice(0, 8).toUpperCase()} • vs. {c.against_party_email || c.requesting_party_email || '—'}
+                              </p>
+                            </div>
+                            <ChevronRight size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="pd-right-col">
+                
+                    <div className="pd-right-col">
                   <div className="pd-side-card">
-                    <h2 className="pd-side-title">Recent Notifications</h2>
-                    {notifications.map((n, i) => (
-                      <div key={i} className="pd-notif-item" style={{ borderBottom: i < notifications.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <div className="pd-notif-icon"><AlertCircle size={14} color="var(--brand)" /></div>
-                        <div>
-                          <p className="pd-notif-text">{n.text}</p>
-                          <p className="pd-notif-time">{n.time}</p>
-                        </div>
-                      </div>
-                    ))}
-                    <button className="pd-view-all">View all notifications</button>
-                  </div>
+  <h2 className="pd-side-title">Quick Actions</h2>
+  {quickActions.map((a, i) => (
+    <button
+      key={i}
+      className="pd-qa-btn"
+      style={{ marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}
+      onClick={() => { if (a.onClick) a.onClick(); else if (a.path) navigate(a.path) }}
+    >
+      <span style={{ color: 'var(--brand)', display: 'flex' }}>{a.icon}</span>
+      <span className="pd-qa-label">{a.label}</span>
+      <ChevronRight size={15} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />
+    </button>
+  ))}
+</div>
 
-                  <div className="pd-side-card">
-                    <h2 className="pd-side-title">Quick Actions</h2>
-                    {quickActions.map((a, i) => (
-                      <button key={i} className="pd-qa-btn" onClick={a.onClick} style={{ marginBottom: i < quickActions.length - 1 ? '8px' : 0 }}>
-                        <span style={{ color: 'var(--brand)', display: 'flex' }}>{a.icon}</span>
-                        <span className="pd-qa-label">{a.label}</span>
-                        <ChevronRight size={15} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />
-                      </button>
-                    ))}
-                  </div>
+            
 
-                  <div className="pd-side-card">
-                    <h2 className="pd-side-title">Recent Activity</h2>
-                    {activities.map((a, i) => (
-                      <div key={i} className="pd-activity-item" style={{ borderBottom: i < activities.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <div className="pd-activity-dot" />
-                        <div>
-                          <p className="pd-activity-title">{a.title}</p>
-                          <p className="pd-activity-desc">{a.desc}</p>
-                          <p className="pd-activity-date">{a.date}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                 
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <button className="pd-chat-btn"><MessageSquare size={21} color="white" /></button>
+       
       </div>
     </>
   )

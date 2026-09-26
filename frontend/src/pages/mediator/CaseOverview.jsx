@@ -1,8 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCaseById, getAnalysisStatus } from "../../api/cases";
-import { Copy, CheckCircle2, AlertTriangle } from "lucide-react";
+import { useTheme } from "../../context/ThemeContext";
+import {
+  Copy,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Link,
+} from "lucide-react";
 import MediatorLayout from "../../layouts/MediatorLayout";
+import client from "../../services/api";
 
 /* ── tokens ─────────────────────────────────────────────── */
 const tokens = (dark) => ({
@@ -14,43 +22,70 @@ const tokens = (dark) => ({
   accent: "#1e40af",
 });
 
-/* ── Status colours ─────────────────────────────────────── */
+function useWindowWidth() {
+  const [width, setWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const h = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  return width;
+}
+
 const STATUS_COLORS = {
-  INVITED: "#6366f1",
-  PARTY_A_SUBMITTED: "#f59e0b",
+  APPLICATION_PENDING: "#f59e0b",
+  APPLICATION_REJECTED: "#ef4444",
+  WITHDRAWN: "#64748b",
+  BOTH_INVITED: "#6366f1",
+  AWAITING_INVITATIONS: "#f59e0b",
+  PARTIALLY_INVITED: "#f59e0b",
+  FIRST_PARTY_SUBMITTED: "#f59e0b",
   BOTH_SUBMITTED: "#3b82f6",
   BURST_1_PROCESSING: "#8b5cf6",
   BURST_1_COMPLETE: "#10b981",
+  PROCESSING_FAILED: "#ef4444",
   QUESTIONNAIRE_ACTIVE: "#06b6d4",
   QUESTIONNAIRE_COMPLETE: "#10b981",
   BURST_2_PROCESSING: "#8b5cf6",
   BURST_2_COMPLETE: "#10b981",
+  PROPOSAL_DRAFT: "#f59e0b",
   PROPOSAL_PUBLISHED: "#3b82f6",
-  PROPOSAL_UNDER_REVIEW: "#f59e0b",
   MEDIATION_IN_PROGRESS: "#6366f1",
-  CLOSED: "#64748b",
-  PROCESSING_FAILED: "#ef4444",
+  MEDIATION_COMPLETE: "#10b981",
+  MEDIATION_FAILED: "#ef4444",
 };
 
-/* ── Next action messages ───────────────────────────────── */
 const NEXT_ACTION = {
-  INVITED: "Waiting for against party to accept invitation",
-  PARTY_A_SUBMITTED: "Waiting for Party B to submit their statement",
-  BOTH_SUBMITTED: "Both parties submitted — AI processing will begin",
+  APPLICATION_PENDING: "Application submitted — waiting for mediator review",
+  APPLICATION_REJECTED: "Application was rejected by mediator",
+  WITHDRAWN: "Application was withdrawn",
+  BOTH_INVITED: "Generate invitation links below and share with both parties",
+  FIRST_PARTY_SUBMITTED:
+      "One party has submitted their statement. Share the invitation link with the other party below so they can submit theirs.",
+  BOTH_SUBMITTED: "Both parties submitted — AI processing will begin shortly",
   BURST_1_PROCESSING: "AI is analysing submissions — please wait",
-  BURST_1_COMPLETE: "AI analysis complete — review and send questionnaire",
-  QUESTIONNAIRE_ACTIVE: "Waiting for both parties to answer questionnaire",
+  BURST_1_COMPLETE: "AI analysis complete — view results or send questionnaire",
+  PROCESSING_FAILED: "AI processing failed — use Retry Analysis below",
+  QUESTIONNAIRE_ACTIVE: "Waiting for both parties to answer the questionnaire",
   QUESTIONNAIRE_COMPLETE: "Questionnaire complete — AI generating BATNA/WATNA",
   BURST_2_PROCESSING: "AI is generating BATNA/WATNA scores — please wait",
   BURST_2_COMPLETE: "BATNA/WATNA ready — create and publish a proposal",
+  PROPOSAL_DRAFT: "Proposal saved as draft — publish when ready",
   PROPOSAL_PUBLISHED: "Proposal published — waiting for party responses",
-  PROPOSAL_UNDER_REVIEW: "Parties are reviewing the proposal",
   MEDIATION_IN_PROGRESS: "Mediation in progress — monitor party responses",
-  CLOSED: "This case is closed",
-  PROCESSING_FAILED: "AI processing failed — contact support or retry",
+  MEDIATION_COMPLETE: "Mediation complete — settlement PDF available",
+  MEDIATION_FAILED: "Mediation failed — case is closed",
+};
+// Add this helper above the component or inline where StatusBadge is rendered
+const getDisplayStatus = (status, invitationStatus) => {
+  if (status !== "BOTH_INVITED") return status;
+  const reqInvited = invitationStatus.requesting_party?.link_generated;
+  const agInvited = invitationStatus.against_party?.link_generated;
+  if (reqInvited && agInvited) return "BOTH_INVITED";      // links actually generated
+  if (reqInvited || agInvited) return "PARTIALLY_INVITED";  // one done
+  return "AWAITING_INVITATIONS";                             // neither yet
 };
 
-/* ── StatusBadge ────────────────────────────────────────── */
 function StatusBadge({ status }) {
   const color = STATUS_COLORS[status] || "#64748b";
   return (
@@ -62,21 +97,60 @@ function StatusBadge({ status }) {
         fontWeight: 600,
         background: `${color}22`,
         color,
+        display: "inline-block",
+        maxWidth: "100%",
+        wordBreak: "break-word",
       }}
     >
-      {status || "UNKNOWN"}
+      {status ? status.replace(/_/g, " ") : "UNKNOWN"}
     </span>
   );
 }
 
 /* ── PartyRow ───────────────────────────────────────────── */
-function PartyRow({ label, name, submitted, tk }) {
+function PartyRow({
+  label,
+  email,
+  submitted,
+  invited,
+  attemptCount,
+  tk,
+  isSmall,
+}) {
+  // Three clear states driven by invitationStatus + submission status
+  // declined = link was generated AND attempt_count >= 1 AND not submitted
+  const declined = invited && !submitted && attemptCount > 0;
+  const maxDeclines = attemptCount >= 3;
+
+  let badge;
+  if (submitted) {
+    badge = { bg: "#dcfce7", color: "#16a34a", text: "✅ Submitted" };
+  } else if (maxDeclines) {
+    badge = {
+      bg: "#fef2f2",
+      color: "#dc2626",
+      text: `❌ Declined (${attemptCount}×)`,
+    };
+  } else if (declined) {
+    badge = {
+      bg: "#fee2e2",
+      color: "#ef4444",
+      text: `⚠ Declined (${attemptCount}/3)`,
+    };
+  } else if (invited) {
+    badge = { bg: "#fef9c3", color: "#ca8a04", text: "🔗 Link Ready" };
+  } else {
+    badge = { bg: "#f1f5f9", color: "#94a3b8", text: "○ Not Invited" };
+  }
+
   return (
     <div
       style={{
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "center",
+        alignItems: isSmall ? "flex-start" : "center",
+        flexDirection: isSmall ? "column" : "row",
+        gap: isSmall ? 8 : 0,
         padding: "14px 0",
         borderBottom: `1px solid ${tk.border}`,
       }}
@@ -86,8 +160,15 @@ function PartyRow({ label, name, submitted, tk }) {
           {label}
         </div>
         <div style={{ fontSize: 14, fontWeight: 500, color: tk.text }}>
-          {name || "Pending"}
+          {email || "Not provided"}
         </div>
+        {declined && (
+          <div style={{ fontSize: 12, color: "#dc2626", marginTop: 4 }}>
+            {maxDeclines
+              ? "Maximum attempts reached — close case or contact party directly"
+              : `Declined ${attemptCount} of 3 times — regenerate link to retry`}
+          </div>
+        )}
       </div>
       <span
         style={{
@@ -95,11 +176,13 @@ function PartyRow({ label, name, submitted, tk }) {
           borderRadius: 6,
           fontSize: 12,
           fontWeight: 600,
-          background: submitted ? "#dcfce7" : "#fef9c3",
-          color: submitted ? "#16a34a" : "#ca8a04",
+          background: badge.bg,
+          color: badge.color,
+          alignSelf: isSmall ? "flex-start" : "center",
+          flexShrink: 0,
         }}
       >
-        {submitted ? "Submitted" : "Pending"}
+        {badge.text}
       </span>
     </div>
   );
@@ -115,11 +198,11 @@ function AnalysisStatusBlock({ caseId, dark, navigate }) {
         const data = await getAnalysisStatus(caseId);
         setAnalysisStatus(data);
       } catch {
-        // endpoint not ready yet — fail silently
+        /* fail silently */
       }
     };
     poll();
-    const interval = setInterval(poll, 5000);
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
   }, [caseId]);
 
@@ -142,8 +225,7 @@ function AnalysisStatusBlock({ caseId, dark, navigate }) {
 
   if (
     !analysisStatus ||
-    analysisStatus.status === "pending" ||
-    analysisStatus.status === "processing"
+    ["pending", "processing"].includes(analysisStatus.status)
   ) {
     return (
       <div
@@ -152,16 +234,16 @@ function AnalysisStatusBlock({ caseId, dark, navigate }) {
           borderRadius: 10,
           background: dark ? "#2e1065" : "#f5f3ff",
           border: `1px solid ${dark ? "#7c3aed" : "#ddd6fe"}`,
-          marginBottom: 20,
+          marginBottom: 16,
           display: "flex",
           alignItems: "center",
           gap: 10,
+          flexWrap: "wrap",
         }}
       >
         <Spinner />
         <span style={{ fontSize: 14, color: "#7c3aed", fontWeight: 500 }}>
-          AI pipeline running — analysing submissions. Usually takes 30–60
-          seconds.
+          AI pipeline running — usually takes 30–60 seconds
         </span>
       </div>
     );
@@ -175,11 +257,12 @@ function AnalysisStatusBlock({ caseId, dark, navigate }) {
           borderRadius: 10,
           background: dark ? "#052e16" : "#f0fdf4",
           border: `1px solid ${dark ? "#16a34a" : "#bbf7d0"}`,
-          marginBottom: 20,
+          marginBottom: 16,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 10,
+          flexWrap: "wrap",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -199,7 +282,6 @@ function AnalysisStatusBlock({ caseId, dark, navigate }) {
             cursor: "pointer",
             fontSize: 12,
             fontWeight: 600,
-            flexShrink: 0,
           }}
         >
           View Results
@@ -216,7 +298,7 @@ function AnalysisStatusBlock({ caseId, dark, navigate }) {
           borderRadius: 10,
           background: "#fef2f2",
           border: "1px solid #fecaca",
-          marginBottom: 20,
+          marginBottom: 16,
           display: "flex",
           alignItems: "center",
           gap: 10,
@@ -224,7 +306,7 @@ function AnalysisStatusBlock({ caseId, dark, navigate }) {
       >
         <AlertTriangle size={16} color="#ef4444" />
         <span style={{ fontSize: 14, color: "#dc2626", fontWeight: 500 }}>
-          AI processing failed. Contact support or ask Backend to retry.
+          AI processing failed. Use the Retry button below.
         </span>
       </div>
     );
@@ -233,55 +315,587 @@ function AnalysisStatusBlock({ caseId, dark, navigate }) {
   return null;
 }
 
-/* ══════════════════════════════════════════════════════════
-   MAIN COMPONENT
-══════════════════════════════════════════════════════════ */
-export default function CaseOverview() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
-  const [caseData, setCaseData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+/* ── InviteLinkModal ────────────────────────────────────── */
+function InviteLinkModal({
+  party,
+  isFirstTime,
+  onClose,
+  onConfirm,
+  loading,
+  tk,
+}) {
+  const partyLabel =
+    party === "requesting_party" ? "Requesting Party" : "Against Party";
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: tk.surface,
+          borderRadius: 12,
+          border: `1px solid ${tk.border}`,
+          padding: 24,
+          maxWidth: 440,
+          width: "100%",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+        }}
+      >
+        <h3
+          style={{
+            fontSize: 16,
+            fontWeight: 700,
+            color: tk.text,
+            margin: "0 0 8px",
+          }}
+        >
+          {isFirstTime
+            ? "Generate Invitation Link"
+            : "Regenerate Invitation Link"}
+        </h3>
+        <p style={{ fontSize: 13, color: tk.sub, margin: "0 0 16px" }}>
+          {isFirstTime
+            ? `Generate an invitation link for the ${partyLabel}. Share it immediately — it will not be shown again.`
+            : `Generate a new invitation link for the ${partyLabel}. The existing link will stop working immediately.`}
+        </p>
+        <div
+          style={{
+            padding: "12px 14px",
+            borderRadius: 8,
+            background: isFirstTime ? "#eff6ff" : "#fef9c3",
+            border: `1px solid ${isFirstTime ? "#bfdbfe" : "#fde68a"}`,
+            marginBottom: 20,
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: isFirstTime ? "#1e40af" : "#92400e",
+            }}
+          >
+            {isFirstTime
+              ? "The link will be shown once — copy it immediately after generating."
+              : "Old link stops working immediately. New link shown once — copy and share right away."}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 8,
+              border: `1px solid ${tk.border}`,
+              background: "transparent",
+              color: tk.text,
+              fontSize: 13,
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 8,
+              border: "none",
+              background: "#1e40af",
+              color: "#fff",
+              fontSize: 13,
+              cursor: loading ? "not-allowed" : "pointer",
+              fontWeight: 600,
+              opacity: loading ? 0.7 : 1,
+            }}
+          >
+            {loading
+              ? "Generating..."
+              : isFirstTime
+                ? "Generate Link"
+                : "Yes, Regenerate"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── NewLinkModal ───────────────────────────────────────── */
+function NewLinkModal({ link, onClose, tk }) {
   const [copied, setCopied] = useState(false);
-
-  const tk = tokens(dark);
-
-  /* ── Fetch + poll every 5s ──────────────────────────── */
-  useEffect(() => {
-    const fetchCase = async () => {
-      try {
-        const data = await getCaseById(id);
-        setCaseData(data);
-      } catch (err) {
-        setError("Failed to load case");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCase();
-    const interval = setInterval(fetchCase, 5000);
-    return () => clearInterval(interval);
-  }, [id]);
-
-  /* ── Copy invite link ───────────────────────────────── */
   const handleCopy = () => {
-    const link = `${window.location.origin}/invitations/${caseData?.invite_token}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: tk.surface,
+          borderRadius: 12,
+          border: `1px solid ${tk.border}`,
+          padding: 24,
+          maxWidth: 440,
+          width: "100%",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 8,
+          }}
+        >
+          <CheckCircle2 size={20} color="#16a34a" />
+          <h3
+            style={{ fontSize: 16, fontWeight: 700, color: tk.text, margin: 0 }}
+          >
+            Link Generated
+          </h3>
+        </div>
+        <p
+          style={{
+            fontSize: 13,
+            color: "#dc2626",
+            margin: "0 0 16px",
+            fontWeight: 500,
+          }}
+        >
+          Copy this link now — it will not be shown again.
+        </p>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            background: tk.bg,
+            border: `1px solid ${tk.border}`,
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 16,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              color: tk.sub,
+              flex: 1,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              minWidth: 0,
+            }}
+          >
+            {link}
+          </span>
+          <button
+            onClick={handleCopy}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "5px 12px",
+              borderRadius: 6,
+              border: `1px solid ${tk.border}`,
+              background: copied ? "#dcfce7" : tk.surface,
+              color: copied ? "#16a34a" : tk.text,
+              fontSize: 12,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            {copied ? <CheckCircle2 size={12} /> : <Copy size={12} />}
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            padding: "9px",
+            borderRadius: 8,
+            border: `1px solid ${tk.border}`,
+            background: "transparent",
+            color: tk.text,
+            fontSize: 13,
+            cursor: "pointer",
+            fontWeight: 500,
+          }}
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── CloseCaseModal ─────────────────────────────────────── */
+function CloseCaseModal({ partyLabel, onClose, onConfirm, loading, tk }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: tk.surface,
+          borderRadius: 12,
+          border: `1px solid ${tk.border}`,
+          padding: 24,
+          maxWidth: 440,
+          width: "100%",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+        }}
+      >
+        <h3
+          style={{
+            fontSize: 16,
+            fontWeight: 700,
+            color: tk.text,
+            margin: "0 0 8px",
+          }}
+        >
+          Close Case?
+        </h3>
+        <p style={{ fontSize: 13, color: tk.sub, margin: "0 0 16px" }}>
+          The <strong style={{ color: tk.text }}>{partyLabel}</strong> has
+          declined the invitation 3 times. Mediation cannot proceed without both
+          parties.
+        </p>
+        <div
+          style={{
+            padding: "12px 14px",
+            borderRadius: 8,
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            marginBottom: 20,
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 13, color: "#92400e" }}>
+            Closing this case will mark it as Mediation Failed. The requesting
+            party will be notified that mediation was unsuccessful. This action
+            cannot be undone.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 8,
+              border: `1px solid ${tk.border}`,
+              background: "transparent",
+              color: tk.text,
+              fontSize: 13,
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 8,
+              border: "none",
+              background: "#ef4444",
+              color: "#fff",
+              fontSize: 13,
+              cursor: loading ? "not-allowed" : "pointer",
+              fontWeight: 600,
+              opacity: loading ? 0.7 : 1,
+            }}
+          >
+            {loading ? "Closing..." : "Close Case"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   MAIN COMPONENT
+══════════════════════════════════════════════════════════ */
+export default function CaseOverview() {
+  const { isDark } = useTheme();
+  const { id } = useParams();
+  console.log("CaseOverview id from URL:", id);
+  const navigate = useNavigate();
+  const [caseData, setCaseData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [proposals, setProposals] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [settlementDone, setSettlementDone] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState(null);
+      const [analysis, setAnalysis] = useState(null);
+
+  // Party submission status — from /submissions endpoint
+  const [partyStatus, setPartyStatus] = useState({
+    party_a_email: null,
+    party_a_submitted: false,
+    party_b_email: null,
+    party_b_submitted: false,
+  });
+
+  // Invitation status — from /invitation-status endpoint
+  // Includes: link_generated, accepted, attempt_count per party
+  const [invitationStatus, setInvitationStatus] = useState({
+    requesting_party: {
+      link_generated: false,
+      accepted: false,
+      attempt_count: 0,
+    },
+    against_party: { link_generated: false, accepted: false, attempt_count: 0 },
+  });
+
+  // Invite link modal — { party, isFirstTime }
+  const [inviteModal, setInviteModal] = useState(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [newLink, setNewLink] = useState(null);
+
+  // Close case modal — { partyKey, partyLabel }
+  const [closeModal, setCloseModal] = useState(null);
+  const [closeLoading, setCloseLoading] = useState(false);
+  const [submissions, setSubmissions] = useState([]);
+
+  const tk = tokens(isDark);
+  const width = useWindowWidth();
+  const isSmall = width < 640;
+
+  // ── Fetch party submission status ────────────────────────
+  const fetchPartyStatus = useCallback(async (caseId) => {
+    try {
+      const res = await client.get(`/cases/${caseId}/submissions`);
+      const subs = res.data?.submissions || [];
+      setSubmissions(subs); 
+      const status = {
+        party_a_email: null,
+        party_a_submitted: false,
+        party_b_email: null,
+        party_b_submitted: false,
+      };
+      subs.forEach((sub) => {
+        if (sub.invitation_role === "requesting_party") {
+          status.party_a_submitted = true;
+          status.party_a_email = sub.party_email || null;
+        } else if (sub.invitation_role === "against_party") {
+          status.party_b_submitted = true;
+          status.party_b_email = sub.party_email || null;
+        }
+      });
+      // Fallback: if invitation_role not on submission, use order
+      if (
+        !status.party_a_submitted &&
+        !status.party_b_submitted &&
+        subs.length > 0
+      ) {
+        if (subs[0]) status.party_a_submitted = true;
+        if (subs[1]) status.party_b_submitted = true;
+      }
+      setPartyStatus(status);
+    } catch {
+      /* fail silently */
+    }
+  }, []);
+
+  // ── Fetch invitation status ───────────────────────────────
+  // Returns: { requesting_party: { link_generated, accepted, attempt_count }, ... }
+  const fetchInvitationStatus = useCallback(async (caseId) => {
+    try {
+      const res = await client.get(`/cases/${caseId}/invitation-status`);
+      setInvitationStatus(
+        res.data || {
+          requesting_party: {
+            link_generated: false,
+            accepted: false,
+            attempt_count: 0,
+          },
+          against_party: {
+            link_generated: false,
+            accepted: false,
+            attempt_count: 0,
+          },
+        },
+      );
+    } catch {
+      /* fail silently */
+    }
+  }, []);
+
+  // ── Main poll ─────────────────────────────────────────────
+ useEffect(() => {
+  const fetchCase = async () => {
+    try {
+      const data = await getCaseById(id);
+      setCaseData(data);
+      await fetchPartyStatus(id);
+      await fetchInvitationStatus(id);
+
+      // Fetch proposals, audit logs, and AI analysis (for neutral summary)
+      const [props, logs, analysisRes] = await Promise.all([
+        client.get(`/cases/${id}/proposals`).then((res) => res.data).catch(() => []),
+        client.get(`/cases/${id}/audit-log`).then((res) => res.data).catch(() => []),
+        client.get(`/cases/${id}/analysis`).then((res) => res.data).catch(() => null),
+      ]);
+      setProposals(props);
+      setAuditLogs(logs);
+      setAnalysis(analysisRes);
+
+      // Only poll settlement status once the case has actually reached
+      // MEDIATION_COMPLETE — calling this earlier was hitting the backend
+      // unnecessarily on every 5s poll for every case in every state.
+      if (data.status === "MEDIATION_COMPLETE") {
+        try {
+          const settlementRes = await client.get(`/cases/${id}/settlement/status`);
+          setSettlementDone(!!settlementRes.data?.pdf_ready);
+          setPdfUrl(settlementRes.data?.pdf_url || null);
+        } catch {
+          // fail silently
+        }
+      }
+    } catch {
+      setError("Failed to load case");
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchCase();
+  const interval = setInterval(fetchCase, 5000);
+  return () => clearInterval(interval);
+}, [id, fetchPartyStatus, fetchInvitationStatus]);
+
+  // ── Generate / Regenerate link ───────────────────────────
+  const handleInviteConfirm = async () => {
+    setInviteLoading(true);
+    try {
+      const emailForParty =
+        inviteModal.party === "requesting_party"
+          ? caseData?.requesting_party_email || ""
+          : caseData?.against_party_email || "";
+
+      const res = await client.post(`/cases/${id}/invitations/regenerate`, {
+        party: inviteModal.party,
+        email: emailForParty,
+        invitation_role: inviteModal.party,
+      });
+
+      const token = res.data?.token;
+      if (!token) throw new Error("No token returned");
+
+      const link = `${window.location.origin}/invitations/${token}`;
+      setNewLink(link);
+      setInviteModal(null);
+
+      // Refresh invitation status so button switches to Regenerate
+      await fetchInvitationStatus(id);
+      const updated = await getCaseById(id);
+      setCaseData(updated);
+    } catch {
+      alert("Failed to generate link. Try again.");
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  // ── Close case after 3 declines ──────────────────────────
+  const handleCloseCase = async () => {
+    setCloseLoading(true);
+    try {
+      await client.post(`/cases/${id}/close-declined`);
+      const updated = await getCaseById(id);
+      setCaseData(updated);
+      setCloseModal(null);
+    } catch {
+      alert("Failed to close case. Try again.");
+    } finally {
+      setCloseLoading(false);
+    }
+  };
+
+  // ── Button label logic ───────────────────────────────────
+  const getButtonLabel = (partyKey) => {
+    const status = invitationStatus[partyKey];
+    if (!status?.link_generated)
+      return { label: "Get Invitation Link", isFirstTime: true };
+    return { label: "Regenerate", isFirstTime: false };
+  };
+
+  // ── Decline detection from invitationStatus ──────────────
+  // A party has "declined" if link was generated but attempt_count > 0 and not submitted
+  const requestingPartyDeclined =
+    invitationStatus.requesting_party?.link_generated &&
+    (invitationStatus.requesting_party?.attempt_count || 0) > 0 &&
+    !partyStatus.party_a_submitted;
+
+  const againstPartyDeclined =
+    invitationStatus.against_party?.link_generated &&
+    (invitationStatus.against_party?.attempt_count || 0) > 0 &&
+    !partyStatus.party_b_submitted;
+
+  const requestingPartyMaxDeclines =
+    (invitationStatus.requesting_party?.attempt_count || 0) >= 3;
+
+  const againstPartyMaxDeclines =
+    (invitationStatus.against_party?.attempt_count || 0) >= 3;
+
+  const showDeclineWarning =
+    (requestingPartyMaxDeclines || againstPartyMaxDeclines) &&
+    caseData?.status !== "MEDIATION_FAILED";
+
+  const showInvitationSection = [
+    "BOTH_INVITED",
+    "FIRST_PARTY_SUBMITTED",
+  ].includes(caseData?.status);
+
+  // ── Loading / error guards ───────────────────────────────
   if (loading)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             height: "60vh",
-            color: tk.sub,
+            color: "#64748b",
           }}
         >
           Loading case...
@@ -291,7 +905,7 @@ export default function CaseOverview() {
 
   if (error)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
@@ -308,14 +922,14 @@ export default function CaseOverview() {
 
   if (!caseData)
     return (
-      <MediatorLayout dark={dark} setDark={setDark}>
+      <MediatorLayout>
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             height: "60vh",
-            color: tk.sub,
+            color: "#64748b",
           }}
         >
           Case not found
@@ -325,9 +939,39 @@ export default function CaseOverview() {
 
   const nextAction = NEXT_ACTION[caseData.status] || "No action required";
 
+  const caseTitle = caseData.dispute_type
+    ? caseData.dispute_type
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase()) + " Dispute"
+    : caseData.brief_description?.slice(0, 60) || "Untitled Case";
+
   return (
-    <MediatorLayout dark={dark} setDark={setDark}>
-      <div style={{ maxWidth: 800, margin: "0 auto" }}>
+    <MediatorLayout>
+      {/* ── Modals ── */}
+      {inviteModal && (
+        <InviteLinkModal
+          party={inviteModal.party}
+          isFirstTime={inviteModal.isFirstTime}
+          onClose={() => setInviteModal(null)}
+          onConfirm={handleInviteConfirm}
+          loading={inviteLoading}
+          tk={tk}
+        />
+      )}
+      {newLink && (
+        <NewLinkModal link={newLink} onClose={() => setNewLink(null)} tk={tk} />
+      )}
+      {closeModal && (
+        <CloseCaseModal
+          partyLabel={closeModal.partyLabel}
+          onClose={() => setCloseModal(null)}
+          onConfirm={handleCloseCase}
+          loading={closeLoading}
+          tk={tk}
+        />
+      )}
+
+      <div style={{ maxWidth: 800, margin: "0 auto", width: "100%" }}>
         {/* ── Back ── */}
         <button
           onClick={() => navigate("/mediator")}
@@ -348,41 +992,47 @@ export default function CaseOverview() {
         </button>
 
         {/* ── Case Header ── */}
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 20 }}>
           <p style={{ fontSize: 13, color: tk.sub, margin: "0 0 4px" }}>
             Case ID: {caseData.id?.slice(0, 8).toUpperCase()}
           </p>
           <h1
             style={{
-              fontSize: 24,
+              fontSize: isSmall ? 20 : 24,
               fontWeight: 700,
               margin: "0 0 12px",
               color: tk.text,
+              wordBreak: "break-word",
             }}
           >
-            {caseData.title || "Untitled Case"}
+            {caseTitle}
           </h1>
-          <StatusBadge status={caseData.status} />
+          <StatusBadge status={getDisplayStatus(caseData.status, invitationStatus)} />
         </div>
 
         {/* ── Next Action banner ── */}
         <div
           style={{
-            padding: "14px 18px",
+            padding: "12px 16px",
             borderRadius: 10,
-            background: dark ? "#1e3a5f" : "#eff6ff",
-            border: `1px solid ${dark ? "#1e40af" : "#bfdbfe"}`,
-            marginBottom: 20,
+            background: isDark ? "#1e3a5f" : "#eff6ff",
+            border: `1px solid ${isDark ? "#1e40af" : "#bfdbfe"}`,
+            marginBottom: 16,
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             gap: 10,
+            flexWrap: "wrap",
           }}
         >
-          <AlertTriangle size={16} color="#3b82f6" />
+          <AlertTriangle
+            size={16}
+            color="#3b82f6"
+            style={{ flexShrink: 0, marginTop: 2 }}
+          />
           <span
             style={{
               fontSize: 14,
-              color: dark ? "#93c5fd" : "#1e40af",
+              color: isDark ? "#93c5fd" : "#1e40af",
               fontWeight: 500,
             }}
           >
@@ -390,24 +1040,25 @@ export default function CaseOverview() {
           </span>
         </div>
 
-        {/* ── Analysis status polling — only when BURST_1_PROCESSING ── */}
+        {/* ── Analysis polling during BURST_1_PROCESSING ── */}
         {caseData.status === "BURST_1_PROCESSING" && (
-          <AnalysisStatusBlock caseId={id} dark={dark} navigate={navigate} />
+          <AnalysisStatusBlock caseId={id} dark={isDark} navigate={navigate} />
         )}
 
-        {/* ── BURST_1_COMPLETE — view results button ── */}
+        {/* ── BURST_1_COMPLETE actions ── */}
         {caseData.status === "BURST_1_COMPLETE" && (
           <div
             style={{
-              padding: "14px 18px",
+              padding: "12px 16px",
               borderRadius: 10,
-              background: dark ? "#052e16" : "#f0fdf4",
-              border: `1px solid ${dark ? "#16a34a" : "#bbf7d0"}`,
-              marginBottom: 20,
+              background: isDark ? "#052e16" : "#f0fdf4",
+              border: `1px solid ${isDark ? "#16a34a" : "#bbf7d0"}`,
+              marginBottom: 16,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               gap: 10,
+              flexWrap: "wrap",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -416,8 +1067,103 @@ export default function CaseOverview() {
                 AI analysis complete
               </span>
             </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={() => navigate(`/mediator/cases/${id}/analysis`)}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: 7,
+                  background: "#16a34a",
+                  color: "#fff",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                View Results
+              </button>
+              <button
+                onClick={() => navigate(`/mediator/cases/${id}/questionnaire`)}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: 7,
+                  background: "#1e40af",
+                  color: "#fff",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                Send Questionnaire
+              </button>
+            </div>
+          </div>
+        )}
+        {/* ── BURST_2_COMPLETE ── */}
+        {caseData.status === "BURST_2_COMPLETE" && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              background: isDark ? "#052e16" : "#f0fdf4",
+              border: `1px solid ${isDark ? "#16a34a" : "#bbf7d0"}`,
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <CheckCircle2 size={16} color="#16a34a" />
+              <span style={{ fontSize: 14, color: "#16a34a", fontWeight: 500 }}>
+                BATNA/WATNA analysis ready
+              </span>
+            </div>
             <button
-              onClick={() => navigate(`/mediator/cases/${id}/analysis`)}
+              onClick={() => navigate(`/mediator/cases/${id}/batna-watna`)}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 7,
+                background: "#1e40af",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              View BATNA/WATNA
+            </button>
+          </div>
+        )}
+        {/* Finalise Case button */}
+      {caseData.status === "MEDIATION_COMPLETE" && !settlementDone && !caseData.finalised_at && (
+  <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              background: isDark ? "#052e16" : "#f0fdf4",
+              border: `1px solid ${isDark ? "#16a34a" : "#bbf7d0"}`,
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <CheckCircle2 size={16} color="#16a34a" />
+              <span style={{ fontSize: 14, color: "#16a34a", fontWeight: 500 }}>
+                Both parties accepted — ready to finalise
+              </span>
+            </div>
+            <button
+              onClick={() => navigate(`/mediator/cases/${id}/finalise`)}
               style={{
                 padding: "6px 16px",
                 borderRadius: 7,
@@ -427,33 +1173,197 @@ export default function CaseOverview() {
                 cursor: "pointer",
                 fontSize: 12,
                 fontWeight: 600,
-                flexShrink: 0,
               }}
             >
-              View Results
+             Finalise Case
             </button>
           </div>
         )}
-
+        {/* ── Download Settlement PDF — visible any time PDF is ready ── */}
+        {caseData.status === "MEDIATION_COMPLETE" && settlementDone && pdfUrl && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              background: isDark ? "#052e16" : "#f0fdf4",
+              border: `1px solid ${isDark ? "#16a34a" : "#bbf7d0"}`,
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <CheckCircle2 size={16} color="#16a34a" />
+              <span style={{ fontSize: 14, color: "#16a34a", fontWeight: 500 }}>
+                Settlement PDF is ready
+              </span>
+            </div>
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                padding: "6px 16px",
+                borderRadius: 7,
+                background: "#16a34a",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+                textDecoration: "none",
+                display: "inline-block",
+              }}
+            >
+              Download Settlement PDF
+            </a>
+          </div>
+        )}
         {/* ── PROCESSING_FAILED ── */}
+           
         {caseData.status === "PROCESSING_FAILED" && (
           <div
             style={{
-              padding: "14px 18px",
+              padding: "12px 16px",
               borderRadius: 10,
               background: "#fef2f2",
               border: "1px solid #fecaca",
-              marginBottom: 20,
+              marginBottom: 16,
               display: "flex",
               alignItems: "center",
+              justifyContent: "space-between",
               gap: 10,
+              flexWrap: "wrap",
             }}
           >
-            <AlertTriangle size={16} color="#ef4444" />
-            <span style={{ fontSize: 14, color: "#dc2626", fontWeight: 500 }}>
-              AI processing failed. Please contact support or ask Backend to
-              retry the Celery task.
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <AlertTriangle size={16} color="#ef4444" />
+              <span style={{ fontSize: 14, color: "#dc2626", fontWeight: 500 }}>
+                AI processing failed
+              </span>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await client.post(`/cases/${id}/analysis/retry-full`);
+                  const updated = await getCaseById(id);
+                  setCaseData(updated);
+                } catch {
+                  alert("Retry failed. Contact support.");
+                }
+              }}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 7,
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              Retry Analysis
+            </button>
+          </div>
+        )}
+        {/* ── MEDIATION_FAILED — final round rejected, no agreement reached ── */}
+{caseData.status === "MEDIATION_FAILED" && (
+  <div
+    style={{
+      padding: "12px 16px",
+      borderRadius: 10,
+      background: "#fef2f2",
+      border: "1px solid #fecaca",
+      marginBottom: 16,
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 10,
+    }}
+  >
+    <AlertTriangle
+      size={16}
+      color="#ef4444"
+      style={{ flexShrink: 0, marginTop: 2 }}
+    />
+    <div>
+      <div style={{ fontSize: 14, color: "#dc2626", fontWeight: 600 }}>
+        Mediation failed — maximum rounds exhausted
+      </div>
+      <div style={{ fontSize: 12, color: "#ef4444", marginTop: 2 }}>
+        The final round was rejected and no settlement was reached. This case
+        is now closed. Both parties have been notified.
+      </div>
+    </div>
+  </div>
+)}
+
+        {/* ── Party declined 3 times warning + Close Case button ── */}
+        {showDeclineWarning && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <AlertTriangle
+                size={16}
+                color="#ef4444"
+                style={{ flexShrink: 0, marginTop: 2 }}
+              />
+              <div>
+                <div
+                  style={{ fontSize: 14, color: "#dc2626", fontWeight: 600 }}
+                >
+                  {requestingPartyMaxDeclines && againstPartyMaxDeclines
+                    ? "Both parties have declined the invitation 3 times"
+                    : requestingPartyMaxDeclines
+                      ? "Requesting party has declined the invitation 3 times"
+                      : "Against party has declined the invitation 3 times"}
+                </div>
+                <div style={{ fontSize: 12, color: "#ef4444", marginTop: 2 }}>
+                  Mediation cannot proceed without both parties. You may close
+                  this case or contact the party directly.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() =>
+                setCloseModal({
+                  partyKey: requestingPartyMaxDeclines
+                    ? "requesting_party"
+                    : "against_party",
+                  partyLabel: requestingPartyMaxDeclines
+                    ? "Requesting Party"
+                    : "Against Party",
+                })
+              }
+              style={{
+                padding: "6px 16px",
+                borderRadius: 7,
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
+              Close Case
+            </button>
           </div>
         )}
 
@@ -478,24 +1388,30 @@ export default function CaseOverview() {
             Parties
           </h2>
           <p style={{ fontSize: 12, color: tk.sub, margin: "0 0 8px" }}>
-            Submission status for each party
+            Status updates every 5 seconds
           </p>
           <PartyRow
             label="Requesting Party"
-            name={caseData.party_a_name}
-            submitted={caseData.party_a_submitted}
+            email={partyStatus.party_a_email || caseData.requesting_party_email}
+            submitted={partyStatus.party_a_submitted}
+            invited={invitationStatus.requesting_party?.link_generated}
+            attemptCount={invitationStatus.requesting_party?.attempt_count || 0}
             tk={tk}
+            isSmall={isSmall}
           />
           <PartyRow
             label="Against Party"
-            name={caseData.party_b_name}
-            submitted={caseData.party_b_submitted}
+            email={partyStatus.party_b_email || caseData.against_party_email}
+            submitted={partyStatus.party_b_submitted}
+            invited={invitationStatus.against_party?.link_generated}
+            attemptCount={invitationStatus.against_party?.attempt_count || 0}
             tk={tk}
+            isSmall={isSmall}
           />
         </div>
 
-        {/* ── Invite Link ── */}
-        {caseData.status === "INVITED" && (
+        {/* ── Invitation Links ── */}
+        {showInvitationSection && (
           <div
             style={{
               background: tk.surface,
@@ -513,58 +1429,524 @@ export default function CaseOverview() {
                 margin: "0 0 4px",
               }}
             >
-              Invitation Link
+              Invitation Links
             </h2>
-            <p style={{ fontSize: 12, color: tk.sub, margin: "0 0 12px" }}>
-              Share this link with the against party
+            <p style={{ fontSize: 12, color: tk.sub, margin: "0 0 16px" }}>
+              Links are one-time — shown only when generated. Use the button
+              below to get a link for each party.
             </p>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                background: tk.bg,
-                border: `1px solid ${tk.border}`,
-                borderRadius: 8,
-                padding: "10px 14px",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 13,
-                  color: tk.sub,
-                  flex: 1,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {`${window.location.origin}/invitations/${caseData?.invite_token}`}
-              </span>
-              <button
-                onClick={handleCopy}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 14px",
-                  borderRadius: 6,
-                  border: `1px solid ${tk.border}`,
-                  background: copied ? "#dcfce7" : tk.surface,
-                  color: copied ? "#16a34a" : tk.text,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  flexShrink: 0,
-                }}
-              >
-                {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-                {copied ? "Copied!" : "Copy"}
-              </button>
-            </div>
+
+            {/* Requesting Party invitation row */}
+            {!partyStatus.party_a_submitted &&
+              (() => {
+                const { label, isFirstTime } =
+                  getButtonLabel("requesting_party");
+                return (
+                  <div style={{ marginBottom: 14 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: tk.sub,
+                        marginBottom: 6,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Requesting Party
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: isSmall ? "wrap" : "nowrap",
+                        background: tk.bg,
+                        border: `1px solid ${tk.border}`,
+                        borderRadius: 8,
+                        padding: "10px 14px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: tk.sub,
+                          flex: 1,
+                          minWidth: 0,
+                        }}
+                      >
+                        {isFirstTime
+                          ? "No link generated yet — click to generate"
+                          : "Link previously generated — regenerate to get a new one"}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setInviteModal({
+                            party: "requesting_party",
+                            isFirstTime,
+                          })
+                        }
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          padding: "5px 10px",
+                          borderRadius: 6,
+                          border: `1px solid ${isFirstTime ? "#bfdbfe" : tk.border}`,
+                          background: isFirstTime ? "#eff6ff" : "transparent",
+                          color: isFirstTime ? "#1e40af" : tk.sub,
+                          fontSize: 11,
+                          cursor: "pointer",
+                          flexShrink: 0,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {isFirstTime ? (
+                          <Link size={11} />
+                        ) : (
+                          <RefreshCw size={11} />
+                        )}
+                        {label}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+            {/* Against Party invitation row */}
+            {!partyStatus.party_b_submitted &&
+              (() => {
+                const { label, isFirstTime } = getButtonLabel("against_party");
+                return (
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: tk.sub,
+                        marginBottom: 6,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Against Party
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: isSmall ? "wrap" : "nowrap",
+                        background: tk.bg,
+                        border: `1px solid ${tk.border}`,
+                        borderRadius: 8,
+                        padding: "10px 14px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: tk.sub,
+                          flex: 1,
+                          minWidth: 0,
+                        }}
+                      >
+                        {isFirstTime
+                          ? "No link generated yet — click to generate"
+                          : "Link previously generated — regenerate to get a new one"}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setInviteModal({
+                            party: "against_party",
+                            isFirstTime,
+                          })
+                        }
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          padding: "5px 10px",
+                          borderRadius: 6,
+                          border: `1px solid ${isFirstTime ? "#bfdbfe" : tk.border}`,
+                          background: isFirstTime ? "#eff6ff" : "transparent",
+                          color: isFirstTime ? "#1e40af" : tk.sub,
+                          fontSize: 11,
+                          cursor: "pointer",
+                          flexShrink: 0,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {isFirstTime ? (
+                          <Link size={11} />
+                        ) : (
+                          <RefreshCw size={11} />
+                        )}
+                        {label}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+            {/* Both submitted — no links needed */}
+            {partyStatus.party_a_submitted && partyStatus.party_b_submitted && (
+              <p style={{ fontSize: 13, color: "#16a34a", margin: 0 }}>
+                ✅ Both parties have submitted — no invitation links needed.
+              </p>
+            )}
           </div>
         )}
 
+        {/* ── Proposals Section ── */}
+        {proposals.length > 0 ? (
+          <div
+            style={{
+              background: tk.surface,
+              borderRadius: 12,
+              border: `1px solid ${tk.border}`,
+              padding: "16px 20px",
+              marginBottom: 16,
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 15,
+                fontWeight: 600,
+                color: tk.text,
+                margin: "0 0 12px",
+              }}
+            >
+              Negotiation Proposals
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {proposals.map((p) => {
+                const reqAcceptLog = auditLogs.find(
+                  (log) =>
+                    log.action === "PARTY_ACCEPTED_PROPOSAL" &&
+                    log.metadata?.proposal_id === p.id &&
+                    log.metadata?.party_role === "requesting_party"
+                );
+                const reqRejectLog = auditLogs.find(
+                  (log) =>
+                    log.action === "PARTY_REJECTED_PROPOSAL" &&
+                    log.metadata?.proposal_id === p.id &&
+                    log.metadata?.party_role === "requesting_party"
+                );
+                const requestingStatus = reqAcceptLog
+                  ? "Accepted"
+                  : reqRejectLog
+                  ? "Rejected"
+                  : "Pending";
+                const requestingReason = reqRejectLog
+                  ? reqRejectLog.metadata?.rejection_reason
+                  : "";
+
+                const againstAcceptLog = auditLogs.find(
+                  (log) =>
+                    log.action === "PARTY_ACCEPTED_PROPOSAL" &&
+                    log.metadata?.proposal_id === p.id &&
+                    log.metadata?.party_role === "against_party"
+                );
+                const againstRejectLog = auditLogs.find(
+                  (log) =>
+                    log.action === "PARTY_REJECTED_PROPOSAL" &&
+                    log.metadata?.proposal_id === p.id &&
+                    log.metadata?.party_role === "against_party"
+                );
+                const againstStatus = againstAcceptLog
+                  ? "Accepted"
+                  : againstRejectLog
+                  ? "Rejected"
+                  : "Pending";
+                const againstReason = againstRejectLog
+                  ? againstRejectLog.metadata?.rejection_reason
+                  : "";
+
+                const statusColor = (status) =>
+                  status === "Accepted"
+                    ? "#16a34a"
+                    : status === "Rejected"
+                    ? "#ef4444"
+                    : "#ca8a04";
+
+                const isRejected =
+                  requestingStatus === "Rejected" || againstStatus === "Rejected";
+                const laterRoundExists = proposals.some((other) => other.round > p.round);
+
+                return (
+                  <div
+                    key={p.id}
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: 8,
+                      border: `1px solid ${tk.border}`,
+                      background: tk.bg,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: tk.text,
+                        }}
+                      >
+                        Round {p.round} Proposal
+                      </span>
+                      <span
+                        style={{
+                          padding: "3px 8px",
+                          borderRadius: 5,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background:
+                            p.status === "published" ? "#eff6ff" : "#f1f5f9",
+                          color: p.status === "published" ? "#1e40af" : tk.sub,
+                        }}
+                      >
+                        {p.status?.toUpperCase()}
+                      </span>
+                    </div>
+
+                    {p.status === "published" && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 20,
+                          fontSize: 12,
+                          color: tk.sub,
+                          marginBottom: 10,
+                        }}
+                      >
+                        <div>
+                          Requesting Party:{" "}
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: statusColor(requestingStatus),
+                            }}
+                          >
+                            {requestingStatus}
+                          </span>
+                        </div>
+                        <div>
+                          Against Party:{" "}
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: statusColor(againstStatus),
+                            }}
+                          >
+                            {againstStatus}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {requestingReason && (
+                      <div
+                        style={{
+                          background: "#fef2f2",
+                          border: "1px solid #fecaca",
+                          borderRadius: 6,
+                          padding: "8px 10px",
+                          fontSize: 12,
+                          color: "#dc2626",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <strong>Requesting Party Rejection:</strong>{" "}
+                        {requestingReason}
+                      </div>
+                    )}
+                    {againstReason && (
+                      <div
+                        style={{
+                          background: "#fef2f2",
+                          border: "1px solid #fecaca",
+                          borderRadius: 6,
+                          padding: "8px 10px",
+                          fontSize: 12,
+                          color: "#dc2626",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <strong>Against Party Rejection:</strong> {againstReason}
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: 8,
+                        marginTop: 8,
+                      }}
+                    >
+                      {p.status === "draft" && (
+  <button
+    onClick={() => {
+      if (p.round === 1) {
+        navigate(`/mediator/cases/${id}/proposals/new`);
+      } else {
+        // Find the rejected proposal from the previous round to load its
+        // rejection reasons + AI revision suggestions
+        const prevRejected = proposals.find(
+          (prop) => prop.round === p.round - 1 && prop.status === "published"
+        );
+        navigate(
+          `/mediator/cases/${id}/proposals/${prevRejected?.id || p.id}/revise`
+        );
+      }
+    }}
+    style={{
+      padding: "5px 12px",
+      borderRadius: 6,
+      border: "none",
+      background: "#1e40af",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer",
+    }}
+  >
+    Edit & Publish Draft
+  </button>
+)}
+                     {p.status === "published" && isRejected && !laterRoundExists && (
+  p.round < (caseData.max_rounds || 3) ? (
+    <button
+      onClick={() =>
+        navigate(
+          `/mediator/cases/${id}/proposals/${p.id}/revise`,
+          {
+            state: {
+              revised_draft:
+                p.revision_suggestions?.revised_draft ||
+                p.content ||
+                "",
+              round_number: p.round,
+              max_rounds: caseData.max_rounds || 3,
+              previous_proposal: p.content,
+              requesting_reason: requestingReason,
+              against_reason: againstReason,
+              changes_summary:
+                p.revision_suggestions?.changes_summary || [],
+            },
+          }
+        )
+      }
+      style={{
+        padding: "5px 12px",
+        borderRadius: 6,
+        border: "none",
+        background: "#1e40af",
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      Revise Proposal
+    </button>
+  ) : (
+    <span
+      style={{
+        fontSize: 11,
+
+        fontWeight: 600,
+        color: "#dc2626",
+        padding: "5px 4px",
+      }}
+    >
+      Final round rejected — mediation cannot continue
+    </span>
+  )
+)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          caseData?.status === "BURST_2_COMPLETE" && (
+            <div
+              style={{
+                background: tk.surface,
+                borderRadius: 12,
+                border: `1px solid ${tk.border}`,
+                padding: "16px 20px",
+                marginBottom: 16,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <h2
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: tk.text,
+                    margin: 0,
+                  }}
+                >
+                  Proposals
+                </h2>
+                <p style={{ fontSize: 12, color: tk.sub, margin: "2px 0 0" }}>
+                  BATNA/WATNA is complete. You can now draft the first settlement proposal.
+                </p>
+              </div>
+              <button
+                onClick={() => navigate(`/mediator/cases/${id}/proposals/new`)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  background: "#1e40af",
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Draft Proposal
+              </button>
+            </div>
+          )
+        )}
+
+        {/* ── Audit Log button ── */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: 16,
+          }}
+        >
+          <button
+            onClick={() => navigate(`/mediator/cases/${id}/audit-log`)}
+            style={{
+              padding: "7px 16px",
+              borderRadius: 8,
+              border: `1px solid ${tk.border}`,
+              background: "transparent",
+              color: tk.sub,
+              fontSize: 13,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            📋 View Audit Log
+          </button>
+        </div>
         {/* ── Case Details ── */}
         <div
           style={{
@@ -584,19 +1966,38 @@ export default function CaseOverview() {
           >
             Case Details
           </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
             {[
               {
+                label: "Dispute Type",
+                value: caseData.dispute_type
+                  ? caseData.dispute_type
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                  : "Not specified",
+              },
+             {
+  label: analysis?.neutral_summary?.summary ? "Description (AI neutral summary)" : "Description (party's original text)",
+  value: analysis?.neutral_summary?.summary || caseData.brief_description || (
+    <span style={{ color: tk.sub, fontStyle: 'italic' }}>
+      Not specified — see individual statements in AI Analysis
+    </span>
+  ),
+},
+              
+              {
                 label: "Created",
-                value: new Date(caseData.created_at).toLocaleDateString(),
+                value: caseData.created_at
+                  ? new Date(caseData.created_at).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })
+                  : "—",
               },
               {
                 label: "Negotiation Round",
-                value: caseData.negotiation_round ?? 0,
-              },
-              {
-                label: "Case Type",
-                value: caseData.case_type || "Not specified",
+                value: `${caseData.negotiation_round ?? 0} of ${caseData.max_rounds ?? 3}`,
               },
             ].map(({ label, value }) => (
               <div
@@ -604,13 +2005,66 @@ export default function CaseOverview() {
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
+                  alignItems: "flex-start",
                   fontSize: 14,
+                  flexDirection: isSmall ? "column" : "row",
+                  gap: isSmall ? 2 : 12,
+                  padding: "10px 0",
+                  borderBottom: `1px solid ${tk.border}`,
                 }}
               >
-                <span style={{ color: tk.sub }}>{label}</span>
-                <span style={{ fontWeight: 500, color: tk.text }}>{value}</span>
+                <span
+                  style={{
+                    color: tk.sub,
+                    flexShrink: 0,
+                    minWidth: isSmall ? "auto" : 140,
+                  }}
+                >
+                  {label}
+                </span>
+                <span
+                  style={{
+                    fontWeight: 500,
+                    color: tk.text,
+                    textAlign: isSmall ? "left" : "right",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {value}
+                </span>
               </div>
             ))}
+           {/* Monetary Value — computed separately to compare both parties' claims */}
+{(() => {
+  const reqSub = submissions.find(s => s.invitation_role === 'requesting_party');
+  const agSub  = submissions.find(s => s.invitation_role === 'against_party');
+  const reqVal = reqSub?.monetary_amount;
+  const agVal  = agSub?.monetary_amount;
+
+  let monetaryDisplay;
+  if (caseData.monetary_value) {
+    monetaryDisplay = `INR ${Number(caseData.monetary_value).toLocaleString("en-IN")}`;
+  } else if (reqVal && agVal && reqVal !== agVal) {
+    monetaryDisplay = (
+      <span>
+        <span style={{ color: '#1e40af' }}>Requesting: ₹{Number(reqVal).toLocaleString("en-IN")}</span>
+        {'  ·  '}
+        <span style={{ color: '#dc2626' }}>Against: ₹{Number(agVal).toLocaleString("en-IN")}</span>
+      </span>
+    );
+  } else if (reqVal || agVal) {
+    monetaryDisplay = `INR ${Number(reqVal || agVal).toLocaleString("en-IN")}`;
+  } else {
+    monetaryDisplay = "Not specified";
+  }
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${tk.border}` }}>
+      <span style={{ color: tk.sub, minWidth: 140 }}>Monetary Value</span>
+      <span style={{ fontWeight: 500, color: tk.text, textAlign: "right" }}>{monetaryDisplay}</span>
+    </div>
+  );
+})()}
           </div>
         </div>
       </div>

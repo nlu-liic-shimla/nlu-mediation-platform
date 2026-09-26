@@ -38,15 +38,17 @@ def calculate_mediatability(conflict: ConflictExtraction) -> MediatabilitySore:
     # High suitability types — well-established mediation track record
     high_suitability = ["landlord_tenant", "consumer", "commercial_contract"]
     # Medium suitability types — mediatable but more complex
-    medium_suitability = ["employment", "construction", "debt_recovery"]
-    # Low suitability — property_boundary, family_business, other get 0
+    # Neighbour disputes mediate well — neighbours often prefer
+    # avoiding court to maintain the future relationship.
+    medium_suitability = ["employment", "construction", "debt_recovery", "neighbour_dispute"]
+    # Low suitability — family_business, other get 0
 
     if conflict.dispute_type.value in high_suitability:
         score += 2
     elif conflict.dispute_type.value in medium_suitability:
         score += 1
     else:
-        score += 0  # property_boundary, family_business, other
+        score += 0  # family_business, other
 
     # Factor 2: Extraction confidence (0-2 points)
     # High confidence = facts are clear = easier to mediate
