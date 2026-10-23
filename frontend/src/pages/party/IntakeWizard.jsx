@@ -191,7 +191,7 @@ export default function IntakeWizard() {
         .iw-amount-wrap { position: relative; }
         .iw-amount-prefix { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); font-size: 14px; font-weight: 500; color: var(--text-muted); }
         .iw-amount-input { padding-left: 42px !important; }
-        .iw-optional-tag { font-size: 11px; color: var(--text-placeholder); font-weight: 400; }
+        .iw-optional-tag { font-size: 11px; color: var(--error, #ef4444); font-weight: 400; }
 
         /* Yes/No toggle */
         .iw-yn-row { display: flex; gap: 10px; margin-bottom: 1rem; }
