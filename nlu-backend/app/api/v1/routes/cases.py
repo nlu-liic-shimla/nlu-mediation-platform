@@ -465,10 +465,14 @@ async def create_submission(
     verify_case_access(case_id, current_user)
 
     valid_types = [
-    "landlord_tenant", "employment", "commercial_contract",
-    "neighbour_dispute", "family_business", "construction",
-    "consumer", "debt_recovery", "other"
-]
+        "family_and_relationships", "property_and_real_estate", "money_and_financial_disputes",
+        "business_and_commercial", "employment_and_workplace", "consumer_dispute",
+        "education", "neighbourhood_and_community", "personal", "other",
+        # Legacy support
+        "landlord_tenant", "employment", "commercial_contract",
+        "neighbour_dispute", "family_business", "construction",
+        "consumer", "debt_recovery"
+    ]
     if relationship_type not in valid_types:
         raise HTTPException(
             status_code=422,

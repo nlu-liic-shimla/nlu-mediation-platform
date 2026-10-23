@@ -36,14 +36,15 @@ IMPORTANT PARTY DEFINITIONS:
 RULES:
 1. Questions must be specific to THIS dispute — not generic
 2. Different dispute types need different questions:
-   - landlord_tenant: focus on deposit, condition, dates, notice period
-   - employment: focus on contract terms, notice period, performance records
-   - commercial_contract: focus on deliverables, deadlines, payment terms
-   - neighbour_dispute: focus on survey records, documents, timeline of construction
-   - family_business: focus on partnership deed, contributions, profit sharing
-   - construction: focus on contract, deadlines, quality standards, payments
-   - consumer: focus on warranty, usage, complaint timeline
-   - debt_recovery: focus on loan agreement, repayment terms, evidence
+   - family_and_relationships / family_business: focus on family agreements, contributions, communications, expectations
+   - property_and_real_estate / landlord_tenant / construction: focus on ownership/tenancy documents, condition, dates, notices, contracts
+   - money_and_financial_disputes / debt_recovery: focus on loan/payment agreements, transaction records, repayment terms, evidence
+   - business_and_commercial / commercial_contract: focus on contracts, deliverables, deadlines, invoices, payment terms
+   - employment_and_workplace / employment: focus on employment contract terms, roles, workplace events, notice period, compensation
+   - consumer_dispute / consumer: focus on purchase proof, product/service defect, warranty, complaint timeline
+   - education: focus on enrollment/admissions agreement, fees, academic/administrative records, grievance timeline
+   - neighbourhood_and_community / neighbour_dispute: focus on survey records, shared space usage, disturbance timeline, prior communication
+   - personal: focus on personal relationship context, incident timeline, communication history, non-monetary remedies
 
 For neighbour_dispute:
   - How long have the parties been neighbours?

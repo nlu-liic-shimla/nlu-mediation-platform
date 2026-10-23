@@ -437,9 +437,13 @@ def process_burst_2(self, case_id: str):
         from ai.utils.ai_client import is_failed
 
         valid_dispute_types = {
+            "family_and_relationships", "property_and_real_estate", "money_and_financial_disputes",
+            "business_and_commercial", "employment_and_workplace", "consumer_dispute",
+            "education", "neighbourhood_and_community", "personal", "other",
+            # Legacy
             "landlord_tenant", "employment", "commercial_contract",
             "neighbour_dispute", "family_business", "construction",
-            "consumer", "debt_recovery", "other"
+            "consumer", "debt_recovery"
         }
         dt_val = conflict_extraction_json.get("dispute_type")
         if dt_val not in valid_dispute_types:
