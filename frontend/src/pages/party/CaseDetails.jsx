@@ -436,6 +436,15 @@ const isFailed = caseData?.status === 'MEDIATION_FAILED'
                 </div>
               )}
             </div>
+
+            {/* proposal */}
+            <div className="cd-card">
+              <p className="cd-card-title">
+                <FileText size={16} color="var(--brand)" /> Proposal
+              </p>
+              <p>No proposal available yet. The mediator will share a proposal once available.</p>
+            </div>
+
 {/* Documents — read-only list once mediation is complete, no upload button */}
 <div className="cd-card">
   <p className="cd-card-title"><Upload size={16} color="var(--brand)" /> Documents</p>
