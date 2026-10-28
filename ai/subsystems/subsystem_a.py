@@ -33,87 +33,57 @@ DISPUTE TYPE DEFINITIONS
 
 Classify the dispute into EXACTLY ONE of these categories:
 
-1. landlord_tenant
-   Disputes arising from a tenancy or rental agreement.
-   Includes: unpaid rent, security deposit, eviction,
-   property damage, maintenance obligations, lease violation.
-   Key: a formal or informal tenancy relationship exists.
+1. family_and_relationships
+   Disputes arising between family members, domestic partners, or relatives.
+   Includes: family inheritance, divorce/separation arrangements, property division,
+   support agreements, family venture division.
 
-2. employment
-   Disputes between employer and employee.
-   Includes: wrongful termination, unpaid wages/salary,
-   notice period, severance, workplace harassment,
-   non-compete clauses, employment contract terms.
-   Key: an employer-employee relationship exists.
+2. property_and_real_estate
+   Disputes concerning real estate, land, tenancy, leases, or construction.
+   Includes: landlord/tenant disputes, rent, security deposits, lease violations,
+   property damage, construction/renovation contracts, property boundary lines.
 
-3. commercial_contract
-   Disputes between two parties (individuals or companies)
-   over a commercial agreement for goods or services —
-   where the parties do NOT have a personal/family relationship.
-   Includes: service agreements, supply contracts, payment
-   for deliverables, SLAs, partnership agreements between
-   strangers or formal business entities.
-   Key: a formal contract exists AND parties are not
-   personal partners, family, or neighbours in a space dispute.
+3. money_and_financial_disputes
+   Disputes involving loans, unpaid debts, personal lending, or financial claims.
+   Includes: personal loans, unpaid promissory notes, informal debt recovery,
+   repayment schedules, investment return disagreements.
 
-4. neighbour_dispute
-   Disputes between people who live or own property
-   ADJACENT to each other, where the CORE issue is
-   about shared physical space or resources.
-   Includes: land boundaries, encroachment, walls, fences,
-   overhanging trees, shared driveways, water drainage,
-   noise between residents, parking in shared areas,
-   common area access between residential neighbours.
-   Key: parties are neighbours AND core dispute = shared space.
-   Note: noise and parking disputes between neighbours qualify
-   but set extraction_confidence lower (0.6-0.7) as these
-   are less documentable than boundary disputes.
+4. business_and_commercial
+   Disputes between commercial entities, co-founders, or businesses over contracts,
+   services, supply, or commercial operations.
+   Includes: vendor contracts, SLAs, deliverables, commercial partnership dissolution,
+   business invoices and non-performance.
 
-5. family_business
-   Disputes between people who personally knew each other
-   AND jointly ran or owned a business together.
-   Includes: profit-sharing disputes between partners,
-   business asset division between co-founders,
-   disputes between family members over a jointly run
-   enterprise, disagreements between people who pooled
-   resources to start or run a venture together.
-   Key question: did BOTH parties share in profits AND losses?
-   If yes, AND the disputed subject matter is the business
-   itself (profits, assets, ownership, dissolution) →
-   family_business, regardless of any formal contract.
+5. employment_and_workplace
+   Disputes between employer and employee or workplace participants.
+   Includes: wrongful termination, unpaid wages/severance, notice period,
+   workplace grievances, employment contract terms, non-compete clauses.
 
-6. construction
-   Disputes involving construction, renovation, or
-   civil works contracts — typically between a property
-   owner and a contractor/builder.
-   Includes: construction defects, incomplete work,
-   cost overruns, payment disputes for building work,
-   contractor abandoning a project, material quality.
-   Key: a construction or renovation contract exists.
+6. consumer_dispute
+   Disputes between an individual consumer and a business/seller.
+   Includes: defective products, faulty services, refund claims,
+   misleading representations, warranty disputes.
 
-7. consumer
-   Disputes between an individual consumer and a
-   business or service provider over a product or service.
-   Includes: defective product, poor service, misleading
-   advertising, refund disputes, warranty claims.
-   Key: one party is a consumer (individual buying for
-   personal use) and the other is a business/provider.
+7. education
+   Disputes involving educational institutions, students, staff, or parents.
+   Includes: tuition/fees disputes, admissions, academic suspensions/disciplinary actions,
+   hostel or school service agreements.
 
-8. debt_recovery
-   Disputes where one party explicitly LENT MONEY
-   to another, and the borrower has not repaid.
-   Includes: personal loans, informal lending between
-   friends/family, loan with interest, partial repayment.
-   Key: an explicit loan transaction exists.
-   NOT debt_recovery: money owed for services, unpaid rent,
-   outstanding invoices — those are commercial_contract
-   or landlord_tenant.
+8. neighbourhood_and_community
+   Disputes between neighbours or community members over shared physical spaces or resources.
+   Includes: residential noise, parking disputes, shared wall/fence, encroachment,
+   water drainage, pets, common community property.
 
-9. other
-   Use when the dispute does not clearly fit any
-   of the above categories, or when statements are
-   too vague or contradictory to classify confidently.
-   When in doubt — use other. Never guess between two categories.
+9. personal
+   Direct interpersonal disputes between acquaintances or individuals
+   that do not fall under commercial, employment, or formal tenancy relations.
+   Includes: personal property disputes, interpersonal communication disagreements,
+   defamation/reputation between individuals.
+
+10. other
+   Use when the dispute does not clearly fit any of the above categories,
+   or when statements are too vague or contradictory to classify confidently.
+   When in doubt — use other. Never guess.
 
 ═══════════════════════════════════════════════════════════════════
 PRECEDENCE RULES — APPLY IN ORDER WHEN MULTIPLE CATEGORIES FIT
@@ -285,7 +255,7 @@ OUTPUT FORMAT
 Return ONLY valid JSON. No explanation. No markdown. No extra text.
 
 {
-  "dispute_type": "one of the 9 category values",
+  "dispute_type": "one of the 10 category values",
   "core_dispute": "one neutral sentence describing the main issue",
   "claims_party_a": ["claim 1", "claim 2"],
   "claims_party_b": ["claim 1", "claim 2"],

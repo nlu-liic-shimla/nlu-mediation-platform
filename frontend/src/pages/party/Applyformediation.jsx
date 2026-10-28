@@ -6,15 +6,16 @@ import client from '../../services/api'
 // Keep this list in sync with IntakeWizard.jsx's RELATIONSHIP_OPTIONS and
 // CaseDetails.jsx's RELATIONSHIP_LABELS map.
 const DISPUTE_TYPES = [
-  { value: 'landlord_tenant', label: 'Landlord / Tenant', icon: '🏠' },
-  { value: 'employment', label: 'Employer / Employee', icon: '💼' },
-  { value: 'commercial_contract', label: 'Business / Contract', icon: '🤝' },
-  { value: 'neighbour_dispute', label: 'Neighbour Dispute', icon: '🏘️' },
-  { value: 'family_business', label: 'Family / Partnership', icon: '👨‍👩‍👧' },
-  { value: 'construction', label: 'Construction', icon: '🏗️' },
-  { value: 'consumer', label: 'Consumer / Product', icon: '🛒' },
-  { value: 'debt_recovery', label: 'Debt / Loan', icon: '💰' },
-  { value: 'other', label: 'Other', icon: '📋' },
+  { value: 'family_and_relationships', label: 'Family and Relationships', icon: '👨‍👩‍👧' },
+  { value: 'property_and_real_estate', label: 'Property and Real Estate', icon: '🏠' },
+  { value: 'money_and_financial_disputes', label: 'Money and Financial Disputes', icon: '💰' },
+  { value: 'business_and_commercial', label: 'Business and Commercial', icon: '🤝' },
+  { value: 'employment_and_workplace', label: 'Employment and Workplace', icon: '💼' },
+  { value: 'consumer_dispute', label: 'Consumer Dispute', icon: '🛒' },
+  { value: 'education', label: 'Education', icon: '🎓' },
+  { value: 'neighbourhood_and_community', label: 'Neighbourhood and Community Disputes', icon: '🏘️' },
+  { value: 'personal', label: 'Personal', icon: '👤' },
+  { value: 'other', label: 'Others', icon: '📋' },
 ]
 
 export default function ApplyForMediation() {

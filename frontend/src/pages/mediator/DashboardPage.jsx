@@ -756,15 +756,16 @@ if (!newCaseForm.dispute_type) {
                 style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: `1px solid ${tk.border}`, background: tk.bg, color: tk.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
               >
                 <option value="">Select dispute type</option>
-                <option value="landlord_tenant">Landlord / Tenant</option>
-                <option value="employment">Employer / Employee</option>
-                <option value="commercial_contract">Business / Contract</option>
-                <option value="neighbour_dispute">Neighbour Dispute</option>
-                <option value="family_business">Family / Partnership</option>
-                <option value="construction">Construction</option>
-                <option value="consumer">Consumer / Product</option>
-                <option value="debt_recovery">Debt / Loan</option>
-                <option value="other">Other</option>
+                <option value="family_and_relationships">Family and Relationships</option>
+                <option value="property_and_real_estate">Property and real estate</option>
+                <option value="money_and_financial_disputes">Money and financial disputes</option>
+                <option value="business_and_commercial">Business and Commercial</option>
+                <option value="employment_and_workplace">Employment and workplace</option>
+                <option value="consumer_dispute">Consumer dispute</option>
+                <option value="education">Education</option>
+                <option value="neighbourhood_and_community">Neighbourhood and comunity disputes</option>
+                <option value="personal">Personal</option>
+                <option value="other">Others</option>
               </select>
             </div>
 
