@@ -8,14 +8,18 @@ or external monitors to prevent or recover from free-tier hibernation.
 """
 
 import os
+# Ensure worker process role is established before tasks module is imported
+os.environ.setdefault("PROCESS_ROLE", "worker")
+
 import threading
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn
 
 from tasks import celery_app
 
-app = FastAPI()
 worker_thread = None
+_worker_start_lock = threading.Lock()
 
 def start_celery_worker():
     celery_app.worker_main([
@@ -24,12 +28,19 @@ def start_celery_worker():
         "--loglevel=info",
     ])
 
-@app.on_event("startup")
-def startup_event():
+def _start_worker_if_needed():
     global worker_thread
-    if worker_thread is None or not worker_thread.is_alive():
-        worker_thread = threading.Thread(target=start_celery_worker, daemon=True)
-        worker_thread.start()
+    with _worker_start_lock:
+        if worker_thread is None or not worker_thread.is_alive():
+            worker_thread = threading.Thread(target=start_celery_worker, daemon=True)
+            worker_thread.start()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _start_worker_if_needed()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def health():
@@ -37,9 +48,5 @@ def health():
     return {"status": "worker alive", "worker_thread_alive": thread_alive}
 
 if __name__ == "__main__":
-    if worker_thread is None or not worker_thread.is_alive():
-        worker_thread = threading.Thread(target=start_celery_worker, daemon=True)
-        worker_thread.start()
-
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
