@@ -3,9 +3,8 @@ worker_web.py
 Wraps the Celery worker in a minimal FastAPI app so it can run on
 Render's free Web Service tier (Background Workers have no free tier).
 
-An external uptime pinger (UptimeRobot) must hit the "/" route every
-10-14 minutes to prevent Render's free tier from spinning this down
-after 15 minutes of inactivity.
+Receives health check and wake-up pings (GET or HEAD) from the backend
+or external monitors to prevent or recover from free-tier hibernation.
 """
 
 import os
@@ -16,10 +15,7 @@ import uvicorn
 from tasks import celery_app
 
 app = FastAPI()
-
-@app.get("/")
-def health():
-    return {"status": "worker alive"}
+worker_thread = None
 
 def start_celery_worker():
     celery_app.worker_main([
@@ -28,9 +24,22 @@ def start_celery_worker():
         "--loglevel=info",
     ])
 
+@app.on_event("startup")
+def startup_event():
+    global worker_thread
+    if worker_thread is None or not worker_thread.is_alive():
+        worker_thread = threading.Thread(target=start_celery_worker, daemon=True)
+        worker_thread.start()
+
+@app.api_route("/", methods=["GET", "HEAD"])
+def health():
+    thread_alive = worker_thread.is_alive() if worker_thread is not None else False
+    return {"status": "worker alive", "worker_thread_alive": thread_alive}
+
 if __name__ == "__main__":
-    worker_thread = threading.Thread(target=start_celery_worker, daemon=True)
-    worker_thread.start()
+    if worker_thread is None or not worker_thread.is_alive():
+        worker_thread = threading.Thread(target=start_celery_worker, daemon=True)
+        worker_thread.start()
 
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
