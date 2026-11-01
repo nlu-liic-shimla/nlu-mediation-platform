@@ -439,7 +439,7 @@ def process_burst_2(self, case_id: str):
         valid_dispute_types = {
             "family_and_relationships", "property_and_real_estate", "money_and_financial_disputes",
             "business_and_commercial", "employment_and_workplace", "consumer_dispute",
-            "education", "neighbourhood_and_community", "personal", "other",
+            "education", "neighbourhood_and_community", "neighborhood_and_community", "personal", "other",
             # Legacy
             "landlord_tenant", "employment", "commercial_contract",
             "neighbour_dispute", "family_business", "construction",

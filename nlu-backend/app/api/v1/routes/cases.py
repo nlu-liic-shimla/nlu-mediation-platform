@@ -467,7 +467,7 @@ async def create_submission(
     valid_types = [
         "family_and_relationships", "property_and_real_estate", "money_and_financial_disputes",
         "business_and_commercial", "employment_and_workplace", "consumer_dispute",
-        "education", "neighbourhood_and_community", "personal", "other",
+        "education", "neighbourhood_and_community", "neighborhood_and_community", "personal", "other",
         # Legacy support
         "landlord_tenant", "employment", "commercial_contract",
         "neighbour_dispute", "family_business", "construction",

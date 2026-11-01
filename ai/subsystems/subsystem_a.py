@@ -98,127 +98,111 @@ Two people can be partners AND neighbours AND anything else —
 that alone does not decide the category. Ask: what is this
 specific dispute actually about?
 
-PRIORITY 1 — family_business
-  Applies when the parties are business partners, co-founders,
-  or family members who jointly ran a business, AND the
-  disputed subject matter is the business itself — profits,
-  losses, capital contributions, business assets, ownership
-  share, or dissolution of the partnership.
-  → family_business, regardless of any formal contract.
-  This includes disputes where the same two people are
-  also neighbours, contractors, etc., as long as the
-  business/partnership issue is what they are disputing.
-  Do NOT use family_business just because the parties are
-  partners or family — the dispute itself must be ABOUT
-  the shared business. If the same two people have a
-  separate, unrelated dispute (e.g. a personal residential
-  boundary issue), classify that dispute on its own facts
-  using the lower-priority categories below.
+PRIORITY 1 — family_and_relationships
+  Applies when the parties are family members, domestic partners,
+  or relatives, AND the disputed subject matter concerns domestic
+  relations, inheritance, divorce/separation, family support,
+  or family-run venture property division.
+  → family_and_relationships.
+  Do NOT use family_and_relationships if two relatives have a purely
+  arm's-length commercial business contract between registered companies;
+  in that case, use business_and_commercial.
 
-PRIORITY 2 — landlord_tenant
-  If a formal or informal tenancy/rental relationship exists
-  AND the dispute concerns that tenancy (rent, deposit,
-  eviction, damage, lease terms):
-  → landlord_tenant, even if parties are also neighbours.
-  Example: landlord living next door to their tenant,
-  disputing a shared driveway that is part of the rented
-  property's access → landlord_tenant.
+PRIORITY 2 — property_and_real_estate
+  If a formal or informal tenancy/rental relationship, lease,
+  property purchase, or construction/renovation contract is the
+  source of the dispute (rent, security deposit, eviction, damage,
+  lease terms, construction workmanship/delays, property boundaries):
+  → property_and_real_estate, even if parties are also neighbours.
+  Example: landlord living next door to tenant disputing security
+  deposit or driveway access → property_and_real_estate.
+  Example: neighbour hired contractor to renovate or build a wall,
+  disputing workmanship or payment → property_and_real_estate.
 
-PRIORITY 3 — construction
-  If a construction or renovation contract is the source
-  of the dispute, even between neighbours:
-  → construction.
-  Example: neighbour hired neighbour to build a wall,
-  now disputes workmanship → construction, NOT neighbour_dispute.
-  Reason: the contract relationship governs, not proximity.
+PRIORITY 3 — business_and_commercial
+  If a commercial contract, B2B service agreement, vendor invoice,
+  or commercial co-founder/business partnership dissolution governs
+  the dispute:
+  → business_and_commercial.
+  Example: freelance software/design services, supplier non-delivery,
+  or co-founders dissolving a commercial startup → business_and_commercial.
 
-PRIORITY 4 — commercial_contract
-  If a formal service or goods contract governs the dispute,
-  between parties who are NOT personal partners or family,
-  and the dispute is about that contract (not a business
-  they jointly own):
-  → commercial_contract.
-  Example: neighbour hired neighbour's business to supply
-  materials → commercial_contract.
+PRIORITY 4 — employment_and_workplace
+  If an employer-employee relationship or workplace grievance governs
+  the dispute (wrongful termination, unpaid wages, notice periods,
+  severance, non-compete clauses):
+  → employment_and_workplace.
 
-PRIORITY 5 — employment
-  If an employer-employee relationship governs.
+PRIORITY 5 — consumer_dispute
+  Disputes between an individual retail consumer and a business/seller
+  over defective products, faulty services, or warranty/refund claims:
+  → consumer_dispute.
 
-PRIORITY 6 — debt_recovery
-  Only if an explicit loan exists.
-  "He owes me money" alone is NOT debt_recovery.
-  Must be a clear lending transaction.
+PRIORITY 6 — education
+  Disputes involving schools, universities, colleges, students, or staff
+  over tuition fees, admissions, disciplinary actions, or academic contracts:
+  → education.
 
-PRIORITY 7 — neighbour_dispute
+PRIORITY 7 — money_and_financial_disputes
+  Applies when there is an explicit loan, promissory note, or personal
+  lending transaction where the loan repayment itself is the dispute.
+  → money_and_financial_disputes.
+  "He owes me money" without a clear lending transaction is NOT enough.
+  If money is owed for services rendered or invoices → business_and_commercial.
+  If money is an unpaid wage or severance → employment_and_workplace.
+  If money is a tenant deposit or rent → property_and_real_estate.
+
+PRIORITY 8 — neighbourhood_and_community
   Apply ONLY when:
-  - parties are confirmed neighbours (adjacent property)
-  - the CORE dispute is about shared physical space or resources
-  - NO higher-priority relationship governs THIS dispute (no
-    tenancy over the disputed space, no construction contract
-    for the disputed work, no formal service contract for the
-    disputed matter, no shared business dispute over the
-    disputed matter)
-  The override "even if money is involved" applies ONLY
-  to money as a REMEDY (repair cost, compensation for
-  encroachment) — NOT to money owed for services or contracts.
+  - parties are adjacent neighbours or community members
+  - the dispute is about shared physical spaces or resources
+    (residential noise, parking, shared fence, encroachment, drainage, pets)
+  - NO higher-priority relationship governs (no tenancy lease,
+    no construction contract, no formal commercial contract)
+  → neighbourhood_and_community.
+  The override "even if money is involved" applies ONLY to money
+  as a remedy (repair cost, compensation for damage) — NOT to commercial contracts.
 
-PRIORITY 8 — consumer
-  Individual consumer vs business dispute.
+PRIORITY 9 — personal
+  Direct interpersonal disputes between acquaintances or individuals
+  not covered by tenancy, employment, or commercial agreements
+  (e.g. personal communication, reputation, personal belongings):
+  → personal.
 
-PRIORITY 9 — other
-  When nothing fits clearly.
+PRIORITY 10 — other
+  When nothing fits clearly or statements are vague or contradictory.
+  When in doubt — use other. Never guess.
 
 ═══════════════════════════════════════════════════════════════════
 CRITICAL BOUNDARY CASES
 ═══════════════════════════════════════════════════════════════════
 
-family_business vs commercial_contract:
-  Partners/friends who ran a business together → family_business
-  Two strangers or companies transacting → commercial_contract
-  Keywords for family_business: partners, partnership, profit sharing,
-  ran together, co-founders, split profits, joint venture between
-  people who knew each other personally.
-  Keywords for commercial_contract: contract, invoice, vendor,
-  supplier, formal agreement between companies or strangers.
+family_and_relationships vs business_and_commercial:
+  Family members/domestic partners disputing inheritance or family ventures
+  → family_and_relationships
+  Unrelated co-founders, partners, or commercial companies transacting
+  → business_and_commercial
 
-family_business vs neighbour_dispute:
-  Parties are both partners AND neighbours, and the dispute is
-  ABOUT the shared business (profits, assets, ownership)?
-  → family_business (Priority 1 wins)
-  Parties are both partners AND neighbours, but THIS dispute
-  is only about their adjacent residential property and has
-  no connection to the business (e.g. one built a wall that
-  encroaches on the other's home, unrelated to the shop
-  they jointly run)?
-  → neighbour_dispute (the business relationship exists but
-  did not cause or govern this particular dispute)
-  If the statements are genuinely unclear about whether the
-  disputed matter is business-related or purely residential
-  → other. Never guess.
+property_and_real_estate vs neighbourhood_and_community:
+  Tenancy or lease relationship exists AND dispute concerns that tenancy
+  → property_and_real_estate (Priority 2 wins)
+  Neighbours with a construction/renovation contract between them
+  → property_and_real_estate (Priority 2 wins)
+  Adjacent property owners disputing noise, parking, trees, or boundary
+  encroachment with NO tenancy or construction contract
+  → neighbourhood_and_community
 
-landlord_tenant vs neighbour_dispute:
-  Tenancy relationship exists AND the dispute concerns that
-  tenancy?
-  → landlord_tenant (Priority 2 wins)
-  No tenancy — just adjacent property owners? Or a tenancy
-  exists but the dispute is unrelated to it (e.g. a landlord
-  and tenant who separately own adjacent, unrelated plots)?
-  → neighbour_dispute
+money_and_financial_disputes vs business_and_commercial:
+  Explicit personal loan (money lent between individuals to be returned)
+  → money_and_financial_disputes
+  Money owed for invoices, services rendered, or commercial goods
+  → business_and_commercial
 
-construction vs neighbour_dispute:
-  Neighbours with a construction contract between them,
-  and the dispute concerns that contract?
-  → construction (Priority 3 wins)
-  Neighbours disputing a wall that was built without a contract
-  (e.g. one party claims encroachment by other's self-built wall)?
-  → neighbour_dispute
-
-debt_recovery vs commercial_contract:
-  Explicit personal loan (money lent, money to be returned)?
-  → debt_recovery
-  Money owed for services rendered or goods supplied?
-  → commercial_contract
-  "He owes me money" without clear lending = NOT debt_recovery.
+consumer_dispute vs business_and_commercial:
+  Individual consumer buying goods/services for personal use from a seller
+  → consumer_dispute
+  Commercial transactions between businesses, contractors, or freelancers
+  → business_and_commercial
 
 When genuinely unclear between two categories:
   → other. Never guess.
@@ -330,15 +314,15 @@ if __name__ == "__main__":
     survey but not to demolish the wall without proof.
     """
 
-    print("Testing S-04 (neighbour_dispute)...")
+    print("Testing boundary encroachment (neighbourhood_and_community)...")
     result = extract_conflict(party_a, party_b)
 
     if is_failed(result):
         print(f"FAILED: {result}")
     else:
         print(f"dispute_type: {result.dispute_type}")
-        print(f"Expected:     neighbour_dispute")
-        print(f"Match: {result.dispute_type.value == 'neighbour_dispute'}")
+        print(f"Expected:     neighbourhood_and_community")
+        print(f"Match: {result.dispute_type.value == 'neighbourhood_and_community'}")
         print(f"confidence: {result.extraction_confidence}")
         print(f"core_dispute: {result.core_dispute}")
 
@@ -358,13 +342,13 @@ if __name__ == "__main__":
     confusing two completely separate issues.
     """
 
-    print("Testing ambiguous (should be family_business, not neighbour_dispute)...")
+    print("Testing ambiguous (should be business_and_commercial, not neighbourhood_and_community)...")
     result2 = extract_conflict(party_a_ambiguous, party_b_ambiguous)
 
     if is_failed(result2):
         print(f"FAILED: {result2}")
     else:
         print(f"dispute_type: {result2.dispute_type}")
-        print(f"Expected:     family_business")
-        print(f"Match: {result2.dispute_type.value == 'family_business'}")
+        print(f"Expected:     business_and_commercial")
+        print(f"Match: {result2.dispute_type.value == 'business_and_commercial'}")
         print(f"confidence: {result2.extraction_confidence}")

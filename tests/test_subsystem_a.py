@@ -15,13 +15,13 @@ from ai.utils.ai_client import is_failed
 
 # ── Scenario definitions ──────────────────────────────────────
 SCENARIOS = [
-    {"file": "S-01.json", "expected_type": "landlord_tenant"},
-    {"file": "S-02.json", "expected_type": "commercial_contract"},
-    {"file": "S-03.json", "expected_type": "employment"},
-    {"file": "S-04.json", "expected_type": "consumer"},
-    {"file": "S-05.json", "expected_type": "family_business"},
-    {"file": "S-06.json", "expected_type": "property_boundary"},
-    {"file": "S-07.json", "expected_type": "construction"},
+    {"file": "S-01.json", "expected_type": "property_and_real_estate"},
+    {"file": "S-02.json", "expected_type": "business_and_commercial"},
+    {"file": "S-03.json", "expected_type": "employment_and_workplace"},
+    {"file": "S-04.json", "expected_type": "consumer_dispute"},
+    {"file": "S-05.json", "expected_type": "business_and_commercial"},
+    {"file": "S-06.json", "expected_type": "neighbourhood_and_community"},
+    {"file": "S-07.json", "expected_type": "property_and_real_estate"},
     {"file": "S-08.json", "expected_type": "other"},
 ]
 

@@ -763,7 +763,7 @@ if (!newCaseForm.dispute_type) {
                 <option value="employment_and_workplace">Employment and workplace</option>
                 <option value="consumer_dispute">Consumer dispute</option>
                 <option value="education">Education</option>
-                <option value="neighbourhood_and_community">Neighbourhood and comunity disputes</option>
+                <option value="neighbourhood_and_community">Neighbourhood and community disputes</option>
                 <option value="personal">Personal</option>
                 <option value="other">Others</option>
               </select>

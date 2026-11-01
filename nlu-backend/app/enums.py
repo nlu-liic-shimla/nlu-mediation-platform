@@ -10,6 +10,7 @@ class DisputeType(str, Enum):
     CONSUMER_DISPUTE           = "consumer_dispute"
     EDUCATION                  = "education"
     NEIGHBOURHOOD_COMMUNITY    = "neighbourhood_and_community"
+    NEIGHBORHOOD_COMMUNITY_US  = "neighborhood_and_community"
     PERSONAL                   = "personal"
     OTHER                      = "other"
 

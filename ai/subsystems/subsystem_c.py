@@ -46,7 +46,7 @@ RULES:
    - neighbourhood_and_community / neighbour_dispute: focus on survey records, shared space usage, disturbance timeline, prior communication
    - personal: focus on personal relationship context, incident timeline, communication history, non-monetary remedies
 
-For neighbour_dispute:
+For neighbourhood_and_community / neighbour_dispute:
   - How long have the parties been neighbours?
   - Have they attempted informal resolution before?
   - Is there a written agreement about shared space?

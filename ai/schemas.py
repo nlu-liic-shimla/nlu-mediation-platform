@@ -22,7 +22,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -39,6 +39,7 @@ class DisputeType(str, Enum):
     CONSUMER_DISPUTE           = "consumer_dispute"
     EDUCATION                  = "education"
     NEIGHBOURHOOD_COMMUNITY    = "neighbourhood_and_community"
+    NEIGHBORHOOD_COMMUNITY_US  = "neighborhood_and_community"
     PERSONAL                   = "personal"
     OTHER                      = "other"
 
@@ -99,6 +100,30 @@ class ConflictExtraction(BaseModel):
         ...,
         description="Category of the dispute."
     )
+
+    @field_validator("dispute_type", mode="before")
+    @classmethod
+    def normalize_dispute_type(cls, v):
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            if v_clean in ("neighborhood_and_community", "neighborhood_and_community_disputes", "neighbourhood_and_community_disputes"):
+                return DisputeType.NEIGHBOURHOOD_COMMUNITY
+            if v_clean in ("others", "other_dispute"):
+                return DisputeType.OTHER
+            legacy_map = {
+                "landlord_tenant": DisputeType.PROPERTY_REAL_ESTATE,
+                "construction": DisputeType.PROPERTY_REAL_ESTATE,
+                "property_boundary": DisputeType.NEIGHBOURHOOD_COMMUNITY,
+                "family_business": DisputeType.BUSINESS_COMMERCIAL,
+                "commercial_contract": DisputeType.BUSINESS_COMMERCIAL,
+                "employment": DisputeType.EMPLOYMENT_WORKPLACE,
+                "debt_recovery": DisputeType.MONEY_FINANCIAL,
+                "neighbour_dispute": DisputeType.NEIGHBOURHOOD_COMMUNITY,
+                "consumer": DisputeType.CONSUMER_DISPUTE,
+            }
+            if v_clean in legacy_map:
+                return legacy_map[v_clean]
+        return v
     core_dispute: str = Field(
         ...,
         description="One to two sentence neutral description of the central disagreement.",
