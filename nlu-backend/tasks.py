@@ -24,6 +24,12 @@ load_dotenv()
 
 # ── Celery app ────────────────────────────────────────────────────────────────
 from celery import Celery
+from celery.signals import before_task_publish
+import time
+import json
+import threading
+import urllib.request
+import urllib.error
 
 REDIS_URL = os.environ.get("REDIS_URL")
 if not REDIS_URL:
@@ -55,6 +61,122 @@ celery_app.conf.update(
 )
 
 logger = logging.getLogger(__name__)
+
+# ── Render Worker Auto-Wakeup Helper ──────────────────────────────────────────
+_last_attempt_time = 0.0
+_last_success_time = 0.0
+_ping_in_progress = False
+_wakeup_lock = threading.Lock()
+WAKEUP_COOLDOWN_SECONDS = 60.0
+WAKEUP_FAILURE_BACKOFF_SECONDS = 5.0
+WAKEUP_TIMEOUT_SECONDS = 30.0
+
+
+def ping_worker_async():
+    """
+    Fire-and-forget HTTP request to wake up the Render worker if it's hibernating.
+    - Suppressed if running inside the Celery worker process (F-02).
+    - Throttled during active cooldown on success, with a short backoff on failure (F-04).
+    """
+    global _last_attempt_time, _last_success_time, _ping_in_progress
+
+    # Opt-out if explicitly disabled via configuration
+    worker_url = os.environ.get("RENDER_WORKER_URL", "https://sulah-worker.onrender.com/")
+    if not worker_url or worker_url.strip().lower() in ("none", "disabled", "false", "0"):
+        return
+
+    # F-02: Do not ping if this process is designated as a worker
+    process_role = os.environ.get("PROCESS_ROLE", "").strip().lower()
+    if process_role in ("worker", "celery", "celery_worker"):
+        return
+
+    now = time.time()
+    with _wakeup_lock:
+        # F-04: Concurrency and cooldown protection
+        if _ping_in_progress:
+            return
+        if now - _last_success_time < WAKEUP_COOLDOWN_SECONDS:
+            return
+        if now - _last_attempt_time < WAKEUP_FAILURE_BACKOFF_SECONDS:
+            return
+
+        _ping_in_progress = True
+        _last_attempt_time = now
+
+    def _ping():
+        global _last_success_time, _last_attempt_time, _ping_in_progress
+        start_time = time.time()
+        succeeded = False
+        try:
+            req = urllib.request.Request(
+                worker_url,
+                headers={"User-Agent": "SulahBackend-Wakeup/1.0"},
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=WAKEUP_TIMEOUT_SECONDS) as response:
+                elapsed = time.time() - start_time
+                body = response.read().decode("utf-8", errors="replace")
+                thread_alive = None
+                try:
+                    data = json.loads(body)
+                    thread_alive = data.get("worker_thread_alive")
+                except Exception:
+                    pass
+
+                if thread_alive is False:
+                    logger.warning(
+                        "[worker_wakeup] Worker web service is online (HTTP %s in %.2fs), but Celery worker thread is not alive.",
+                        response.status,
+                        elapsed,
+                    )
+                    succeeded = False
+                else:
+                    logger.info(
+                        "[worker_wakeup] Worker ping succeeded (HTTP %s in %.2fs)",
+                        response.status,
+                        elapsed,
+                    )
+                    succeeded = True
+        except urllib.error.HTTPError as e:
+            elapsed = time.time() - start_time
+            logger.warning(
+                "[worker_wakeup] Worker ping returned HTTP %s in %.2fs: %s",
+                e.code,
+                elapsed,
+                e.reason,
+            )
+        except urllib.error.URLError as e:
+            elapsed = time.time() - start_time
+            logger.warning(
+                "[worker_wakeup] Worker ping failed after %.2fs (%s). Worker may still be spinning up.",
+                elapsed,
+                e.reason,
+            )
+        except Exception as e:
+            elapsed = time.time() - start_time
+            logger.warning(
+                "[worker_wakeup] Unexpected error pinging worker after %.2fs: %s",
+                elapsed,
+                type(e).__name__,
+            )
+        finally:
+            with _wakeup_lock:
+                _ping_in_progress = False
+                now_finish = time.time()
+                if succeeded:
+                    _last_success_time = now_finish
+                else:
+                    _last_attempt_time = now_finish
+
+    thread = threading.Thread(target=_ping, name="worker-wakeup-ping", daemon=True)
+    thread.start()
+
+
+# F-03: Make Celery signal registration idempotent with dispatch_uid
+@before_task_publish.connect(dispatch_uid="sulah_worker_auto_wakeup")
+def on_task_publish(sender=None, headers=None, body=None, **kwargs):
+    """Celery signal hook: wakes up the Render worker container when any task is dispatched."""
+    ping_worker_async()
 
 
 def get_supabase():
