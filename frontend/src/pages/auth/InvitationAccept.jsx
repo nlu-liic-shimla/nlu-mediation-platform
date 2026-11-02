@@ -489,7 +489,7 @@ const data = isLogin
   role: 'party_user',
   case_id: data.case_id,
 }))
-    localStorage.setItem('nlu_case_role', data.role_in_this_case)
+    localStorage.setItem('nlu_case_role', data.role_in_this_case || data.role_in_case)
     navigate(`/party/cases/${data.case_id}/intake`)
   } catch (err) {
     if (err.response?.status === 410) {

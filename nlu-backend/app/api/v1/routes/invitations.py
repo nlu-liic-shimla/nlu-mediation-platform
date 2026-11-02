@@ -226,7 +226,8 @@ async def accept_invitation(token: str, body: AcceptRequest):
             }
         )
 
-    if body.email.strip().lower() != invitation["invited_email"].strip().lower():
+    invited_email_stored = (invitation.get("invited_email") or "").strip().lower()
+    if invited_email_stored and body.email.strip().lower() != invited_email_stored:
         raise HTTPException(
             status_code=403,
             detail={
@@ -236,9 +237,10 @@ async def accept_invitation(token: str, body: AcceptRequest):
             }
         )
 
+    lookup_email = invited_email_stored or body.email.strip().lower()
     existing_user = supabase.table("users").select(
         "id, email, password_hash, role"
-    ).eq("email", invitation["invited_email"]).execute()
+    ).eq("email", lookup_email).execute()
 
     if existing_user.data:
         user = existing_user.data[0]
@@ -265,7 +267,7 @@ async def accept_invitation(token: str, body: AcceptRequest):
             )
 
         new_user = supabase.table("users").insert({
-            "email": invitation["invited_email"],
+            "email": lookup_email,
             "password_hash": hash_password(body.password),
             "full_name": body.full_name,
             "role": "party_user",
@@ -305,7 +307,7 @@ async def accept_invitation(token: str, body: AcceptRequest):
     access_token = create_access_token(data={
         "sub": str(user_id),
         "role": "party_user",
-        "email": invitation["invited_email"]
+        "email": lookup_email
     })
 
     logger.info(
@@ -313,12 +315,20 @@ async def accept_invitation(token: str, body: AcceptRequest):
         f"by user {user_id} ({'new' if is_new_user else 'existing'} account)"
     )
 
+    full_name_returned = None
+    if not is_new_user and existing_user.data:
+        full_name_returned = existing_user.data[0].get("full_name")
+    elif is_new_user:
+        full_name_returned = body.full_name
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "case_id": invitation["case_id"],
         "role_in_case": invitation.get("invitation_role"),
-        "is_new_user": is_new_user
+        "role_in_this_case": invitation.get("invitation_role"),
+        "is_new_user": is_new_user,
+        "full_name": full_name_returned
     }
 
 
