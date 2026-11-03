@@ -495,14 +495,6 @@ const totalMonetaryValue = cases
                         <p className="pd-section-sub">Track your ongoing mediation cases</p>
                       </div>
                       
-                     <button
-  className="pd-new-case-btn"
-  onClick={() => navigate('/party/apply')}
-  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
->
-  <FilePlus size={15} />
-  New Case
-</button>
                     </div>{applications
     .filter(a => a.status === 'APPLICATION_PENDING')
     .map(a => (

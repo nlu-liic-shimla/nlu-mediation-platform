@@ -60,15 +60,25 @@ const BURST_2_STATUSES = new Set([
 // Replace the existing RELATIONSHIP_LABELS block in CaseDetails.jsx with this:
 
 const RELATIONSHIP_LABELS = {
-  landlord_tenant:      'Landlord / Tenant',
-  employment:           'Employer / Employee',
-  commercial_contract:  'Business / Contract',
-  neighbour_dispute: 'Neighbour Dispute',
-  family_business:      'Family / Partnership',
-  construction:         'Construction',
-  consumer:             'Consumer / Product',
-  debt_recovery:        'Debt / Loan',
-  other:                'Other',
+  family_and_relationships:      'Family and Relationships',
+  property_and_real_estate:      'Property and Real Estate',
+  money_and_financial_disputes:  'Money and Financial Disputes',
+  business_and_commercial:       'Business and Commercial',
+  employment_and_workplace:      'Employment and Workplace',
+  consumer_dispute:              'Consumer Dispute',
+  education:                     'Education',
+  neighbourhood_and_community:   'Neighbourhood and Community Disputes',
+  personal:                      'Personal',
+  other:                         'Others',
+  // Legacy labels
+  landlord_tenant:               'Landlord / Tenant',
+  employment:                    'Employer / Employee',
+  commercial_contract:           'Business / Contract',
+  neighbour_dispute:             'Neighbour Dispute',
+  family_business:               'Family / Partnership',
+  construction:                  'Construction',
+  consumer:                      'Consumer / Product',
+  debt_recovery:                 'Debt / Loan',
 }
 
 const ACTION_NEEDED = {
@@ -426,6 +436,20 @@ const isFailed = caseData?.status === 'MEDIATION_FAILED'
                 </div>
               )}
             </div>
+
+            {/* proposal */}
+            <div className="cd-card">
+              <p className="cd-card-title">
+                <FileText size={16} color="var(--brand)" /> Proposal
+              </p>
+              <div className="cd-empty">
+                <div className="cd-empty-icon">
+                  <FileText size={22} color="var(--text-muted)" />
+                </div>
+                <p className="cd-empty-text">No proposal available yet. The mediator will share a proposal once it is ready.</p>
+              </div>
+            </div>
+
 {/* Documents — read-only list once mediation is complete, no upload button */}
 <div className="cd-card">
   <p className="cd-card-title"><Upload size={16} color="var(--brand)" /> Documents</p>

@@ -12,6 +12,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", 
                    "https://nlu-mediation-platform.vercel.app",
+                   "https://nlu-mediation-platform-git-mritunjay-sulah.vercel.app",
                   ],
     allow_credentials=True,
     allow_methods=["*"],

@@ -2,7 +2,7 @@
 {
   "id": "S-09",
   "description": "Medical negligence dispute between patient and clinic",
-  "dispute_type": "consumer",
+  "dispute_type": "consumer_dispute",
   "party_a_statement": "I went to Dr Mehta's clinic in January 2026 for a knee surgery. After the surgery my condition got worse and I developed an infection. I had to be admitted to another hospital for 3 weeks and spent 120000 INR on additional treatment. The clinic never warned me about infection risks and I was not given proper post-operative care instructions. I want full reimbursement of my additional medical expenses.",
   "party_b_statement": "The surgery was performed correctly and in line with standard medical practice. The patient was given post-operative care instructions both verbally and in writing. The infection developed due to the patient not following the care instructions — he did not clean the wound as advised and returned to physical work within 3 days of surgery against our explicit advice. We have signed consent forms and discharge notes. We are not liable for patient non-compliance.",
   "metadata": {
@@ -12,7 +12,7 @@
     "prior_negotiation": true
   },
   "expected": {
-    "dispute_type": "consumer",
+    "dispute_type": "consumer_dispute",
     "mediatability_band": "Medium",
     "extraction_confidence_min": 0.7
   }

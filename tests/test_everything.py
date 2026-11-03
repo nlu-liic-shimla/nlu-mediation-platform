@@ -169,7 +169,7 @@ if out is None:
     check("Sub-system A runs", False, "extraction failed or missing")
 else:
     check("Sub-system A runs", True)
-    check("dispute_type correct", out.dispute_type.value == "landlord_tenant", f"got={out.dispute_type}")
+    check("dispute_type correct", out.dispute_type.value in ("property_and_real_estate", "landlord_tenant"), f"got={out.dispute_type}")
     check("confidence >= 0.7", out.extraction_confidence >= 0.7, f"got={out.extraction_confidence}")
     divider()
     show("Dispute type",     out.dispute_type.value)
