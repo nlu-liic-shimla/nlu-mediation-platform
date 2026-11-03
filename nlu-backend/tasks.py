@@ -69,7 +69,7 @@ _ping_in_progress = False
 _wakeup_lock = threading.Lock()
 WAKEUP_COOLDOWN_SECONDS = 60.0
 WAKEUP_FAILURE_BACKOFF_SECONDS = 5.0
-WAKEUP_TIMEOUT_SECONDS = 30.0
+WAKEUP_TIMEOUT_SECONDS = float(os.environ.get("RENDER_WORKER_WAKEUP_TIMEOUT", "60.0"))
 
 
 def ping_worker_async():
