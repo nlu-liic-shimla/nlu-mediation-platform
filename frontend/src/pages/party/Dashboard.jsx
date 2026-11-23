@@ -164,9 +164,14 @@ const userInitials = userName.substring(0, 2).toUpperCase()
   }, [])
 
   const handleSignOut = () => {
+    sessionStorage.removeItem('nlu_token')
+    sessionStorage.removeItem('nlu_role')
+    sessionStorage.removeItem('nlu_user')
+    sessionStorage.removeItem('nlu_case_role')
     localStorage.removeItem('nlu_token')
     localStorage.removeItem('nlu_role')
     localStorage.removeItem('nlu_user')
+    localStorage.removeItem('nlu_case_role')
     navigate('/auth/login')
   }
 

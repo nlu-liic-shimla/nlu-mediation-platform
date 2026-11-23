@@ -76,7 +76,7 @@ export default function UploadDocuments() {
 
   // ── Upload single file ──
   const uploadFile = async (entry) => {
-    const token = localStorage.getItem('nlu_token')
+    const token = sessionStorage.getItem('nlu_token') || localStorage.getItem('nlu_token')
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
     // Update status to uploading

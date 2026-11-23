@@ -182,7 +182,8 @@ const generateJSMediatorPDF = async (caseId) => {
 
 // Attach token and handle mock responses
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('nlu_token')
+  // Prefer sessionStorage (invitation tab) over localStorage (normal login)
+  const token = sessionStorage.getItem('nlu_token') || localStorage.getItem('nlu_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
 
   // Dev mode simulation: Intercept and mock settlement/proposal requests if local status exists
@@ -294,6 +295,8 @@ api.interceptors.response.use(
       err.config?.url?.includes('/auth/register')
 
     if (err.response?.status === 401 && !isAuthEndpoint) {
+      sessionStorage.removeItem('nlu_token')
+      sessionStorage.removeItem('nlu_role')
       localStorage.removeItem('nlu_token')
       localStorage.removeItem('nlu_role')
       window.location.href = '/auth/login'
