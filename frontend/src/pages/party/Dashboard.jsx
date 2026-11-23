@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import ThemeToggle from '../../components/ui/ThemeToggle'
 import client from '../../services/api'
 import AnalysisStatusBanner from '../../components/party/AnalysisStatusBanner'
+import { getAuthUser } from '../../utils/auth'
 import {
   Scale, LayoutDashboard, FilePlus, 
   FileText, CheckSquare, Bell, ChevronRight,
@@ -151,10 +152,9 @@ export default function Dashboard() {
 
   const [docCounts, setDocCounts] = useState({})
 
-  const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
-const userEmail = user.email || 'User'
-const userName = user.full_name || userEmail.split('@')[0]
-const userInitials = userName.substring(0, 2).toUpperCase()
+  const user = getAuthUser() || JSON.parse(localStorage.getItem('nlu_user') || '{}')
+  const userLoginId = user.email || user.full_name || 'User'
+  const userInitials = userLoginId.substring(0, 2).toUpperCase()
  
 
   useEffect(() => {
@@ -427,7 +427,7 @@ const totalMonetaryValue = cases
               <ThemeToggle />
              
               <div className="pd-avatar">{userInitials}</div>
-              <span className="pd-avatar-name">{userName}</span>
+              <span className="pd-avatar-name">{userLoginId}</span>
               <button className="pd-signout-btn" onClick={handleSignOut}>
                 <LogOut size={15} />
                 <span>Sign out</span>
@@ -440,7 +440,7 @@ const totalMonetaryValue = cases
             <div className="pd-inner">
               <div className="pd-page-header">
                 <h1 className="pd-page-title">Dashboard</h1>
-                <p className="pd-page-sub">Welcome back, {userName}. Here's your case overview.</p>
+                <p className="pd-page-sub">Welcome back, {userLoginId}. Here's your case overview.</p>
               </div>
               {activeCase && (
   ['QUESTIONNAIRE_ACTIVE', 'PROPOSAL_PUBLISHED'].includes(activeCase.status) ||
