@@ -32,7 +32,6 @@ const friendlyStatus = (status) => PARTY_STATUS_LABELS[status] || 'In progress'
 
 const NAV_ITEMS = [
   { id: 'dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
-  { id: 'new-case',      icon: FilePlus,        label: 'New Case' },
 ]
 
 const Sidebar = ({ active, onNavigate, collapsed, onToggle, onSignOut, isMobile, mobileOpen, onMobileClose, visibleIds }) => (
@@ -402,10 +401,7 @@ const totalMonetaryValue = cases
       <div className="pd-page">
         <Sidebar
   active={activeNav}
- onNavigate={(id) => {
-    setActiveNav(id)
-    if (id === 'new-case') { navigate('/party/apply'); return }
-  }}
+  onNavigate={(id) => setActiveNav(id)}
   collapsed={collapsed}
   onToggle={() => setCollapsed(p => !p)}
   onSignOut={handleSignOut}
