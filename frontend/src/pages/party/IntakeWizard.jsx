@@ -100,7 +100,7 @@ export default function IntakeWizard() {
       formData.append('prior_negotiation', form.prior_negotiation)
       if (form.monetary_amount) formData.append('monetary_amount', form.monetary_amount)
 
-      const token = localStorage.getItem('nlu_token')
+      const token = sessionStorage.getItem('nlu_token') || localStorage.getItem('nlu_token')
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/v1/cases/${caseId}/submissions`,
         { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData }
@@ -112,6 +112,8 @@ export default function IntakeWizard() {
       } else if (res.status === 409) {
         setApiError('You have already submitted for this case.')
       } else if (res.status === 401) {
+        sessionStorage.removeItem('nlu_token')
+        sessionStorage.removeItem('nlu_role')
         localStorage.removeItem('nlu_token')
         localStorage.removeItem('nlu_role')
         navigate('/auth/login')

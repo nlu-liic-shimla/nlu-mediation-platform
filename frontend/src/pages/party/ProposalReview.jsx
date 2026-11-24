@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { getAuthUser } from '../../utils/auth'
 import {
   ChevronLeft, CheckCircle, XCircle, AlertCircle,
   Loader, FileText, Clock
@@ -22,7 +23,7 @@ export default function ProposalReview() {
   const [submitting, setSubmitting]       = useState(false)
   const [submitError, setSubmitError]     = useState('')
 
-  const user = JSON.parse(localStorage.getItem('nlu_user') || '{}')
+  const user = getAuthUser() || JSON.parse(localStorage.getItem('nlu_user') || '{}')
   const userKey = user.user_id || user.email || 'guest'
   const getDecisionKey = (proposalId) => `proposal_decision_${caseId}_${proposalId}_${userKey}`
 

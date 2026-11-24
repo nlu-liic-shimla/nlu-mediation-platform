@@ -1,9 +1,10 @@
 import { Navigate } from "react-router-dom";
+import { getAuthRole } from "../utils/auth";
 
 // Blocks users whose role doesn't match the allowed list
 // Always returns 403-style redirect, never 404 — matches backend security model
 export default function RoleBasedRoute({ children, allowedRoles }) {
-  const role = localStorage.getItem("nlu_role");
+  const role = getAuthRole();
 
   if (!role || !allowedRoles.includes(role)) {
     // Redirect to their correct dashboard instead of login

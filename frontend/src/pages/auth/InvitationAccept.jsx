@@ -481,21 +481,27 @@ const handleAccept = async () => {
 const data = isLogin
   ? await acceptInvitation(token, email, password)
   : await acceptInvitation(token, email, password, email.split('@')[0])
-    localStorage.setItem('nlu_token', data.access_token)
-    localStorage.setItem('nlu_role', 'party_user')
-    localStorage.setItem('nlu_user', JSON.stringify({
+    // Store in sessionStorage only — tab-scoped, never overwrites mediator localStorage session
+    sessionStorage.setItem('nlu_token', data.access_token)
+    sessionStorage.setItem('nlu_role', 'party_user')
+    sessionStorage.setItem('nlu_user', JSON.stringify({
   email,
   full_name: data.full_name || null,
   role: 'party_user',
   case_id: data.case_id,
 }))
-    localStorage.setItem('nlu_case_role', data.role_in_this_case)
+    sessionStorage.setItem('nlu_case_role', data.role_in_this_case || data.role_in_case)
     navigate(`/party/cases/${data.case_id}/intake`)
   } catch (err) {
+    const errorDetail = err.response?.data?.detail
+    const errorMessage = typeof errorDetail === 'object' ? errorDetail?.message : (errorDetail || null)
+
     if (err.response?.status === 410) {
-      setApiError('This invitation has expired.')
+      setApiError(errorMessage || 'This invitation has expired.')
     } else if (err.response?.status === 409) {
-      setApiError('This invitation has already been accepted.')
+      setApiError(errorMessage || 'This invitation has already been accepted.')
+    } else if (err.response?.status === 403) {
+      setApiError(errorMessage || 'This invitation was sent to a different email address.')
     } else if (err.response?.status === 401) {
       // 401 means wrong password — account exists
       if (accountChoice === 'no_account') {
@@ -504,19 +510,19 @@ const data = isLogin
           'This email already has an account. Please go back and select "Yes, I have an account" instead.'
         )
       } else {
-        setApiError('Incorrect password. Please try again.')
+        setApiError(errorMessage || 'Incorrect password. Please try again.')
       }
     } else if (err.response?.status === 400) {
       // Backend says email already registered — on register path
       if (accountChoice === 'no_account') {
         setApiError(
-          'This email is already registered. Please go back and select "Yes, I have an account".'
+          errorMessage || 'This email is already registered. Please go back and select "Yes, I have an account".'
         )
       } else {
-        setApiError('Something went wrong. Please try again.')
+        setApiError(errorMessage || 'Something went wrong. Please try again.')
       }
     } else {
-      setApiError('Something went wrong. Please try again.')
+      setApiError(errorMessage || 'Something went wrong. Please try again.')
     }
   } finally {
     setLoading(false)
